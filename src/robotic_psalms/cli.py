@@ -2,15 +2,20 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional, Union
 
+import numpy as np
+import numpy.typing as npt
 import soundfile as sf
 import yaml
+from matplotlib import pyplot as plt
 
 from .config import PsalmConfig
 from .synthesis.sacred_machinery import SacredMachineryEngine
 
-def setup_logging(verbose: bool = False):
+AudioData = Dict[str, Union[npt.NDArray[np.float32], int]]
+
+def setup_logging(verbose: bool = False) -> None:
     """Configure logging"""
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
@@ -39,7 +44,7 @@ def load_lyrics(lyrics_path: Path) -> str:
         logging.error(f"Failed to load lyrics from {lyrics_path}: {str(e)}")
         sys.exit(1)
 
-def save_audio(audio_path: Path, audio_data: dict):
+def save_audio(audio_path: Path, audio_data: AudioData) -> None:
     """Save audio files"""
     try:
         # Save stems
@@ -50,23 +55,26 @@ def save_audio(audio_path: Path, audio_data: dict):
             if name == 'sample_rate':
                 continue
                 
-            stem_path = stems_dir / f"{name}.wav"
-            sf.write(stem_path, data, audio_data['sample_rate'])
-            logging.info(f"Saved {name} stem to {stem_path}")
+            if isinstance(data, np.ndarray):
+                stem_path = stems_dir / f"{name}.wav"
+                sf.write(stem_path, data, audio_data['sample_rate'])
+                logging.info(f"Saved {name} stem to {stem_path}")
             
         # Save combined mix
-        sf.write(audio_path, audio_data['combined'], audio_data['sample_rate'])
+        sf.write(
+            audio_path, 
+            audio_data['combined'],
+            audio_data['sample_rate']
+        )
         logging.info(f"Saved combined mix to {audio_path}")
         
     except Exception as e:
         logging.error(f"Failed to save audio: {str(e)}")
         sys.exit(1)
 
-def generate_waveform(audio_path: Path):
+def generate_waveform(audio_path: Path) -> None:
     """Generate waveform visualization"""
     try:
-        import matplotlib.pyplot as plt
-        
         # Load audio
         audio, sr = sf.read(audio_path)
         
@@ -78,7 +86,7 @@ def generate_waveform(audio_path: Path):
         plt.ylabel("Amplitude")
         
         # Add glitch art effect
-        for i in range(10):
+        for _ in range(10):
             x = np.random.randint(0, len(audio))
             w = np.random.randint(100, 1000)
             plt.axvspan(x, x + w, alpha=0.1, color='red')
@@ -91,7 +99,7 @@ def generate_waveform(audio_path: Path):
     except Exception as e:
         logging.error(f"Failed to generate waveform: {str(e)}")
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate ethereal computerized vocal arrangements of Latin psalms"
     )
@@ -153,7 +161,7 @@ def main():
         result = engine.process_psalm(lyrics, args.duration)
         
         # Prepare audio data for saving
-        audio_data = {
+        audio_data: AudioData = {
             'combined': result.combined,
             'vocals': result.vocals,
             'pads': result.pads,

@@ -1,0 +1,32 @@
+# Robotic Psalms Configuration
+
+# Liturgical mode selection
+mode: "dorian"
+tempo_scale: 0.8  # Slower, more ethereal tempo
+
+# Effect densities
+glitch_density: 0.4
+celestial_harmonicity: 0.7  # More sawtooth character
+
+# Voice articulation
+robotic_articulation:
+  phoneme_spacing: 1.2  # Slightly stretched phonemes
+  consonant_harshness: 0.3  # Softer consonants
+
+# Ethereal qualities
+haunting_intensity:
+  reverb_decay: 8.0  # Long reverb tail
+  spectral_freeze: 0.4  # Moderate spectral freezing
+
+# Voice character blend
+vocal_timbre:
+  choirboy: 0.4  # Emphasis on choir-like qualities
+  android: 0.4
+  machinery: 0.2  # Subtle mechanical undertones
+
+# MIDI control mapping
+midi_mapping:
+  glitch_density: 1
+  harmonicity: 2
+  articulation: 3
+  haunting: 4

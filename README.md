@@ -27,51 +27,61 @@ Generate ethereal computerized vocal arrangements of Latin psalms in the style o
   - Waveform visualization
   - Automatic mode documentation
 
-## Installation
+## System Requirements
 
-```bash
-# Clone the repository
-git clone https://github.com/username/robotic-psalms.git
-cd robotic-psalms
+Before installing the Python package, you need to install the following system dependencies:
 
-# Create a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+### Required System Packages
 
-# Install dependencies
-pip install -e .
-```
+1. **Text-to-Speech Engines**
+   - eSpeak: Required for primary vocal synthesis
+   - Festival: Required for secondary vocal synthesis
 
-### System Requirements
+2. **Audio Libraries**
+   - PortAudio: Required for real-time audio processing
 
-- Python 3.9+
-- eSpeak and Festival TTS engines
-- PortAudio (for real-time audio)
-
-#### Installing TTS Engines
+#### Installing System Dependencies
 
 Ubuntu/Debian:
 ```bash
-sudo apt-get install espeak festival
+# Install TTS engines and audio libraries
+sudo apt-get update
+sudo apt-get install espeak festival portaudio19-dev
 ```
 
 macOS:
 ```bash
-brew install espeak festival
+# Install TTS engines and audio libraries
+brew install espeak festival portaudio
+```
+
+### Python Requirements
+- Python 3.9 or higher
+- Virtual environment recommended
+
+## Installation
+
+1. Create and activate a virtual environment:
+```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+2. Install the package in development mode:
+```bash
+pip install -e .
 ```
 
 ## Usage
 
-Basic usage with default settings:
+After installation, the `robotic-psalms` command will be available in your terminal:
 
 ```bash
-robotic-psalms psalm.txt output.wav
-```
+# Basic usage with default settings
+robotic-psalms examples/psalm.txt output.wav
 
-Using custom configuration:
-
-```bash
-robotic-psalms psalm.txt output.wav --config config.yml --duration 180 --visualize
+# Using custom configuration and visualization
+robotic-psalms examples/psalm.txt output.wav --config examples/config.yml --duration 180 --visualize
 ```
 
 ### Configuration
@@ -155,6 +165,42 @@ Blend between three voice characteristics:
 - `choirboy`: Pure, angelic qualities
 - `android`: Synthetic, processed sound
 - `machinery`: Mechanical, industrial tones
+
+## Development
+
+To install development dependencies:
+
+```bash
+pip install -e ".[dev]"
+```
+
+This will install additional tools:
+- pytest: For running tests
+- black: Code formatting
+- isort: Import sorting
+- mypy: Type checking
+
+## Troubleshooting
+
+### Common Issues
+
+1. **TTS Engine Not Found**
+   ```
+   VoxDeiSynthesisError: eSpeak initialization failed
+   ```
+   Solution: Ensure eSpeak is installed: `sudo apt-get install espeak`
+
+2. **PortAudio Not Found**
+   ```
+   OSError: PortAudio library not found
+   ```
+   Solution: Install PortAudio: `sudo apt-get install portaudio19-dev`
+
+3. **Festival Not Running**
+   ```
+   VoxDeiSynthesisError: Festival initialization failed
+   ```
+   Solution: Ensure Festival is installed and running: `sudo apt-get install festival`
 
 ## Contributing
 

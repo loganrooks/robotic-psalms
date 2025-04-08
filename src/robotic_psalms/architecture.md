@@ -79,8 +79,8 @@ voice:
 ## Technical Dependencies
 - Audio: numpy, scipy, librosa
 - MIDI: mido, python-rtmidi
-- Synthesis: sounddevice, pyDynaMix
-- Text: espeak, festival
+- Synthesis: sounddevice
+- Text: espeakng (Python wrapper for system `espeak-ng`)
 - Config: pyyaml, pydantic
 
 ## Implementation Notes
@@ -88,3 +88,5 @@ voice:
 2. Implement thread-safe parameter controls
 3. Cache frequently used audio samples
 4. Monitor CPU/memory usage for stability
+5. **Refactoring Note (April 2025):** The TTS engine was refactored to use the `espeakng` Python wrapper interacting with the system's `espeak-ng` command-line tool, resolving previous stability issues. Festival is no longer used.
+6. **Future Direction:** Subsequent development aims to enhance artistic expression through improved effects (reverb, formant shifting), complex ambient layers, and melodic control, as detailed in `artistic_specification.md`.

@@ -80,3 +80,15 @@
 ### [2025-04-08 12:19:01] - Task: Refine Specifications for "Odi et Amo" Aesthetic
 - **Focus:** Analyze target aesthetic, review current capabilities (`README.md`, `project_specification.md`, `config.py`, `vox_dei.py`, `sacred_machinery.py`), identify gaps, define new artistic requirements (including melodic control), and create `artistic_specification.md`.
 - **Status:** `artistic_specification.md` created. Preparing to generate pseudocode for high-priority artistic requirements (starting with REQ-ART-E01: High-Quality Reverb).
+
+
+
+### [2025-04-08 12:31:14] - Task: Update Project Documentation (Current State & Roadmap)
+- **Focus:** Update `README.md` and `src/robotic_psalms/architecture.md` to reflect the use of `espeakng` (sayak-brm wrapper) and outline future artistic goals from `artistic_specification.md`.
+- **Actions:**
+    - Confirmed `espeakng` dependency in `pyproject.toml`.
+    - Read `artistic_specification.md` for future goals.
+    - Created `docs/index.md` as a placeholder for detailed documentation.
+    - Updated `README.md`: System Requirements, Python Requirements, Installation, Troubleshooting, Acknowledgments, added Development Status/Roadmap section, added link to `docs/index.md`.
+    - Updated `src/robotic_psalms/architecture.md`: Technical Dependencies, added Implementation Notes on refactoring and future direction.
+- **Status:** Documentation files updated. Preparing Memory Bank update and task completion.

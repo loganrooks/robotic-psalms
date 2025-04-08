@@ -4,6 +4,10 @@
 
 ---
 
+
+### Plan Item: Update Core Documentation - [2025-04-08 12:31:26]
+- **Type**: Guide / **Audience**: User/Dev / **Outline**: 1. Update README (Requirements, Install, Troubleshooting, Roadmap) 2. Update architecture.md (Dependencies, Notes) 3. Create docs/index.md / **Status**: Done / **Owner**: docs-writer / **Source**: User Task / **Location**: README.md, src/robotic_psalms/architecture.md, docs/index.md
+
 ## Documentation Scope
 <!-- Describe the documentation task -->
 
@@ -15,3 +19,10 @@
 
 ## Source Material Notes
 <!-- Link to relevant code, specs, or discussions -->
+
+## Documentation Maintenance & Updates
+
+### Update: Refine README.md - [2025-04-08 12:44:31]
+- **Item:** Refined `README.md` for clarity regarding `espeakng` dependency.
+- **Details:** Updated System Requirements, Python Requirements, Troubleshooting, and Acknowledgments sections to specify the correct `espeakng` Python wrapper (`sayak-brm/espeakng-python`), add relevant links, and provide more specific troubleshooting advice.
+- **Status:** Completed.

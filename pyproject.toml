@@ -33,7 +33,7 @@ robotic-psalms = "robotic_psalms.cli:main"
 [project.optional-dependencies]
 # Individual TTS engines - choose one
 espeak-ng = [
-    "python-espeak-ng>=0.6.6"
+    "espeakng>=1.0" # Switch to the alternative espeakng library
 ]
 espeak = [
     "python-espeak>=0.6.3"

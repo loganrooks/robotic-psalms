@@ -31,3 +31,74 @@
 - **Green**: Implementation approach: Next step is to implement minimal code in `EspeakNGWrapper`, `VoxDeiSynthesizer`, and `SacredMachineryEngine` to make these tests pass.
 - **Refactor**: Improvements made: N/A (Red phase only)
 - **Outcomes**: Established test harness for vocal synthesis pipeline.
+
+
+
+### TDD Cycle: Improve TTS Coverage - 2025-04-08 10:41:13
+- **Start**: 2025-04-08 10:27:02
+- **End**: 2025-04-08 10:41:13
+- **Red**: Identified coverage gaps in `espeak.py` (error handling, params, audio processing) and `vox_dei.py` (init errors, synth errors, processing edge cases). Wrote failing tests using mocks for these scenarios.
+- **Green**: Fixed int16 scaling bug in `espeak.py` (`synth` method) to pass `test_synth_handles_int16`. Added `# type: ignore` to resolve persistent Pylance error with `np.iinfo`. Added `cast` in `sacred_machinery.py` to resolve Pylance error.
+- **Refactor**: N/A (Focus was on adding tests and fixing related issues).
+- **Outcomes**: Significantly improved test coverage for TTS components, increasing confidence in error handling and processing logic. Addressed static analysis issues.
+
+## Test Coverage Summary
+
+
+### TDD Cycle: Improve Sacred Machinery Coverage - 2025-04-08 10:49:49
+- **Start**: 2025-04-08 10:42:44
+- **End**: 2025-04-08 10:49:49
+- **Red**: Identified low coverage in `sacred_machinery.py`. Wrote new tests in `test_sacred_machinery.py` covering `process_psalm`, effects, generation, and helpers, using mocks.
+- **Green**: Debugged and fixed test failures caused by incorrect mocking strategy (`@patch.object` vs instance patching) and Pydantic validation errors (`reverb_decay` minimum value). Corrected assertions for mix level testing.
+- **Refactor**: Rewrote `test_sacred_machinery.py` to use actual implementations with appropriate mocking instead of placeholder mocks.
+- **Outcomes**: Significantly improved test coverage for `sacred_machinery.py` (13% to 73%). All tests passing.
+
+
+### TDD Cycle: Improve Sacred Machinery Coverage - 2025-04-08 10:49:49
+- **Start**: 2025-04-08 10:42:44
+- **End**: 2025-04-08 10:49:49
+- **Red**: Identified low coverage in `sacred_machinery.py`. Wrote new tests in `test_sacred_machinery.py` covering `process_psalm`, effects, generation, and helpers, using mocks.
+- **Green**: Debugged and fixed test failures caused by incorrect mocking strategy (`@patch.object` vs instance patching) and Pydantic validation errors (`reverb_decay` minimum value). Corrected assertions for mix level testing.
+
+
+### Coverage Update: 2025-04-08 10:49:49
+- **Overall**: Line: [77%] / Branch: [N/A] / Function: [N/A]
+- **By Component**: `sacred_machinery.py`: [73%], `espeak.py`: [94%], `vox_dei.py`: [95%]
+- **Areas Needing Attention**: `cli.py` and `__main__.py` remain untested. Some complex internal logic in `sacred_machinery.py` (generation, effects) might still have uncovered edge cases.
+- **Refactor**: Rewrote `test_sacred_machinery.py` to use actual implementations with appropriate mocking instead of placeholder mocks.
+- **Outcomes**: Significantly improved test coverage for `sacred_machinery.py` (13% to 73%). All tests passing.
+<!-- Update coverage summary using the format below -->
+
+### Coverage Update: 2025-04-08 10:41:13
+- **Overall**: Line: [58%] / Branch: [N/A] / Function: [N/A] (Note: Branch/Function data not available from basic cov report)
+- **By Component**: `espeak.py`: [94%], `vox_dei.py`: [95%]
+- **Areas Needing Attention**: `sacred_machinery.py` remains low (13%). Some complex internal logic in `vox_dei.py` (formant shift, timbre blend normalisation) might still have uncovered edge cases.
+
+
+
+
+### Test Run: 2025-04-08 10:49:49
+- **Trigger**: Manual / **Env**: Local / **Suite**: tests/
+- **Result**: PASS / **Summary**: 41 Passed / 0 Failed / 0 Skipped
+- **Report Link**: N/A / **Failures**: None
+
+### Coverage Update: 2025-04-08 10:49:49
+- **Overall**: Line: [77%] / Branch: [N/A] / Function: [N/A]
+- **By Component**: `sacred_machinery.py`: [73%], `espeak.py`: [94%], `vox_dei.py`: [95%]
+- **Areas Needing Attention**: `cli.py` and `__main__.py` remain untested. Some complex internal logic in `sacred_machinery.py` (generation, effects) might still have uncovered edge cases.
+## Test Fixtures
+<!-- Append new fixtures using the format below -->
+
+## Test Execution Results
+<!-- Append test run summaries using the format below -->
+
+### Test Run: 2025-04-08 10:41:13
+- **Trigger**: Manual / **Env**: Local / **Suite**: tests/synthesis/
+- **Result**: PASS / **Summary**: 30 Passed / 0 Failed / 0 Skipped
+- **Report Link**: N/A / **Failures**: None
+
+
+### Test Run: 2025-04-08 10:49:49
+- **Trigger**: Manual / **Env**: Local / **Suite**: tests/
+- **Result**: PASS / **Summary**: 41 Passed / 0 Failed / 0 Skipped
+- **Report Link**: N/A / **Failures**: None

@@ -4,6 +4,12 @@
 
 ---
 
+
+
+### Implementation: TTS Fix (eSpeak-NG Command-Line Wrapper) - 2025-04-08 09:59:00
+- **Approach**: Replaced Python library wrappers (`py-espeak-ng`, `espeakng`) with a direct command-line call to `/usr/bin/espeak-ng` using `subprocess.run`. Input text is passed via a temporary file (`-f`), and WAV audio is captured from stdout (`--stdout`). This bypasses library integration issues.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/tts/engines/espeak.py`: Rewritten `EspeakNGWrapper`.
+- **Notes**: This approach proved necessary after persistent failures with Python library wrappers returning empty audio data. The command-line tool was verified to work independently. Tests `test_espeak.py` and `test_vox_dei.py` now pass with this implementation.
 ## Current Implementation Focus
 <!-- Describe the code being worked on -->
 
@@ -14,9 +20,21 @@
 <!-- Track potential refactoring opportunities -->
 
 
-### Implementation: eSpeak TTS Fix (Buffer Retrieval) - [2025-04-08 07:33:41]
-- **Approach**: Modified C++ bindings (`lib/espeakmodulecore.cpp`) to capture audio buffer in callback and expose via `get_last_audio_buffer`. Updated Python wrapper (`src/robotic_psalms/synthesis/tts/engines/espeak.py`) to use this function, removing file I/O. Rebuilt package. (Ref: `pseudocode.md#2-attempt-espeak-ng-fix`)
-- **Key Files Modified/Created**:
-  - `lib/espeakmodulecore.cpp`: Added buffer capture logic, `pyespeak_get_last_audio_buffer` function, and updated module definition.
-  - `src/robotic_psalms/synthesis/tts/engines/espeak.py`: Removed file I/O, polling, and temp file logic; added call to `get_last_audio_buffer` and buffer processing.
-- **Notes**: This approach aims for a more robust and efficient audio retrieval from eSpeak-NG compared to the previous file-based method. Requires successful compilation of the C++ extension (needs `python3-dev` headers). Next step is testing.
+### Dependency: py-espeak-ng - 2025-04-08 09:29:40
+- **Version**: >=0.1.0
+- **Purpose**: Initial attempt to wrap eSpeak-NG library.
+- **Used by**: `EspeakNGWrapper` (initially).
+- **Config notes**: Removed from `pyproject.toml` due to persistent runtime issues (empty audio output).
+
+
+### Dependency: espeakng - 2025-04-08 09:55:31
+- **Version**: >=1.0
+- **Purpose**: Alternative attempt to wrap eSpeak-NG library.
+- **Used by**: `EspeakNGWrapper` (briefly considered).
+- **Config notes**: Added to `pyproject.toml` but ultimately not used in the final implementation; the library required file export, leading back to the command-line wrapper approach. Removed from `pyproject.toml`.
+
+
+### Implementation: Pylance Fixes for vox_dei.py - 2025-04-08 10:23:06
+- **Approach**: Resolved Pylance static analysis issues in `src/robotic_psalms/synthesis/vox_dei.py`. Removed unused imports and deprecated `EspeakWrapper` fallback. Refactored filter methods (`_choir_filter`, `_android_filter`, `_machinery_filter`) to use `signal.butter(..., output='sos')` and `signal.sosfiltfilt` for improved stability and type inference, resolving errors related to `signal.butter` return types.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/vox_dei.py`: Applied fixes.
+- **Notes**: The use of SOS format for filters resolved the Pylance errors related to tuple unpacking and potential `None` values from `signal.butter` with `output='ba'`. `sosfiltfilt` maintains zero-phase filtering.

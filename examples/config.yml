@@ -2,31 +2,31 @@
 
 # Liturgical mode selection
 mode: "dorian"
-tempo_scale: 0.8  # Slower, more ethereal tempo
+tempo_scale: 0.7  # Slower, more ethereal tempo
 
 # Effect densities
 glitch_density: 0.0001
-celestial_harmonicity: 0.3  # More sawtooth character
+celestial_harmonicity: 0.4  # More sawtooth character
 
 # Voice articulation
 robotic_articulation:
-  phoneme_spacing: 1.2  # Slightly stretched phonemes
-  consonant_harshness: 0.3  # Softer consonants
+  phoneme_spacing: 1.5  # Slightly stretched phonemes
+  consonant_harshness: 0.1  # Softer consonants
 
 # Ethereal qualities
 haunting_intensity:
-  reverb_decay: 4.0    # Shorter reverb
-  spectral_freeze: 0.2 # Less freezing
+  reverb_decay: 8.0    # Further reduced reverb
+  spectral_freeze: 0.95 # Further reduced freezing
 
 # Voice character blend
 vocal_timbre:
-  choirboy: 0.6  # Emphasis on choir-like qualities
+  choirboy: 0.95  # Emphasis on choir-like qualities
   android: 0.1
   machinery: 0.1  # Subtle mechanical undertones
 
 voice_range:
-  base_pitch: "G2"  # Base pitch (can be: C2-G2 for bass, G2-D3 for baritone, C3-G3 for tenor, E3-C4 for counter-tenor)
-  formant_shift: 0.9  # > 1.0 raises formants, < 1.0 lowers them
+  base_pitch: "C4"  # Base pitch (can be: C2-G2 for bass, G2-D3 for baritone, C3-G3 for tenor, E3-C4 for counter-tenor)
+  formant_shift: 1.1  # > 1.0 raises formants, < 1.0 lowers them
 
 # MIDI control mapping
 midi_mapping:

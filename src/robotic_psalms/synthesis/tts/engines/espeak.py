@@ -1,449 +1,169 @@
 """eSpeak wrapper implementations"""
-import importlib
 import logging
-from pathlib import Path
-import time
-from typing import Any, List, Optional
-import struct
-import wave
+from typing import Optional
+import subprocess
+import io
+import os
 import tempfile
+import shlex # For safe command construction
 
 import numpy as np
 import numpy.typing as npt
 import soundfile as sf
+
 from ..base import TTSEngine, ParameterEnum
 
+# EspeakNGWrapper using command-line execution
+class EspeakNGWrapper(TTSEngine):
+    """espeak-ng wrapper implementation using direct command-line execution."""
+    Parameter = ParameterEnum.RATE # Satisfy protocol
 
-class EspeakWrapperBase:
-    """Base wrapper for eSpeak engines"""
-    Parameter = ParameterEnum  # Use the base ParameterEnum
+    def __init__(self, voice: str = "en", rate: int = 175, pitch: int = 50, volume: int = 100) -> None:
+        """
+        Initializes the EspeakNGWrapper for command-line execution.
 
-    def __init__(self) -> None:
+        Args:
+            voice (str): Voice/language code (default: 'en').
+            rate (int): Speaking rate in words per minute (default: 175, espeak-ng default).
+            pitch (int): Pitch adjustment (0-99, default: 50).
+            volume (int): Amplitude adjustment (0-200, default: 100).
+        """
         self.logger = logging.getLogger(__name__)
-        self._engine: Optional[Any] = None
-        self._wave_data: List[bytes] = []
-        self._pcm_path: Optional[Path] = None
-        self._wav_path: Optional[Path] = None
-        self._samplerate: int = 22050 # Default sample rate
+        self.voice = voice
+        self.rate = rate
+        self.pitch = pitch
+        self.volume = volume # Corresponds to espeak-ng -a flag (amplitude)
+        self.espeak_cmd = "/usr/bin/espeak-ng" # Path confirmed earlier
+        self.input_file_path: Optional[str] = None # Initialize temporary file path tracker
 
-    def synth(self, text: str) -> npt.NDArray[np.float32]:
-        """Synthesize text using NG API - Base implementation (should be overridden)"""
-        if not self._engine:
-            return np.array([], dtype=np.float32)
-
-        # This base method is not intended for direct use after NG wrapper changes.
-        # Returning empty array directly. The functional implementation is in EspeakNGWrapper.
-        self.logger.warning("EspeakWrapperBase.synth called directly - returning empty array.")
-        return np.array([], dtype=np.float32)
+        # Verify command exists
+        if not os.path.exists(self.espeak_cmd):
+             self.logger.error(f"espeak-ng command not found at {self.espeak_cmd}")
+             # Optionally try finding in PATH if absolute path fails? For now, rely on the known path.
+             raise FileNotFoundError(f"espeak-ng command not found at {self.espeak_cmd}")
+        self.logger.info(f"EspeakNGWrapper initialized using command: {self.espeak_cmd}")
 
     def set_voice(self, voice: str) -> None:
-        """Set voice language - base implementation"""
-        pass
-
-    def set_parameter(self, param: ParameterEnum, value: int) -> None:
-        """Set synthesis parameters - base implementation"""
-        pass
-
-    def cleanup(self):
-        """Clean up temporary files if they exist."""
-        if hasattr(self, '_pcm_path') and self._pcm_path and self._pcm_path.exists():
-            try:
-                self.logger.debug(f"Cleaning up PCM file: {self._pcm_path}")
-                self._pcm_path.unlink()
-            except OSError as e:
-                self.logger.error(f"Error deleting PCM file {self._pcm_path}: {e}")
-        if hasattr(self, '_wav_path') and self._wav_path and self._wav_path.exists():
-             try:
-                 self.logger.debug(f"Cleaning up WAV file: {self._wav_path}")
-                 self._wav_path.unlink()
-             except OSError as e:
-                 self.logger.error(f"Error deleting WAV file {self._wav_path}: {e}")
-        # Reset paths
-        self._pcm_path = None
-        self._wav_path = None
-
-    def __del__(self):
-        """Ensure temporary files are cleaned up on object deletion."""
-        self.cleanup()
-
-
-class EspeakNGWrapper(EspeakWrapperBase, TTSEngine):
-    """espeak-ng wrapper implementation using improved file handling"""
-    def __init__(self) -> None:
-        super().__init__()
-        self._speaker: Optional[Any] = None # Initialize speaker attribute
-        try:
-            self.logger.debug("Attempting to import espeak-ng module")
-            # The actual module name might be 'espeakng' or similar depending on the binding
-            try:
-                espeak = importlib.import_module('espeakng') # Try 'espeakng' first
-                self.logger.info("Imported 'espeakng' module.")
-            except ImportError:
-                self.logger.warning("Failed to import 'espeakng', trying 'espeak'.")
-                espeak = importlib.import_module('espeak') # Fallback to 'espeak'
-                self.logger.info("Imported 'espeak' module.")
-
-            # Initialize core with RETRIEVAL mode (no playback)
-            self.logger.debug("Initializing espeak core")
-            # Check available initialization methods
-            samplerate = -1 # Initialize samplerate
-            if hasattr(espeak, 'core') and hasattr(espeak.core, 'initialize'):
-                 # Newer python-espeak-ng structure
-                 # Need to figure out the correct arguments for initialize
-                 # Assuming it might take options or path like the older one
-                 # Let's try initializing without arguments first if possible,
-                 # or check the signature if available.
-                 # For now, assume it returns samplerate directly or needs mode.
-                 # Trying with AUDIO_OUTPUT_RETRIEVAL if it's defined at the top level
-                 audio_output_mode = getattr(espeak, 'AUDIO_OUTPUT_RETRIEVAL', 1) # Default to 1 if not found
-                 samplerate = espeak.core.initialize(audio_output_mode)
-                 self._engine = espeak.core # Store the core module
-                 self.logger.debug(f"Initialized espeak core (new API), samplerate: {samplerate}")
-            elif hasattr(espeak, 'initialize'):
-                 # Older structure or direct binding
-                 audio_output_mode = getattr(espeak, 'AUDIO_OUTPUT_RETRIEVAL', 1)
-                 samplerate = espeak.initialize(audio_output_mode)
-                 self._engine = espeak # Store the main module
-                 self.logger.debug(f"Initialized espeak core (old API), samplerate: {samplerate}")
-            else:
-                 raise ImportError("Could not find a suitable initialize function in espeak/espeakng module.")
-
-            if not isinstance(samplerate, int) or samplerate <= 0:
-                # Attempt to get samplerate via get_parameter if init didn't return it
-                if hasattr(self._engine, 'get_parameter') and hasattr(self._engine, 'SAMPLERATE'):
-                     try:
-                         samplerate = self._engine.get_parameter(self._engine.SAMPLERATE, 1)
-                         self.logger.info(f"Retrieved samplerate via get_parameter: {samplerate}")
-                     except Exception as e_param:
-                          self.logger.warning(f"Could not get samplerate via get_parameter: {e_param}")
-                          samplerate = -1 # Indicate failure
-                if samplerate <= 0 :
-                     self.logger.warning(f"eSpeak initialization returned invalid/unknown samplerate: {samplerate}. Defaulting to 22050.")
-                     samplerate = 22050 # Fallback default
-
-            self._samplerate = samplerate # Store the reported or default sample rate
-
-            # Use tempfile for unique paths
-            with tempfile.NamedTemporaryFile(suffix=".pcm", delete=False) as pcm_file:
-                self._pcm_path = Path(pcm_file.name)
-            self._wav_path = self._pcm_path.with_suffix(".wav")
-            self.logger.debug(f"Using temporary PCM path: {self._pcm_path}")
-            self.logger.debug(f"Using temporary WAV path: {self._wav_path}")
-
-            # Create speaker instance (if applicable, structure varies)
-            if hasattr(espeak, 'Espeak'):
-                self._speaker = espeak.Espeak() # Older structure?
-                self.logger.debug("Created espeak.Espeak() instance.")
-            # Check if synth is directly on the engine object we stored
-            elif hasattr(self._engine, 'synth'):
-                 self._speaker = None # No separate speaker object needed
-                 self.logger.debug("Using direct engine.synth() method.")
-            else:
-                 raise ImportError("Could not find a way to synthesize (no Espeak class or engine.synth).")
-
-            # Configure speaker parameters if speaker object exists
-            if self._speaker and hasattr(self._speaker, 'param'):
-                self._speaker.param = {
-                    'rate': 150,
-                    'pitch': 50,
-                    'volume': 200  # Maximum volume
-                }
-                self.logger.debug("Set parameters on speaker object.")
-
-            # Set wave output path for PCM data using the unique temp path
-            self.logger.debug(f"Setting wave output filename to {self._pcm_path}")
-            assert self._engine is not None, "Engine should be initialized before setting wave filename"
-            if hasattr(self._engine, 'set_wave_filename'):
-                 self._engine.set_wave_filename(str(self._pcm_path))
-                 self.logger.debug("Set wave filename via engine.set_wave_filename()")
-            else:
-                 self.logger.error("Unable to set wave output filename via engine.")
-                 raise RuntimeError("Cannot set espeak wave output filename.")
-
-        except (ImportError, RuntimeError, AttributeError) as e:
-            self.logger.error(f"Failed to initialize espeak-ng wrapper: {e}", exc_info=True)
-            self._engine = None
-            self._speaker = None
-            self.cleanup() # Clean up temp files if init fails
-            raise # Re-raise the exception
-
-    def _pcm_to_wav(self, pcm_path: Path, wav_path: Path, samplerate: int) -> None:
-        """Convert raw PCM (16-bit mono) to WAV format"""
-        self.logger.debug(f"Converting PCM '{pcm_path}' to WAV '{wav_path}' at {samplerate} Hz")
-        try:
-            with open(pcm_path, 'rb') as pcm_file:
-                pcm_data = pcm_file.read()
-
-            if not pcm_data:
-                self.logger.warning("PCM file is empty, cannot convert to WAV.")
-                # Create an empty WAV file to avoid downstream errors maybe?
-                with wave.open(str(wav_path), 'wb') as wav_file:
-                     wav_file.setnchannels(1)
-                     wav_file.setsampwidth(2)
-                     wav_file.setframerate(samplerate)
-                     wav_file.writeframes(b'') # Write empty frames
-                return
-
-            with wave.open(str(wav_path), 'wb') as wav_file:
-                wav_file.setnchannels(1)  # Mono
-                wav_file.setsampwidth(2)  # 16-bit
-                wav_file.setframerate(samplerate)
-                wav_file.writeframes(pcm_data)
-            self.logger.debug("PCM to WAV conversion successful.")
-        except Exception as e:
-            self.logger.error(f"PCM to WAV conversion failed: {e}", exc_info=True)
-            # Attempt to clean up potentially corrupted WAV file
-            if wav_path.exists():
-                try:
-                    wav_path.unlink()
-                except OSError:
-                    pass
-            raise # Re-raise the exception
-
-    def set_voice(self, voice: str) -> None:
-        """Set voice language"""
-        if not self._engine: return
+        """Set voice language."""
         self.logger.debug(f"Setting voice to: {voice}")
-        try:
-            if self._speaker and hasattr(self._speaker, 'voice'):
-                # Assumes voice setting is via speaker object property
-                self._speaker.voice = {"language": voice}
-            elif hasattr(self._engine, 'set_voice_by_name'):
-                 # Assumes voice setting is via core engine function
-                 self._engine.set_voice_by_name(voice)
-            else:
-                 self.logger.warning("Could not determine how to set voice.")
-        except Exception as e:
-            self.logger.error(f"Failed to set voice to '{voice}': {e}", exc_info=True)
-
+        self.voice = voice
 
     def set_parameter(self, param: ParameterEnum, value: int) -> None:
-        """Set synthesis parameters"""
-        if not self._engine: return
+        """Set synthesis parameters."""
+        if param == ParameterEnum.RATE:
+            # espeak-ng speed: words per minute (80-?)
+            value = max(80, value) # Clamp lower bound
+            self.logger.debug(f"Setting rate (speed) to {value}")
+            self.rate = value
+        elif param == ParameterEnum.PITCH:
+            # espeak-ng pitch: 0-99
+            value = max(0, min(value, 99)) # Clamp value
+            self.logger.debug(f"Setting pitch to {value}")
+            self.pitch = value
+        elif param == ParameterEnum.VOLUME:
+            # espeak-ng amplitude: 0-200
+            value = max(0, min(value, 200)) # Clamp value
+            self.logger.debug(f"Setting volume (amplitude) to {value}")
+            self.volume = value
+        else:
+            self.logger.warning(f"Unsupported parameter: {param}")
 
-        param_map_speaker = {
-            ParameterEnum.RATE: 'rate',
-            ParameterEnum.PITCH: 'pitch',
-            ParameterEnum.VOLUME: 'volume'
-        }
-        # Mapping for core engine parameters (constants might differ)
-        # Need to access constants via the imported module, not self._engine directly initially
-        espeak_module = None
+    def synth(self, text: str) -> tuple[npt.NDArray[np.float32], int]:
+        """Synthesize text using espeak-ng command and return audio data and sample rate."""
+        self.input_file_path = None # Reset path for each call
+
+        # Use a temporary file for the input text to handle potential command length limits and special characters
         try:
-            espeak_module = importlib.import_module('espeakng')
-        except ImportError:
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix=".txt", encoding='utf-8') as temp_input_file:
+                temp_input_file.write(text)
+                self.input_file_path = temp_input_file.name # Assign path here
+            self.logger.debug(f"Using temporary file for input: {self.input_file_path}")
+
+            command_list = [
+                self.espeak_cmd,
+                "-v", self.voice,
+                "-s", str(self.rate),    # Speed flag
+                "-p", str(self.pitch),   # Pitch flag
+                "-a", str(self.volume),  # Amplitude flag
+                "-f", self.input_file_path,   # Read text from file
+                "--stdout"               # Output WAV to stdout
+            ]
+
+            self.logger.debug(f"Executing command: {' '.join(shlex.quote(arg) for arg in command_list)}")
+
+            # Execute the command
+            result = subprocess.run(command_list, capture_output=True, check=False) # check=False to inspect errors manually
+
+            # Check for errors
+            if result.returncode != 0:
+                error_message = result.stderr.decode('utf-8', errors='ignore').strip()
+                self.logger.error(f"espeak-ng command failed (code {result.returncode}): {error_message}")
+                return np.array([], dtype=np.float32), 0 # Return empty array and 0 sample rate on error
+
+            wav_bytes = result.stdout
+            if not wav_bytes:
+                self.logger.error("espeak-ng command succeeded but produced empty stdout.")
+                return np.array([], dtype=np.float32), 0 # Return empty array and 0 sample rate on error
+
+            # Process the WAV bytes
             try:
-                espeak_module = importlib.import_module('espeak')
-            except ImportError:
-                 self.logger.error("Cannot import espeak/espeakng module for parameter constants.")
-                 return
+                audio_data, sample_rate = sf.read(io.BytesIO(wav_bytes))
+                self.logger.debug(f"Read {len(audio_data)} samples at {sample_rate}Hz from espeak-ng stdout.")
 
-        param_map_core = {
-            ParameterEnum.RATE: getattr(espeak_module, 'RATE', None),
-            ParameterEnum.PITCH: getattr(espeak_module, 'PITCH', None),
-            ParameterEnum.VOLUME: getattr(espeak_module, 'VOLUME', None),
-        }
+                if audio_data.ndim > 1:
+                    audio_data = np.mean(audio_data, axis=1)
 
-        try:
-            if self._speaker and param in param_map_speaker:
-                param_name = param_map_speaker[param]
-                if hasattr(self._speaker, 'param') and isinstance(self._speaker.param, dict):
-                    self.logger.debug(f"Setting speaker param '{param_name}' to {value}")
-                    self._speaker.param[param_name] = value
-                else:
-                     self.logger.warning(f"Speaker object lacks 'param' dict attribute.")
-            elif param in param_map_core and param_map_core[param] is not None and hasattr(self._engine, 'set_parameter'):
-                 core_param_enum = param_map_core[param]
-                 self.logger.debug(f"Setting core param '{param.name}' (enum {core_param_enum}) to {value}")
-                 self._engine.set_parameter(core_param_enum, value, 0) # 0 for absolute
-            else:
-                 self.logger.warning(f"Could not set parameter '{param.name}'. No method found or enum missing.")
-
-        except Exception as e:
-             self.logger.error(f"Failed to set parameter {param.name} to {value}: {e}", exc_info=True)
-
-
-    def synth(self, text: str) -> npt.NDArray[np.float32]:
-        """Synthesize text using espeak API with improved file handling"""
-        if not self._engine:
-            self.logger.error("Synth called but engine not initialized.")
-            return np.array([], dtype=np.float32)
-
-        # Ensure temp file paths are valid and engine is available
-        if not self._pcm_path or not self._wav_path:
-             self.logger.error("Temporary file paths are not set.")
-             # Attempt to recreate them
-             try:
-                 assert self._engine is not None, "Engine must be initialized to recreate temp files"
-                 with tempfile.NamedTemporaryFile(suffix=".pcm", delete=False) as pcm_file:
-                     self._pcm_path = Path(pcm_file.name)
-                 self._wav_path = self._pcm_path.with_suffix(".wav")
-                 self.logger.info(f"Recreated temp paths: PCM={self._pcm_path}, WAV={self._wav_path}")
-                 # Re-set the filename in espeak
-                 if hasattr(self._engine, 'set_wave_filename'):
-                     self._engine.set_wave_filename(str(self._pcm_path))
-                 else:
-                      raise RuntimeError("Cannot set espeak wave output filename.")
-             except Exception as e:
-                 self.logger.critical(f"Failed to recreate temporary files: {e}", exc_info=True)
-                 return np.array([], dtype=np.float32)
-
-        # --- Main Synthesis Logic ---
-        pcm_path = self._pcm_path # Local variable for clarity
-        wav_path = self._wav_path # Local variable for clarity
-
-        try:
-            self.logger.debug(f"Synthesizing text to PCM file: {pcm_path} - Text: {text[:50]}...")
-            # Clear any previous temp file content before synthesis
-            if pcm_path.exists():
-                try:
-                    pcm_path.unlink()
-                except OSError as e:
-                    self.logger.warning(f"Could not delete old PCM file {pcm_path}: {e}")
-            if wav_path.exists():
-                 try:
-                     wav_path.unlink()
-                 except OSError as e:
-                     self.logger.warning(f"Could not delete old WAV file {wav_path}: {e}")
-
-            # Perform synthesis
-            if self._speaker:
-                self.logger.debug("Calling speaker.say()")
-                self._speaker.say(text)
-                # We might need to call sync here depending on the library version
-                if hasattr(self._speaker, 'sync'):
-                    self.logger.debug("Calling speaker.sync()")
-                    self._speaker.sync()
-            elif hasattr(self._engine, 'synth'):
-                 self.logger.debug("Calling engine.synth()")
-                 # Flags might be needed here? Check python-espeak-ng docs
-                 # Example: espeakCHARS_AUTO | espeakENDPAUSE
-                 # Need to import these constants if used.
-                 espeak_module = importlib.import_module(self._engine.__module__.split('.')[0])
-                 flags = getattr(espeak_module, 'espeakCHARS_AUTO', 0)
-                 self._engine.synth(text, flags=flags)
-                 # Sync might be needed here too
-                 if hasattr(self._engine, 'sync'):
-                     self.logger.debug("Calling engine.sync()")
-                     self._engine.sync()
-            else:
-                 raise RuntimeError("No valid synthesis method found.")
-
-            # Wait for PCM file with improved polling and timeout
-            max_wait_time = 15.0 # Increased timeout
-            poll_interval = 0.1 # seconds
-            start_time = time.time()
-            pcm_file_size = -1 # Use -1 to ensure first check logs size
-            logged_empty = False
-
-            self.logger.debug(f"Polling for PCM file: {pcm_path}")
-            while time.time() - start_time < max_wait_time:
-                try:
-                    if pcm_path.exists():
-                        current_size = pcm_path.stat().st_size
-                        if current_size > 0:
-                            # Check if size is stable for a short period
-                            time.sleep(poll_interval / 2) # Wait a bit more
-                            if pcm_path.exists() and pcm_path.stat().st_size == current_size: # Re-check existence
-                                self.logger.debug(f"PCM file found and size stable: {current_size} bytes.")
-                                break
-                            else: # File changed size or disappeared during the short wait
-                                pcm_file_size = pcm_path.stat().st_size if pcm_path.exists() else -1 # Update size if changed
-                                if pcm_file_size != -1:
-                                     self.logger.debug(f"PCM file growing/changing... Size: {pcm_file_size} bytes.")
-                                else:
-                                     self.logger.debug("PCM file disappeared during stability check.")
-                        elif not logged_empty: # File exists but is empty
-                            self.logger.debug("PCM file exists but is empty, waiting...")
-                            logged_empty = True # Log this only once
-                        # else: file is empty, already logged, continue waiting
-                    else:
-                        self.logger.debug("PCM file not found yet...")
-
-                except FileNotFoundError:
-                    self.logger.debug("PCM file disappeared during polling (or not found yet).")
-                except Exception as stat_e:
-                    self.logger.error(f"Error checking PCM file status: {stat_e}", exc_info=True)
-                    break # Stop polling on error
-
-                time.sleep(poll_interval)
-            else:
-                # Loop finished without break (timeout)
-                self.logger.error(f"PCM file '{pcm_path}' not created or finalized within {max_wait_time} seconds.")
-                self.cleanup() # Clean up potentially empty/partial files
-                return np.array([], dtype=np.float32)
-
-            # --- Process the audio file ---
-            try:
-                # Use the samplerate reported by espeak during initialization
-                samplerate = self._samplerate
-                self.logger.debug(f"Attempting to convert PCM to WAV at {samplerate} Hz.")
-                assert isinstance(pcm_path, Path), "PCM path should be a Path object here"
-                assert isinstance(wav_path, Path), "WAV path should be a Path object here"
-                self._pcm_to_wav(pcm_path, wav_path, samplerate=samplerate)
-
-                self.logger.debug(f"Reading WAV file: {wav_path}")
-                # Ensure the WAV path is valid before reading
-                if not wav_path.exists() or wav_path.stat().st_size == 0:
-                     raise ValueError(f"WAV file {wav_path} is missing or empty after conversion.")
-
-                audio, read_samplerate = sf.read(str(wav_path), dtype='float32')
-
-                if read_samplerate != samplerate:
-                     self.logger.warning(f"Read sample rate {read_samplerate} differs from expected {samplerate}. Check conversion.")
-                     # Consider resampling if critical:
-                     # num_samples = int(len(audio) * samplerate / read_samplerate)
-                     # audio = signal.resample(audio, num_samples)
-
-                # Ensure even number of samples (less critical now, but keep for safety?)
-                if len(audio) % 2 != 0:
-                    audio = audio[:-1]
-
-                # Boost volume
-                boost_factor = 4.0
-                audio = np.clip(audio * boost_factor, -1.0, 1.0)
-
-                if len(audio) == 0:
-                    raise ValueError("Audio data is empty after reading WAV.")
-
-                self.logger.debug(f"Successfully read {len(audio)} float samples, max amplitude: {np.max(np.abs(audio))}")
-                return audio.astype(np.float32)
+                # Check if data needs conversion and scaling
+                if audio_data.dtype.kind == 'i': # Check if it's an integer type
+                    # Scale integer types to [-1.0, 1.0] float range
+                    int_dtype = np.dtype(audio_data.dtype.type) # Explicitly create dtype object
+                    dtype_info = np.iinfo(int_dtype) # type: ignore
+                    max_val = float(dtype_info.max) # Use float for division
+                    audio_data = audio_data.astype(np.float32) / max_val
+                elif audio_data.dtype != np.float32:
+                    # Handle other non-float types if necessary
+                    audio_data = audio_data.astype(np.float32)
+                # Ensure it's float32 at the end
+                # Return both audio data and sample rate
+                return audio_data.astype(np.float32), sample_rate
 
             except Exception as e:
-                self.logger.error(f"Failed to process audio file: {e}", exc_info=True)
-                return np.array([], dtype=np.float32)
+                self.logger.error(f"Failed to read/process WAV bytes from espeak-ng: {e}")
+                return np.array([], dtype=np.float32), 0 # Return empty array and 0 sample rate on error
 
+        except FileNotFoundError:
+             # This shouldn't happen if __init__ check passes, but handle defensively
+            self.logger.error(f"espeak-ng command not found at {self.espeak_cmd} during synth.")
+            return np.array([], dtype=np.float32), 0 # Return empty array and 0 sample rate on error
         except Exception as e:
-            self.logger.error(f"Synthesis failed unexpectedly: {e}", exc_info=True)
-            return np.array([], dtype=np.float32)
+            self.logger.error(f"Unexpected error during espeak-ng synthesis: {e}")
+            return np.array([], dtype=np.float32), 0 # Return empty array and 0 sample rate on error
         finally:
-            # Ensure cleanup happens regardless of success or failure
-            self.logger.debug("Running cleanup in finally block.")
-            self.cleanup()
+            # Ensure temporary file is deleted
+            if self.input_file_path and os.path.exists(self.input_file_path):
+                try:
+                    os.remove(self.input_file_path)
+                    self.logger.debug(f"Removed temporary input file: {self.input_file_path}")
+                except OSError as e:
+                    self.logger.error(f"Error removing temporary file {self.input_file_path}: {e}")
 
 
-class EspeakWrapper(EspeakWrapperBase, TTSEngine):
-    """Legacy eSpeak wrapper: DO NOT USE"""
+# Keep the legacy wrapper for completeness, but mark as unused/deprecated clearly
+class EspeakWrapper(TTSEngine):
+    """Legacy eSpeak wrapper: DO NOT USE - Placeholder"""
+    Parameter = ParameterEnum.RATE # Satisfy protocol
+
     def __init__(self) -> None:
-        super().__init__()
         self.logger = logging.getLogger(__name__)
-        self.logger.warning("Using deprecated eSpeak wrapper")
-        self._engine = None # Explicitly set engine to None
+        self.logger.critical("Attempted to initialize DEPRECATED EspeakWrapper. This should not happen.")
+        # Raise an error to prevent accidental usage
+        raise NotImplementedError("EspeakWrapper is deprecated and non-functional.")
 
     def set_voice(self, voice: str) -> None:
-        """Set voice using espeak API"""
-        self.logger.warning("Attempted to use set_voice on deprecated EspeakWrapper.")
-        # if self._engine: # This will always be false
-        #     self._engine.set_voice(language=voice)
+        raise NotImplementedError("EspeakWrapper is deprecated.")
 
     def set_parameter(self, param: ParameterEnum, value: int) -> None:
-        """Set parameters using espeak API"""
-        self.logger.warning("Attempted to use set_parameter on deprecated EspeakWrapper.")
-        # if not self._engine: # This will always be true
-        #     return
-        # ... rest of original code ...
+        raise NotImplementedError("EspeakWrapper is deprecated.")
 
-    def synth(self, text: str) -> npt.NDArray[np.float32]:
-        """Synthesize text using espeak API"""
-        self.logger.error("Attempted to use synth on deprecated EspeakWrapper.")
-        return np.array([], dtype=np.float32)
+    def synth(self, text: str) -> tuple[npt.NDArray[np.float32], int]:
+        raise NotImplementedError("EspeakWrapper is deprecated.")

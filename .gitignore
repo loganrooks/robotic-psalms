@@ -45,6 +45,8 @@ venv.bak/
 output/
 output.*/
 *_stems/
+*context.txt
+create_context_file.py
 
 # System
 .DS_Store

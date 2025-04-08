@@ -9,25 +9,9 @@ import soundfile as sf
 from scipy import signal
 
 from ..config import PsalmConfig, VocalTimbre
+from .tts.engines.espeak import EspeakNGWrapper # Remove EspeakWrapper import
+from .tts.base import TTSEngine, ParameterEnum
 
-class ParameterEnum:
-    """Mock Parameter enum for type checking"""
-    RATE: int = 1
-    PITCH: int = 2
-
-@runtime_checkable
-class TTSEngine(Protocol):
-    """Protocol for TTS engines to ensure type safety"""
-    Parameter: ParameterEnum
-    def synth(self, text: str) -> list[float]: ...
-    def set_voice(self, voice: str) -> None: ...
-    def set_parameter(self, param: int, value: int) -> None: ...
-
-@runtime_checkable
-class FestivalEngine(Protocol):
-    """Protocol for Festival TTS engine"""
-    def set_language(self, lang: str) -> None: ...
-    def text_to_wave(self, text: str) -> str: ...
 
 class VoxDeiSynthesisError(Exception):
     """Raised when vocal synthesis fails"""
@@ -51,162 +35,133 @@ class VoxDeiSynthesizer:
         self._tts_buffer: Optional[npt.NDArray[np.float32]] = None
         self._formant_buffer: Optional[npt.NDArray[np.float32]] = None
         
-        # Initialize TTS engines
+        # Initialize TTS engine
         self.espeak: Optional[TTSEngine] = None
-        self.festival: Optional[FestivalEngine] = None
         
+        # Try espeak-ng first
         try:
-            # Import espeak dynamically to avoid static type checking
-            espeak_module = importlib.import_module('espeak')
-            self.espeak = espeak_module.init()
+            self.espeak = EspeakNGWrapper()
             if not isinstance(self.espeak, TTSEngine):
-                raise VoxDeiSynthesisError("eSpeak initialization failed: invalid interface")
-        except ImportError as e:
-            self.logger.error(f"Failed to initialize eSpeak: {e}")
-            raise VoxDeiSynthesisError("eSpeak initialization failed")
+                raise VoxDeiSynthesisError("Invalid eSpeak interface")
+        except Exception as e:
+            # Fallback logic for legacy EspeakWrapper removed as it's deprecated
+            # except Exception as e2:
+                self.logger.warning("No eSpeak engine available")
+                self.logger.error(f"Failed to initialize any functional eSpeak wrapper: {e}")
+                self.espeak = None
+
+        if self.espeak:
+            # Configure TTS engine based on settings
+            self.espeak.set_parameter(ParameterEnum.RATE, 
+                                    int(150 * self.config.tempo_scale))
+            self.espeak.set_parameter(ParameterEnum.PITCH, 
+                                    int(50 + self.config.vocal_timbre.choirboy * 30))
             
-        try:
-            # Import festival dynamically to avoid static type checking
-            festival_module = importlib.import_module('festival')
-            self.festival = festival_module.Festival()
-            if not isinstance(self.festival, FestivalEngine):
-                raise VoxDeiSynthesisError("Festival initialization failed: invalid interface")
-        except ImportError as e:
-            self.logger.error(f"Failed to initialize Festival: {e}")
-            raise VoxDeiSynthesisError("Festival initialization failed")
+            # Apply articulation settings
+            phoneme_rate = int(200 * self.config.robotic_articulation.phoneme_spacing)
+            self.espeak.set_parameter(ParameterEnum.VOLUME,
+                                    int(200 * self.config.robotic_articulation.consonant_harshness))
+            self.espeak.set_parameter(ParameterEnum.RATE, phoneme_rate)
+
+            # Configure voice range
+            base_freqs = {
+                "C2": 65.41, "G2": 98.00,  # Bass
+                "A2": 110.00, "D3": 146.83,  # Baritone
+                "C3": 130.81, "G3": 196.00,  # Tenor
+                "E3": 164.81, "C4": 261.63   # Counter-tenor
+            }
+            
+            # Get base frequency or default to C3
+            base_freq = base_freqs.get(self.config.voice_range.base_pitch, 130.81)
+            
+            # Set pitch based on voice range with proper scaling
+            pitch_value = int(50 * (base_freq / 130.81))
+            self.logger.debug(f"Setting base pitch to {pitch_value}")
+            self.espeak.set_parameter(ParameterEnum.PITCH, pitch_value)
+            
+            # Apply formant shifting for voice character
+            self.formant_shift_factor = self.config.voice_range.formant_shift
 
     def synthesize_text(self, text: str) -> npt.NDArray[np.float32]:
-        """Synthesize Latin text using combined TTS engines
-        
-        Args:
-            text: Latin text to synthesize
-            
-        Returns:
-            numpy array of audio samples (float32)
-            
-        Raises:
-            VoxDeiSynthesisError: If synthesis fails
-        """
-        try:
-            # Generate raw TTS audio
-            espeak_audio = self._generate_espeak(text)
-            festival_audio = self._generate_festival(text)
-            
-            # Align and combine TTS streams
-            combined = self._align_and_mix(espeak_audio, festival_audio)
-            
-            # Apply formant shifting
-            shifted = self._apply_formant_shift(combined)
-            
-            # Apply timbre blending
-            final = self._apply_timbre_blend(shifted)
-            
-            return final
-            
-        except Exception as e:
-            self.logger.error(f"Synthesis failed: {str(e)}")
-            raise VoxDeiSynthesisError(f"Failed to synthesize text: {str(e)}")
-
-    def _generate_espeak(self, text: str) -> npt.NDArray[np.float32]:
-        """Generate speech using eSpeak"""
+        """Synthesize text using TTS engine"""
         if not self.espeak:
-            raise VoxDeiSynthesisError("eSpeak not initialized")
+            raise VoxDeiSynthesisError("No TTS engine available")
             
         try:
-            # Configure eSpeak for Latin
-            self.espeak.set_voice("la")
-            self.espeak.set_parameter(self.espeak.Parameter.RATE, 130)
-            self.espeak.set_parameter(self.espeak.Parameter.PITCH, 60)
+            # Update parameters before synthesis
+            self.espeak.set_parameter(ParameterEnum.RATE, 
+                                    int(150 * self.config.tempo_scale))
+            self.espeak.set_parameter(ParameterEnum.VOLUME,
+                                    int(100 * self.config.robotic_articulation.consonant_harshness))
             
-            # Generate audio and convert to float32
-            raw_audio = self.espeak.synth(text)
-            return np.array(raw_audio, dtype=np.float32)
+            self.logger.debug("Synthesizing text with eSpeak...")
+            audio = self.espeak.synth(text)
             
-        except Exception as e:
-            raise VoxDeiSynthesisError(f"eSpeak synthesis failed: {str(e)}")
+            if len(audio) == 0:
+                raise VoxDeiSynthesisError("Empty audio data")
+            
+            self.logger.debug(f"Pre-processing max amplitude: {np.max(np.abs(audio))}")
 
-    def _generate_festival(self, text: str) -> npt.NDArray[np.float32]:
-        """Generate speech using Festival"""
-        if not self.festival:
-            raise VoxDeiSynthesisError("Festival not initialized")
+            # Apply formant shift and timbre blend
+            audio = self._apply_formant_shift(audio)
+            audio = self._apply_timbre_blend(audio)
+
+             # Boost vocal output
+            audio = np.tanh(audio * 2.0)  # Double gain with soft clipping
             
-        try:
-            # Configure Festival for Latin
-            self.festival.set_language("latin")
-            
-            # Generate audio
-            wav_path = self.festival.text_to_wave(text)
-            audio_data = sf.read(wav_path)
-            Path(wav_path).unlink()  # Clean up temp file
-            
-            # Convert to float32
-            audio = np.array(audio_data[0], dtype=np.float32)
-            
+            self.logger.debug(f"Post-processing max amplitude: {np.max(np.abs(audio))}")
+                
             return audio
             
         except Exception as e:
-            raise VoxDeiSynthesisError(f"Festival synthesis failed: {str(e)}")
+            raise VoxDeiSynthesisError(f"TTS synthesis failed: {str(e)}")
 
-    def _align_and_mix(
-        self,
-        esp: npt.NDArray[np.float32],
-        fest: npt.NDArray[np.float32]
-    ) -> npt.NDArray[np.float32]:
-        """Align and mix two audio streams"""
-        # Resample to match lengths if needed
-        if len(esp) != len(fest):
-            resampled = signal.resample(fest, len(esp))
-            fest = np.array(resampled, dtype=np.float32)
+    def _apply_formant_shift(self, audio: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+        """Apply formant shifting based on timbre and voice range settings"""
+        timbre: VocalTimbre = self.config.vocal_timbre
         
-        # Apply cross-fade mixing
-        mix_ratio = 0.6  # Favor eSpeak slightly
-        return esp * mix_ratio + fest * (1 - mix_ratio)
-
-    def _apply_formant_shift(
-        self,
-        audio: npt.NDArray[np.float32]
-    ) -> npt.NDArray[np.float32]:
-        """Apply formant shifting based on timbre settings"""
-        timbre = self.config.vocal_timbre
+        # Apply base formant shift for voice range
+        shifted = self._formant_shift(audio, self.formant_shift_factor)
         
-        # Calculate shift factors based on timbre blend
+        # Calculate additional shifts based on timbre blend
         choir_shift = 1.2 * timbre.choirboy
         android_shift = 0.8 * timbre.android
         machine_shift = 0.5 * timbre.machinery
         
-        # Apply multiple formant shifts
-        shifted = audio.copy()
+        # Layer additional formant shifts
         if choir_shift > 0:
-            shifted += self._formant_shift(audio, choir_shift)
+            shifted += self._formant_shift(audio, choir_shift * self.formant_shift_factor)
         if android_shift > 0:
-            shifted += self._formant_shift(audio, android_shift)
+            shifted += self._formant_shift(audio, android_shift * self.formant_shift_factor)
         if machine_shift > 0:
-            shifted += self._formant_shift(audio, machine_shift)
-            
-        # Normalize
-        max_val = np.max(np.abs(shifted))
-        if max_val > 0:
-            shifted = shifted / max_val
+            shifted += self._formant_shift(audio, machine_shift * self.formant_shift_factor)
             
         return shifted
 
-    def _formant_shift(
-        self,
-        audio: npt.NDArray[np.float32],
-        factor: float
-    ) -> npt.NDArray[np.float32]:
-        """Apply formant shifting by factor"""
-        # Use phase vocoder for formant shifting
-        D = np.abs(np.fft.rfft(audio))
+    def _formant_shift(self, audio: npt.NDArray[np.float32], factor: float) -> npt.NDArray[np.float32]:
+        """Apply formant shifting"""
+        # Ensure even length for FFT
+        if len(audio) % 2 != 0:
+            audio = np.pad(audio, (0, 1), mode='constant')
+        
+        # Get frequency spectrum    
+        D = np.fft.rfft(audio)
         freqs = np.fft.rfftfreq(len(audio), 1/self.sample_rate)
         
         # Shift frequency components
         shifted_freqs = freqs * factor
-        shifted_D = np.interp(freqs, shifted_freqs, D)
+        shifted_D = np.interp(freqs, shifted_freqs, np.abs(D)) * np.exp(1j * np.angle(D))
         
-        # Convert back to time domain and ensure float32
+        # Inverse transform
         result = np.fft.irfft(shifted_D)
-        return np.array(result, dtype=np.float32)
+        
+        # Ensure output matches input length
+        if len(result) > len(audio):
+            result = result[:len(audio)]
+        elif len(result) < len(audio):
+            result = np.pad(result, (0, len(audio) - len(result)), mode='constant')
+            
+        return result.astype(np.float32)
 
     def _apply_timbre_blend(
         self,
@@ -238,9 +193,13 @@ class VoxDeiSynthesizer:
         
         # Add chorus effect
         chorus = np.zeros_like(audio)
+        max_delay = int(0.03 * self.sample_rate)  # Maximum delay samples
+        padded_audio = np.pad(audio, (max_delay, 0), mode='constant')
+        
         for i, delay in enumerate([0.01, 0.02, 0.03]):
             samples = int(delay * self.sample_rate)
-            delayed = np.pad(audio, (samples, 0))[:-samples]
+            # Use pre-padded audio slice
+            delayed = padded_audio[max_delay-samples:len(padded_audio)-samples]
             chorus += delayed * 0.3
             
         return np.array(filtered + chorus, dtype=np.float32)

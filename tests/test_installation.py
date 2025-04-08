@@ -45,15 +45,15 @@ def test_core_dependencies() -> None:
 
 def test_tts_dependencies() -> None:
     """Test text-to-speech engine availability"""
-    # Check eSpeak
+    # Check eSpeak-NG
     try:
-        subprocess.run(
-            ["espeak", "--version"], 
-            capture_output=True, 
-            check=True
-        )
+        subprocess.run(["espeak-ng", "--version"], capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        pytest.fail("eSpeak is not installed or not in PATH")
+        # Check regular eSpeak
+        try:
+            subprocess.run(["espeak", "--version"], capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pytest.fail("Neither eSpeak-NG nor eSpeak is installed")
     
     # Check Festival
     try:

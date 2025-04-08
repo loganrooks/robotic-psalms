@@ -1,6 +1,10 @@
 from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
+from dataclasses import dataclass
+
+
+
 
 class LiturgicalMode(str, Enum):
     """Church modes for psalm settings"""
@@ -97,6 +101,27 @@ class MIDIMapping(BaseModel):
         description="CC number for haunting intensity"
     )
 
+class MixLevels(BaseModel):
+    """Audio mix level settings"""
+    vocals: float = Field(default=1.0, ge=0.0, le=2.0)
+    pads: float = Field(default=0.8, ge=0.0, le=2.0)
+    percussion: float = Field(default=0.6, ge=0.0, le=2.0)
+    drones: float = Field(default=0.7, ge=0.0, le=2.0)
+
+class VoiceRange(BaseModel):
+    """Voice range and pitch settings"""
+    base_pitch: str = Field(
+        default="C3",
+        pattern="^[A-G][#b]?[0-8]$",
+        description="Base pitch in scientific notation"
+    )
+    formant_shift: float = Field(
+        default=1.0,
+        ge=0.5,
+        le=2.0,
+        description="Formant shift factor for voice character"
+    )
+
 class PsalmConfig(BaseModel):
     """Main configuration for psalm processing"""
     mode: LiturgicalMode = Field(
@@ -129,6 +154,10 @@ class PsalmConfig(BaseModel):
         default_factory=HauntingParameters,
         description="Ethereal effect parameters"
     )
+    voice_range: VoiceRange = Field(
+        default_factory=VoiceRange,
+        description="Voice range settings"
+    )
     vocal_timbre: VocalTimbre = Field(
         default_factory=VocalTimbre,
         description="Voice timbre blend settings"
@@ -137,10 +166,17 @@ class PsalmConfig(BaseModel):
         default_factory=MIDIMapping,
         description="MIDI CC control mappings"
     )
+    mix_levels: MixLevels = Field(
+        default_factory=MixLevels,
+        description="Audio mix level settings"
+    )
     midi_input: Optional[str] = Field(
         default=None,
         description="Path to input MIDI file"
     )
+    
 
     class Config:
         use_enum_values = True
+
+

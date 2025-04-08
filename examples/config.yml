@@ -5,8 +5,8 @@ mode: "dorian"
 tempo_scale: 0.8  # Slower, more ethereal tempo
 
 # Effect densities
-glitch_density: 0.4
-celestial_harmonicity: 0.7  # More sawtooth character
+glitch_density: 0.0001
+celestial_harmonicity: 0.3  # More sawtooth character
 
 # Voice articulation
 robotic_articulation:
@@ -15,14 +15,18 @@ robotic_articulation:
 
 # Ethereal qualities
 haunting_intensity:
-  reverb_decay: 8.0  # Long reverb tail
-  spectral_freeze: 0.4  # Moderate spectral freezing
+  reverb_decay: 4.0    # Shorter reverb
+  spectral_freeze: 0.2 # Less freezing
 
 # Voice character blend
 vocal_timbre:
-  choirboy: 0.4  # Emphasis on choir-like qualities
-  android: 0.4
-  machinery: 0.2  # Subtle mechanical undertones
+  choirboy: 0.6  # Emphasis on choir-like qualities
+  android: 0.1
+  machinery: 0.1  # Subtle mechanical undertones
+
+voice_range:
+  base_pitch: "G2"  # Base pitch (can be: C2-G2 for bass, G2-D3 for baritone, C3-G3 for tenor, E3-C4 for counter-tenor)
+  formant_shift: 0.9  # > 1.0 raises formants, < 1.0 lowers them
 
 # MIDI control mapping
 midi_mapping:
@@ -30,3 +34,30 @@ midi_mapping:
   harmonicity: 2
   articulation: 3
   haunting: 4
+
+mix_levels:
+  vocals: 1.0    # Full volume for vocals
+  pads: 0.3      # Slightly reduced pads
+  percussion: 0.3 # Lower percussion
+  drones: 0.3    # Moderate drones
+
+
+# # Bass
+# voice_range:
+#   base_pitch: "C2"
+#   formant_shift: 0.8
+
+# # Baritone
+# voice_range:
+#   base_pitch: "G2"
+#   formant_shift: 0.9
+
+# # Tenor
+# voice_range:
+#   base_pitch: "C3"
+#   formant_shift: 1.0
+
+# # Counter-tenor
+# voice_range:
+#   base_pitch: "E3"
+#   formant_shift: 1.2

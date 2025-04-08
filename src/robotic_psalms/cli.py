@@ -75,29 +75,29 @@ def save_audio(audio_path: Path, audio_data: AudioData) -> None:
 def generate_waveform(audio_path: Path) -> None:
     """Generate waveform visualization"""
     try:
-        # Load audio
-        audio, sr = sf.read(audio_path)
+        # Load audio safely
+        audio, sr = sf.read(str(audio_path))
         
-        # Create waveform plot
+        # Create new figure
         plt.figure(figsize=(12, 4))
-        plt.plot(audio)
+        plt.clf()
+        
+        # Plot safely
+        plt.plot(np.arange(len(audio)) / sr, audio)
         plt.title("Sacred Machinery Waveform")
-        plt.xlabel("Sample")
+        plt.xlabel("Time (s)")
         plt.ylabel("Amplitude")
         
-        # Add glitch art effect
-        for _ in range(10):
-            x = np.random.randint(0, len(audio))
-            w = np.random.randint(100, 1000)
-            plt.axvspan(x, x + w, alpha=0.1, color='red')
-            
-        # Save plot
+        # Save and close
         plot_path = audio_path.with_suffix('.png')
-        plt.savefig(plot_path)
+        plt.savefig(str(plot_path))
+        plt.close()
+        
         logging.info(f"Saved waveform visualization to {plot_path}")
         
     except Exception as e:
         logging.error(f"Failed to generate waveform: {str(e)}")
+        
 
 def main() -> None:
     parser = argparse.ArgumentParser(

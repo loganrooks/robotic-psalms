@@ -34,8 +34,21 @@ Before installing the Python package, you need to install the following system d
 ### Required System Packages
 
 1. **Text-to-Speech Engines**
-   - eSpeak: Required for primary vocal synthesis
+  - **eSpeak-NG** (recommended):
+    - Actively maintained fork
+    - Better voice quality
+    - Improved language support
+    - Install: `sudo apt-get install espeak-ng libespeak-ng-dev`
+
+  - **eSpeak** (fallback):
+    - Original implementation 
+    - Legacy compatibility
+    - Install: `sudo apt-get install espeak libespeak-dev`
+
    - Festival: Required for secondary vocal synthesis
+
+The system will try eSpeak-NG first, falling back to eSpeak if needed.
+
 
 2. **Audio Libraries**
    - PortAudio: Required for real-time audio processing
@@ -46,13 +59,13 @@ Ubuntu/Debian:
 ```bash
 # Install TTS engines and audio libraries
 sudo apt-get update
-sudo apt-get install espeak festival portaudio19-dev
+sudo apt-get install espeak-ng festival portaudio19-dev
 ```
 
 macOS:
 ```bash
 # Install TTS engines and audio libraries
-brew install espeak festival portaudio
+brew install espeak-ng festival portaudio
 ```
 
 ### Python Requirements

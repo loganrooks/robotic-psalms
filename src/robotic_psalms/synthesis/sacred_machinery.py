@@ -1,15 +1,12 @@
 import logging
-from dataclasses import dataclass
-from pathlib import Path
-from typing import List, Optional, Tuple
-
+from typing import Any, Optional, Protocol, runtime_checkable
 import numpy as np
 import numpy.typing as npt
 from scipy import signal
+from ..config import PsalmConfig, HauntingParameters, LiturgicalMode
+from .vox_dei import VoxDeiSynthesizer, VoxDeiSynthesisError
 from scipy.signal.windows import hann
-
-from ..config import HauntingParameters, LiturgicalMode, PsalmConfig
-from .vox_dei import VoxDeiSynthesizer
+from dataclasses import dataclass
 
 @dataclass
 class SynthesisResult:
@@ -37,6 +34,9 @@ class SacredMachineryEngine:
         # Initialize component synthesizers
         self.vox_dei = VoxDeiSynthesizer(config, self.sample_rate)
         
+        # Extract effect parameters for direct access
+        self.haunting: HauntingParameters = config.haunting_intensity
+        
         # Modulation state
         self._lfo_phase = 0.0
         self._noise_buffer: npt.NDArray[np.float32] = np.random.uniform(
@@ -45,90 +45,259 @@ class SacredMachineryEngine:
         
         # Modal frequencies for each liturgical mode
         self.mode_frequencies = {
-            LiturgicalMode.DORIAN: [146.83, 220.00, 293.66],      # D3, A3, D4
-            LiturgicalMode.PHRYGIAN: [164.81, 220.00, 329.63],    # E3, A3, E4
-            LiturgicalMode.LYDIAN: [174.61, 261.63, 349.23],      # F3, C4, F4
-            LiturgicalMode.MIXOLYDIAN: [196.00, 293.66, 392.00],  # G3, D4, G4
-            LiturgicalMode.AEOLIAN: [220.00, 293.66, 440.00],     # A3, D4, A4
+            LiturgicalMode.DORIAN: [146.83, 220.00, 293.66],
+            LiturgicalMode.PHRYGIAN: [164.81, 220.00, 329.63],
+            LiturgicalMode.LYDIAN: [174.61, 261.63, 349.23],
+            LiturgicalMode.MIXOLYDIAN: [196.00, 293.66, 392.00],
+            LiturgicalMode.AEOLIAN: [220.00, 293.66, 440.00],
         }
 
     def process_psalm(self, text: str, duration: float) -> SynthesisResult:
-        """Process a complete psalm
-        
-        Args:
-            text: Latin psalm text
-            duration: Total duration in seconds
-            
-        Returns:
-            SynthesisResult containing all audio components
-        """
+        """Process a complete psalm"""
         # Generate base components
-        vocals = self.vox_dei.synthesize_text(text)
+        try:
+            raw_vocals = self.vox_dei.synthesize_text(text)
+            # Resample to match engine sample rate if needed
+            if self.vox_dei.sample_rate != self.sample_rate:
+                vocals = signal.resample(raw_vocals, int(len(raw_vocals) * self.sample_rate / self.vox_dei.sample_rate))
+            else:
+                vocals = raw_vocals
+        except VoxDeiSynthesisError as e:
+            self.logger.error(f"Vocal synthesis failed: {e}")
+            vocals = np.zeros(int(duration * self.sample_rate), dtype=np.float32)
+
         pads = self._generate_pads(duration)
         percussion = self._generate_percussion(duration)
         drones = self._generate_drones(duration)
         
-        # Apply haunting effects
+        # Apply effects
         vocals = self._apply_haunting_effects(vocals)
         pads = self._apply_haunting_effects(pads)
         drones = self._apply_haunting_effects(drones)
+
+        # Apply glitch effects
+        if self.config.glitch_density > 0:
+            vocals = self._apply_glitch_effect(vocals)
+            pads = self._apply_glitch_effect(pads)
+            drones = self._apply_glitch_effect(drones)
+
+        # Align lengths using sample count instead of duration
+        target_samples = int(duration * self.sample_rate)
+        vocals = self._fit_to_length(vocals, target_samples)
+        pads = self._fit_to_length(pads, target_samples)
+        percussion = self._fit_to_length(percussion, target_samples)
+        drones = self._fit_to_length(drones, target_samples)
         
-        # Align lengths
-        target_length = int(duration * self.sample_rate)
-        vocals = self._fit_to_length(vocals, target_length)
-        pads = self._fit_to_length(pads, target_length)
-        percussion = self._fit_to_length(percussion, target_length)
-        drones = self._fit_to_length(drones, target_length)
-        
-        # Mix components
+        # Mix components with levels applied before any final processing
         combined = self._mix_components(vocals, pads, percussion, drones)
         
         return SynthesisResult(
-            vocals=vocals,
-            pads=pads,
-            percussion=percussion,
-            drones=drones,
-            combined=combined,
+            vocals=vocals.astype(np.float32),
+            pads=pads.astype(np.float32),
+            percussion=percussion.astype(np.float32),
+            drones=drones.astype(np.float32),
+            combined=combined.astype(np.float32),
             sample_rate=self.sample_rate
         )
+
+    def _mix_components(self, vocals, pads, percussion, drones):
+        """Mix all audio components together"""
+        max_len = max(len(vocals), len(pads), len(percussion), len(drones))
+        
+        # Apply mix levels before padding
+        vocals = vocals * self.config.mix_levels.vocals
+        pads = pads * self.config.mix_levels.pads
+        percussion = percussion * self.config.mix_levels.percussion
+        drones = drones * self.config.mix_levels.drones
+        
+        # Pad to same length
+        vocals = np.pad(vocals, (0, max_len - len(vocals)), mode='constant')
+        pads = np.pad(pads, (0, max_len - len(pads)), mode='constant')
+        percussion = np.pad(percussion, (0, max_len - len(percussion)), mode='constant')
+        drones = np.pad(drones, (0, max_len - len(drones)), mode='constant')
+        
+        # Simple sum with protection against clipping
+        mixed = vocals + pads + percussion + drones
+        peak = np.max(np.abs(mixed))
+        if peak > 1.0:
+            mixed /= peak
+        return mixed
+
+    def _generate_backup_vocals(
+            self,
+            text: str,
+            duration: float
+        ) -> npt.NDArray[np.float32]:
+            """Generate fallback robotic vocals when TTS fails
+            
+            This creates a synthetic vocal-like sound using formant synthesis
+            and robotic modulation, maintaining the rhythmic structure of the text.
+            
+            Args:
+                text: Latin text to synthesize
+                duration: Target duration in seconds
+                
+            Returns:
+                Synthesized backup vocals as float32 array
+            """
+            # Estimate number of syllables (rough approximation for Latin)
+            syllables = len([c for c in text.lower() if c in 'aeiouy'])
+            if syllables == 0:
+                syllables = len(text) // 3  # Fallback approximation
+            
+            # Calculate timing
+            samples_per_syllable = int(self.sample_rate * duration / syllables)
+            num_samples = int(duration * self.sample_rate)
+            result = np.zeros(num_samples, dtype=np.float32)
+            
+            # Generate carrier frequencies (typical vocal formants)
+            formants = [500, 1500, 2500]  # Hz
+            t = np.arange(samples_per_syllable) / self.sample_rate
+            
+            # Generate base formant waves
+            formant_waves = []
+            for freq in formants:
+                wave = np.sin(2 * np.pi * freq * t)
+                # Add slight frequency modulation for more natural sound
+                mod = np.sin(2 * np.pi * 5 * t)  # 5 Hz modulation
+                wave *= (1 + 0.1 * mod)  # 10% modulation depth
+                formant_waves.append(wave)
+            
+            # Combine formants with different amplitudes
+            syllable = formant_waves[0] * 1.0 + formant_waves[1] * 0.5 + formant_waves[2] * 0.25
+            
+            # Create amplitude envelope
+            envelope = np.exp(-t * 10)  # Quick decay
+            envelope = envelope / np.max(envelope)
+            syllable *= envelope
+            
+            # Place syllables in output buffer with random timing variations
+            time_index = 0
+            for i in range(syllables):
+                if time_index >= num_samples:
+                    break
+                    
+                # Add random timing variation (±10%)
+                variation = int(samples_per_syllable * np.random.uniform(-0.1, 0.1))
+                actual_length = min(len(syllable), num_samples - time_index)
+                
+                # Add syllable with random pitch variation
+                pitch_var = np.random.uniform(0.95, 1.05)
+                pitched = signal.resample(
+                    syllable, 
+                    int(actual_length * pitch_var)
+                )[:actual_length]
+                
+                # Add to result with crossfade
+                if len(pitched) > 0:
+                    result[time_index:time_index + len(pitched)] += pitched
+                
+                # Move to next syllable position with spacing
+                time_index += int(samples_per_syllable * 1.2)  # 20% gap between syllables
+            
+            # Apply robotic effects
+            # 1. Ring modulation
+            t_full = np.arange(len(result)) / self.sample_rate
+            carrier = np.sin(2 * np.pi * 2000 * t_full)  # 2kHz carrier
+            result *= (1 + 0.5 * carrier)  # 50% modulation depth
+            
+            # 2. Frequency shifter
+            D = np.fft.rfft(result)
+            freqs = np.fft.rfftfreq(len(result))
+            shift = 100  # Hz shift up
+            shifted_freqs = freqs + shift / (self.sample_rate / 2)
+            shifted_D = np.interp(freqs, shifted_freqs, np.abs(D))
+            shifted_D = shifted_D * np.exp(1j * np.angle(D))
+            result = np.fft.irfft(shifted_D)
+            
+            # 3. Bitcrushing effect for digital character
+            bits = 8
+            steps = 2**bits
+            result = np.round(result * steps) / steps
+            
+            # Normalize
+            max_val = np.max(np.abs(result))
+            if max_val > 0:
+                result /= max_val
+                
+            return result.astype(np.float32)
+        
+
+    def _apply_glitch_effect(
+        self,
+        audio: npt.NDArray[np.float32]
+    ) -> npt.NDArray[np.float32]:
+        """Apply glitch effects based on glitch_density parameter"""
+        density = self.config.glitch_density
+        result = audio.copy()
+        
+        # Calculate number of glitch points based on density
+        num_glitches = int(len(audio) * density * 0.01)  # 1% max glitch points
+        if num_glitches == 0:
+            return result
+            
+        # Generate random glitch points
+        glitch_points = np.random.randint(0, len(audio), num_glitches)
+        
+        for point in glitch_points:
+            # Random glitch length between 100-1000 samples
+            glitch_length = np.random.randint(100, 1000)
+            if point + glitch_length > len(audio):
+                continue
+                
+            # Apply random glitch effects
+            effect_type = np.random.choice(['repeat', 'reverse', 'bitcrush', 'dropout'])
+            
+            if effect_type == 'repeat':
+                # Repeat a small segment
+                seg_length = glitch_length // 4
+                segment = result[point:point + seg_length]
+                for i in range(4):
+                    if point + (i+1)*seg_length <= len(result):
+                        result[point + i*seg_length:point + (i+1)*seg_length] = segment
+                        
+            elif effect_type == 'reverse':
+                # Reverse a segment
+                result[point:point + glitch_length] = np.flip(
+                    result[point:point + glitch_length]
+                )
+                
+            elif effect_type == 'bitcrush':
+                # Reduce bit depth effect
+                segment = result[point:point + glitch_length]
+                bits = np.random.randint(2, 8)
+                steps = 2**bits
+                segment = np.round(segment * steps) / steps
+                result[point:point + glitch_length] = segment
+                
+            else:  # dropout
+                # Random audio dropout
+                result[point:point + glitch_length] = 0
+        
+        return result
 
     def _apply_haunting_effects(
         self,
         audio: npt.NDArray[np.float32]
     ) -> npt.NDArray[np.float32]:
-        """Apply haunting effects using reverb and spectral freeze
-        
-        Args:
-            audio: Input audio array
-            
-        Returns:
-            Processed audio with haunting effects
-        """
-        haunting = self.config.haunting_intensity
-        
+        """Apply haunting effects using reverb and spectral freeze"""
         # Apply reverb based on decay time
-        reverb_time = haunting.reverb_decay
+        reverb_time = self.haunting.reverb_decay  # Using direct HauntingParameters
         impulse_response = self._generate_reverb_ir(reverb_time)
         reverbed = signal.fftconvolve(audio, impulse_response)[:len(audio)]
         
         # Apply spectral freeze effect
-        if haunting.spectral_freeze > 0:
-            frozen = self._spectral_freeze(audio, haunting.spectral_freeze)
-            result = reverbed * (1 - haunting.spectral_freeze) + frozen * haunting.spectral_freeze
+        freeze_amount = self.haunting.spectral_freeze  # Using direct HauntingParameters
+        if freeze_amount > 0:
+            frozen = self._spectral_freeze(audio, freeze_amount)
+            result = reverbed * (1 - freeze_amount) + frozen * freeze_amount
         else:
             result = reverbed
             
         return np.array(result, dtype=np.float32)
 
     def _generate_reverb_ir(self, decay_time: float) -> npt.NDArray[np.float32]:
-        """Generate reverb impulse response
-        
-        Args:
-            decay_time: Reverb decay time in seconds
-            
-        Returns:
-            Impulse response array
-        """
+        """Generate reverb impulse response"""
         ir_length = int(decay_time * self.sample_rate)
         t = np.arange(ir_length) / self.sample_rate
         
@@ -150,15 +319,7 @@ class SacredMachineryEngine:
         audio: npt.NDArray[np.float32],
         freeze_amount: float
     ) -> npt.NDArray[np.float32]:
-        """Apply spectral freeze effect
-        
-        Args:
-            audio: Input audio array
-            freeze_amount: Amount of freezing (0-1)
-            
-        Returns:
-            Spectrally frozen audio
-        """
+        """Apply spectral freeze effect"""
         # Get spectral representation
         D = np.fft.rfft(audio)
         freqs = np.fft.rfftfreq(len(audio))
@@ -280,30 +441,3 @@ class SacredMachineryEngine:
             return audio
         resampled = signal.resample(audio, target_length)
         return np.array(resampled, dtype=np.float32)
-
-    def _mix_components(
-        self,
-        vocals: npt.NDArray[np.float32],
-        pads: npt.NDArray[np.float32],
-        percussion: npt.NDArray[np.float32],
-        drones: npt.NDArray[np.float32]
-    ) -> npt.NDArray[np.float32]:
-        """Mix all components with proper levels"""
-        # Mix levels
-        vocal_level = 0.8
-        pad_level = 0.6
-        percussion_level = 0.4
-        drone_level = 0.5
-        
-        # Combine components
-        mixed = (vocals * vocal_level + 
-                pads * pad_level + 
-                percussion * percussion_level + 
-                drones * drone_level)
-        
-        # Normalize
-        max_val = np.max(np.abs(mixed))
-        if max_val > 0:
-            mixed = mixed / max_val
-        
-        return mixed

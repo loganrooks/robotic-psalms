@@ -5,31 +5,60 @@ description = "Ethereal computerized vocal arrangements of Latin psalms"
 authors = [
     {name = "Robotic Psalms Project"}
 ]
+
 dependencies = [
+    # Audio Processing
     "numpy>=1.22.0",
     "scipy>=1.8.0",
     "librosa>=0.9.0",
+    "sounddevice>=0.4.4",
+    "soundfile>=0.10.3",
+    
+    # MIDI Support
     "mido>=1.2.10",
     "python-rtmidi>=1.4.9",
-    "sounddevice>=0.4.4",
+    
+    # Configuration
     "pydantic>=2.0.0",
     "pyyaml>=6.0.0",
+    
+    # Visualization
     "matplotlib>=3.5.0",
     "pyopengl>=3.1.6",
-    "soundfile>=0.10.3",
 ]
-requires-python = ">=3.9"
 
 [project.scripts]
 robotic-psalms = "robotic_psalms.cli:main"
 
 [project.optional-dependencies]
+# Individual TTS engines - choose one
+espeak-ng = [
+    "python-espeak-ng>=0.6.6"
+]
+espeak = [
+    "python-espeak>=0.6.3"
+]
+
+# Development and documentation
 dev = [
     "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
     "black>=22.0.0",
     "isort>=5.10.0",
     "mypy>=0.900",
+    "flake8>=4.0.0",
 ]
+
+docs = [
+    "sphinx>=4.0.0",
+    "sphinx-rtd-theme>=1.0.0"
+]
+
+# Full development setup
+all = [
+    "robotic-psalms[espeak-ng, dev,docs]"
+]
+
 
 [build-system]
 requires = ["hatchling"]
@@ -42,6 +71,9 @@ packages = ["src/robotic_psalms"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.black]
 line-length = 88
 target-version = ["py39"]
@@ -49,3 +81,7 @@ target-version = ["py39"]
 [tool.isort]
 profile = "black"
 line_length = 88
+
+
+[tool.pylance]
+reportMissingModuleSource = "none"

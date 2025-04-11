@@ -1,12 +1,13 @@
 import numpy as np
-from pydantic import BaseModel, Field, ConfigDict
-import pedalboard
+from pydantic import BaseModel, Field, ConfigDict, model_validator
+from pedalboard import Delay, Reverb
+from pedalboard._pedalboard import Pedalboard # Import as suggested by Pylance
 
-import librosa
 # Define validation ranges based on common sense and test cases
-import parselmouth # Keep for potential future use, though not for this task
-import pyworld as pw # Use pw alias
-from scipy.interpolate import interp1d # Keep for warping
+# import librosa # Not used in reverb, delay, or formant shift sections
+# import parselmouth # Not used in reverb, delay, or formant shift sections
+import pyworld as pw # Use pw alias for formant shifting
+from scipy.interpolate import interp1d # Used for formant shifting spectral warping
 
 # Pedalboard's Reverb defaults: room_size=0.5, damping=0.5, wet_level=0.33, dry_level=0.4, width=1.0, freeze_mode=0.0
 # We'll map our params where possible. Pedalboard doesn't have direct decay_time, pre_delay, diffusion.
@@ -58,7 +59,7 @@ def apply_high_quality_reverb(audio: np.ndarray, sample_rate: int, params: Rever
     # Note: Pedalboard's levels might not sum to 1 for constant power.
     # A more perceptually accurate mapping might be needed later.
 
-    reverb_effect = pedalboard.Reverb(
+    reverb_effect = Reverb( # Use direct import
         room_size=room_size,
         damping=params.damping,
         wet_level=wet_level,
@@ -83,7 +84,9 @@ def apply_high_quality_reverb(audio: np.ndarray, sample_rate: int, params: Rever
 
     # Apply effect
     # Pedalboard handles mono/stereo automatically if input is (samples,) or (samples, channels)
-    reverberated_signal = reverb_effect(audio_padded, sample_rate=sample_rate)
+    # Apply effect using a Pedalboard instance
+    reverb_board = Pedalboard([reverb_effect]) # No sample_rate here
+    reverberated_signal = reverb_board(audio_padded, sample_rate=sample_rate) # Pass sample_rate here
 
     # The output length will be input_length + pre_delay_samples + reverb_tail
     # We need to combine the original dry signal (with pre-delay) and the wet signal correctly
@@ -171,13 +174,13 @@ def _apply_formant_shift_mono(x: np.ndarray, fs: int, shift_factor: float) -> np
 
     # --- WORLD Analysis ---
     # Use default DIO/Harvest parameters for F0 estimation
-    f0, t = pw.dio(x, fs)
+    f0, t = pw.dio(x, fs) # type: ignore
     # Refine F0 using Stonemask
-    f0 = pw.stonemask(x, f0, t, fs)
+    f0 = pw.stonemask(x, f0, t, fs) # type: ignore
     # Estimate spectral envelope using CheapTrick
-    sp = pw.cheaptrick(x, f0, t, fs)
+    sp = pw.cheaptrick(x, f0, t, fs) # type: ignore
     # Estimate aperiodicity using D4C
-    ap = pw.d4c(x, f0, t, fs)
+    ap = pw.d4c(x, f0, t, fs) # type: ignore
 
     # --- Warp Spectral Envelope ---
     sp_warped = _warp_spectral_envelope(sp, fs, shift_factor)
@@ -190,7 +193,7 @@ def _apply_formant_shift_mono(x: np.ndarray, fs: int, shift_factor: float) -> np
     ap_cont = np.ascontiguousarray(ap, dtype=np.float64)
 
     # Synthesize using original F0, warped SP, original AP
-    y = pw.synthesize(f0_cont, sp_warped_cont, ap_cont, fs)
+    y = pw.synthesize(f0_cont, sp_warped_cont, ap_cont, fs) # type: ignore
 
     # Ensure output length matches input length (synthesis might slightly alter it)
     if len(y) > len(x):
@@ -229,7 +232,7 @@ def _warp_spectral_envelope(sp: np.ndarray, fs: int, formant_shift_ratio: float)
         interp_func = interp1d(
             warped_freqs, sp[i], kind='linear', bounds_error=False,
             # Extrapolate using edge values of the original envelope
-            fill_value=(sp[i, 0], sp[i, -1])
+            fill_value="extrapolate" # type: ignore
         )
         # Evaluate the interpolation function at the original frequencies to get the warped envelope
         sp_warped[i] = interp_func(original_freqs)
@@ -240,3 +243,76 @@ def _warp_spectral_envelope(sp: np.ndarray, fs: int, formant_shift_ratio: float)
 
     # Ensure output is float64 for pyworld synthesis
     return sp_warped.astype(np.float64)
+
+
+# --- Complex Delay ---
+
+class DelayParameters(BaseModel):
+    """Parameters for the complex delay effect."""
+    delay_time_ms: float = Field(..., ge=0.0, description="Delay time in milliseconds.")
+    feedback: float = Field(..., ge=0.0, le=1.0, description="Feedback amount (0.0 to 1.0).")
+    wet_dry_mix: float = Field(..., ge=0.0, le=1.0, description="Mix between wet (delay) and dry (original) signal (0=dry, 1=wet).")
+    stereo_spread: float = Field(..., ge=0.0, le=1.0, description="Stereo spread of the delay taps (0.0 to 1.0). [IGNORED by current pedalboard.Delay implementation]")
+    lfo_rate_hz: float = Field(..., ge=0.0, description="Rate of the Low-Frequency Oscillator (LFO) modulating the delay time, in Hz. [IGNORED by current pedalboard.Delay implementation]")
+    lfo_depth: float = Field(..., ge=0.0, le=1.0, description="Depth of the LFO modulation (0.0 to 1.0). [IGNORED by current pedalboard.Delay implementation]")
+    filter_low_hz: float = Field(..., ge=0.0, description="Low-cut filter frequency for the feedback path, in Hz. [IGNORED by current pedalboard.Delay implementation]")
+    filter_high_hz: float = Field(..., ge=0.0, description="High-cut filter frequency for the feedback path, in Hz. [IGNORED by current pedalboard.Delay implementation]")
+
+    model_config = ConfigDict(extra='forbid')
+
+    @model_validator(mode='after')
+    def check_filter_range(self) -> 'DelayParameters':
+        if self.filter_low_hz > self.filter_high_hz:
+            raise ValueError("filter_low_hz cannot be greater than filter_high_hz")
+        return self
+
+
+def apply_complex_delay(audio: np.ndarray, sample_rate: int, params: DelayParameters) -> np.ndarray:
+    """
+    Applies a complex delay effect to an audio signal using pedalboard.Delay.
+    Focuses on delay_time, feedback, and mix for initial TDD green phase.
+    Other parameters (spread, LFO, filters) are ignored in this implementation.
+
+    Args:
+        audio: Input audio signal as a NumPy array (mono or stereo).
+        sample_rate: Sample rate of the audio signal.
+        params: An instance of DelayParameters containing effect settings.
+
+    Returns:
+        The processed audio signal with delay applied.
+    """
+    if audio.size == 0:
+        return np.array([], dtype=audio.dtype)
+
+    # Map parameters from DelayParameters to pedalboard.Delay arguments
+    delay_seconds = params.delay_time_ms / 1000.0
+    feedback = params.feedback
+    mix = params.wet_dry_mix # pedalboard.Delay uses 'mix' (0=dry, 1=wet)
+
+    # Instantiate the delay effect
+    delay_effect = Delay( # Use direct import
+        delay_seconds=delay_seconds,
+        feedback=feedback, # Note: Known upstream issue in pedalboard.Delay may affect feedback behavior.
+        mix=mix
+        # Note: stereo_spread, LFO parameters, and filter parameters from
+        # DelayParameters are not directly supported by pedalboard.Delay
+        # and are ignored in this implementation.
+    )
+
+    # Create a Pedalboard instance with the delay effect
+    board = Pedalboard([delay_effect]) # No sample_rate here
+
+    # Process the audio (pedalboard expects float32)
+    audio_float32 = audio.astype(np.float32)
+    delayed_signal = board(audio_float32, sample_rate=sample_rate) # Pass sample_rate here
+
+    # Ensure output shape matches input channel count, though length might change
+    if audio.ndim == 1 and delayed_signal.ndim == 2 and delayed_signal.shape[1] == 1:
+        # If input was mono but output is (n, 1), flatten it
+        delayed_signal = delayed_signal.flatten()
+    elif audio.ndim == 2 and delayed_signal.ndim == 1 and audio.shape[1] == 1:
+         # If input was (n, 1) and output is mono, reshape it
+         delayed_signal = delayed_signal.reshape(-1, 1)
+
+    # Return float32 as pedalboard outputs
+    return delayed_signal

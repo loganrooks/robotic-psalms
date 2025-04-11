@@ -6,10 +6,23 @@
 
 
 
+### Implementation: Add Configuration for Complex Delay Effect (REQ-ART-V02) - 2025-04-11 16:02:23
+- **Approach**: Added configuration options for the complex delay effect to `src/robotic_psalms/config.py`. Defined a new Pydantic model `DelayConfig` mirroring the fields from `synthesis.effects.DelayParameters`, including default values (e.g., `wet_dry_mix=0.0`), validation (`gt`, `ge`, `le`, `@model_validator` for filter order), and docstrings. Integrated this model as an optional field (`delay_effect: Optional[DelayConfig] = None`) into the main `PsalmConfig` model.
+- **Key Files Modified/Created**: `src/robotic_psalms/config.py` (Modified).
+- **Notes**: Corrected initial `insert_content` errors related to imports and indentation by using `write_to_file` to ensure the final structure was correct. The configuration allows enabling/disabling the effect and controlling its parameters via the main config file.
+
+
+
 ### Implementation: TTS Fix (eSpeak-NG Command-Line Wrapper) - 2025-04-08 09:59:00
 - **Approach**: Replaced Python library wrappers (`py-espeak-ng`, `espeakng`) with a direct command-line call to `/usr/bin/espeak-ng` using `subprocess.run`. Input text is passed via a temporary file (`-f`), and WAV audio is captured from stdout (`--stdout`). This bypasses library integration issues.
 - **Key Files Modified/Created**: `src/robotic_psalms/synthesis/tts/engines/espeak.py`: Rewritten `EspeakNGWrapper`.
 - **Notes**: This approach proved necessary after persistent failures with Python library wrappers returning empty audio data. The command-line tool was verified to work independently. Tests `test_espeak.py` and `test_vox_dei.py` now pass with this implementation.
+### Implementation: Integrate Complex Delay (REQ-ART-V02 - Integration) - 2025-04-11 16:07:55
+- **Approach**: Integrated `apply_complex_delay` from `.effects` into `SacredMachineryEngine.process_psalm`. Added conditional logic to apply the effect to the final `combined` audio signal only if `config.delay_effect` is configured and `wet_dry_mix > 0`. The `DelayParameters` model is instantiated from the configuration before calling the effect function.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/sacred_machinery.py` (Modified).
+- **Notes**: This completes the integration step for the complex delay effect. All tests in `tests/test_sacred_machinery.py`, including the specific integration tests for this feature, now pass.
+
+
 ## Current Implementation Focus
 <!-- Describe the code being worked on -->
 
@@ -109,3 +122,15 @@
     2. `AssertionError: Expected 'apply_high_quality_reverb' to have been called once. Called 3 times.`: Updated the assertion in `test_process_psalm_applies_haunting` to correctly expect 3 calls to the mocked reverb function, as it's applied to vocals, pads, and drones.
 - **Key Files Modified/Created**: `tests/test_sacred_machinery.py`: Applied fixes.
 - **Notes**: The `apply_diff` tool initially reported partial failures despite applying some changes correctly, requiring verification steps using `read_file` and `search_files`. All tests in the file now pass.
+
+
+
+
+### Implementation: Functional Complex Delay (REQ-ART-V02 - Green Phase) - 2025-04-11 15:46:01
+- **Approach**: Implemented `apply_complex_delay` using `pedalboard.Delay`. Mapped `delay_time_ms`, `feedback`, and `wet_dry_mix` from `DelayParameters` to `pedalboard.Delay` arguments (`delay_seconds`, `feedback`, `mix`). Used `pedalboard.Pedalboard` to apply the effect. Ignored unsupported parameters (spread, LFO, filters) for this initial implementation.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Modified function, updated imports).
+- **Notes**: Addressed Pylance errors related to `pyworld` type hints, `scipy` interpolation, and `pedalboard` usage (importing `Pedalboard` from `_pedalboard`, passing `sample_rate` correctly to the processing call). Ready for testing.
+### Implementation: Minimal Complex Delay (REQ-ART-V02 - Green Phase Start) - 2025-04-11 15:43:17
+- **Approach**: Implemented the `DelayParameters` Pydantic model with fields (`delay_time_ms`, `feedback`, `wet_dry_mix`, `stereo_spread`, `lfo_rate_hz`, `lfo_depth`, `filter_low_hz`, `filter_high_hz`) and basic validation (`ge`, `le`). Implemented the `apply_complex_delay(audio: np.ndarray, sample_rate: int, params: DelayParameters) -> np.ndarray` function signature with a minimal body (`return audio.copy()`) to resolve import errors.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Added model and function), `tests/synthesis/test_effects.py` (Updated invalid parameter test calls to include all required model fields).
+- **Notes**: This minimal implementation successfully resolves the `ImportError` reported by the `tdd` mode, allowing tests in `tests/synthesis/test_effects.py` to be collected and run. As expected, tests asserting that the effect changes the audio fail because the function currently returns the input unchanged. The test for invalid filter range (`filter_low_hz > filter_high_hz`) also fails as cross-field validation was not part of this minimal step.

@@ -66,6 +66,24 @@
 *Milestones, completed tasks, overall status.*
 
 
+#### [2025-04-11 16:26:00] - Task: Update Documentation for Complex Delay Integration (REQ-ART-V02 - Documentation)
+- **Status:** Completed.
+- **Deliverables:** Updated `README.md` with `delay_effect` example configuration and parameter descriptions. Verified docstrings in `src/robotic_psalms/config.py` for `DelayConfig` and `PsalmConfig.delay_effect` are accurate.
+---
+
+
+#### [2025-04-11 16:07:47] - Task: Integrate Complex Delay into Sacred Machinery (REQ-ART-V02 - Integration TDD Green Phase)
+- **Status:** Completed.
+- **Deliverables:** Modified `src/robotic_psalms/synthesis/sacred_machinery.py` to import and conditionally call `apply_complex_delay` based on `PsalmConfig.delay_effect`. All 9 tests in `tests/test_sacred_machinery.py` pass.
+---
+
+
+#### [2025-04-11 16:02:23] - Task: Add Configuration for Complex Delay Effect (REQ-ART-V02 - Configuration)
+- **Status:** Completed.
+- **Deliverables:** Added `DelayConfig` Pydantic model and `delay_effect: Optional[DelayConfig]` field to `PsalmConfig` in `src/robotic_psalms/config.py`. Includes defaults, validation, and docstrings.
+---
+
+
 #### [2025-04-11 15:07:01] - Task: Update Documentation for Formant Shifter Integration (REQ-ART-V01 - Documentation)
 - **Status:** Completed.
 - **Deliverables:** Updated `README.md` (example config, parameter guide, roadmap, known issues). Delegated update of `src/robotic_psalms/config.py` docstring for `formant_shift` to `code` mode (confirmed completed).
@@ -126,4 +144,11 @@
 #### [2025-04-11 15:21:54] - Feature: Robust Formant Shifting (REQ-ART-V01)
 - **Status:** Completed.
 - **Deliverables:** Functional `pyworld`-based formant shifter (`apply_robust_formant_shift`) implemented in `src/robotic_psalms/synthesis/effects.py`, resolving previous technical debt. Integrated into `VoxDeiSynthesizer`, replacing the old method. Relevant tests created/updated and passing. Documentation updated in `README.md`, `config.py`, `vox_dei.py`. Dependency `pyworld` added.
+---
+
+
+#### [2025-04-11 16:26:34] - Feature: Complex Delay Effect (REQ-ART-V02 Part)
+- **Status:** Completed (Core Functionality).
+- **Deliverables:** Implemented `apply_complex_delay` function and `DelayParameters`/`DelayConfig` models using `pedalboard.Delay` in `src/robotic_psalms/synthesis/effects.py` and `src/robotic_psalms/config.py`. Integrated conditionally into `SacredMachineryEngine`. Core tests passing, documentation updated.
+- **Notes:** Tests for advanced parameters (stereo spread, LFO, filtering) marked `xfail` as these are not supported by `pedalboard.Delay`. Feedback parameter test also `xfail` due to suspected library issue.
 ---

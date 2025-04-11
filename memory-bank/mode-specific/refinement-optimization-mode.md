@@ -33,3 +33,21 @@
 - **Metrics After**: N/A
 - **Related Debt**: N/A
 - **Related Issue**: N/A
+
+### Optimization: [2025-04-11 15:59:32] - Refactor Complex Delay Implementation & Tests (REQ-ART-V02)
+- **Target**: `src/robotic_psalms/synthesis/effects.py`, `tests/synthesis/test_effects.py`
+- **Type**: Readability/Maintainability
+- **Desc**: Refactored `effects.py`: Removed duplicate/unused imports, added comments to `DelayParameters` indicating ignored fields (stereo_spread, LFO, filters), added comment acknowledging known `pedalboard.Delay` feedback issue. Refactored `test_effects.py`: Reverted incorrect import consolidation attempt. Confirmed test results (22 passed, 6 xfailed) unchanged.
+- **Metrics Before**: N/A
+- **Metrics After**: N/A
+- **Related Debt**: N/A
+- **Related Issue**: REQ-ART-V02
+
+### Optimization: [2025-04-11 16:14:00] - Refactor Complex Delay Integration Code & Tests (REQ-ART-V02)
+- **Target**: `src/robotic_psalms/synthesis/sacred_machinery.py`, `tests/test_sacred_machinery.py`
+- **Type**: Modularity/Readability/Maintainability
+- **Desc**: Refactored `sacred_machinery.py`: Extracted delay application logic into `_apply_configured_delay` helper method, removed debug code. Refactored `test_sacred_machinery.py`: Introduced `engine_factory` fixture to reduce setup duplication for tests requiring modified configurations.
+- **Metrics Before**: N/A
+- **Metrics After**: N/A
+- **Related Debt**: N/A
+- **Related Issue**: REQ-ART-V02

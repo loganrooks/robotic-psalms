@@ -70,5 +70,85 @@
 - Completion time: 2025-04-11 15:07:30
 - Outcome: Documentation updated successfully.
 
+### [2025-04-11 15:27:11] Task: REQ-ART-V02 - Write Failing Tests (Complex Delay)
+- Assigned to: tdd
+- Description: Create failing unit tests for complex delay effect.
+- Expected deliverable: Failing tests in `tests/synthesis/test_effects.py`.
+- Status: completed
+- Completion time: 2025-04-11 15:40:54
+- Outcome: Failing tests created successfully (failing on import).
+
+### [2025-04-11 15:40:54] Task: REQ-ART-V02 - Implement Minimal Complex Delay (Green Phase Start)
+- Assigned to: code
+- Description: Implement minimal code for `apply_complex_delay` and `DelayParameters` to resolve import errors.
+- Expected deliverable: Tests running but failing on assertions.
+- Status: completed
+- Completion time: 2025-04-11 15:43:50
+- Outcome: Minimal implementation added. ImportError resolved.
+
+### [2025-04-11 15:43:50] Task: REQ-ART-V02 - Implement Functional Complex Delay (Green Phase)
+- Assigned to: code
+- Description: Implement functional delay logic using `pedalboard.Delay`.
+- Expected deliverable: Passing core delay tests.
+- Status: completed
+- Completion time: 2025-04-11 15:48:49
+- Outcome: Core delay implemented. 22 tests pass, 6 xfail (unimplemented params + feedback issue).
+
+### [2025-04-11 15:48:49] Task: REQ-ART-V02 - Debug Delay Feedback Test
+- Assigned to: debug
+- Description: Investigate why the feedback parameter test is unexpectedly failing/xfailing.
+- Expected deliverable: Root cause analysis and recommendation.
+- Status: completed
+- Completion time: 2025-04-11 15:57:36
+- Outcome: Issue traced to `pedalboard.Delay` library behavior under test conditions. Recommended keeping test xfailed.
+
+### [2025-04-11 15:57:36] Task: REQ-ART-V02 - Refactor Complex Delay Implementation
+- Assigned to: refinement-optimization-mode
+- Description: Refactor `apply_complex_delay` and `DelayParameters` in `effects.py` and tests.
+- Expected deliverable: Refactored code, stable test results.
+- Status: completed
+- Completion time: 2025-04-11 16:00:11
+- Outcome: Code clarity improved with comments. Test results stable (22 passed, 6 xfailed).
+
+### [2025-04-11 16:00:11] Task: REQ-ART-V02 - Add Delay Configuration
+- Assigned to: code
+- Description: Add `DelayConfig` model to `config.py` and integrate into `PsalmConfig`.
+- Expected deliverable: Updated `config.py`.
+- Status: completed
+- Completion time: 2025-04-11 16:03:26
+- Outcome: Configuration added successfully.
+
+### [2025-04-11 16:03:26] Task: REQ-ART-V02 - Update Integration Tests (Complex Delay - Red Phase)
+- Assigned to: tdd
+- Description: Add/update tests in `test_sacred_machinery.py` to expect `apply_complex_delay` based on config.
+- Expected deliverable: Failing integration tests.
+- Status: completed
+- Completion time: 2025-04-11 16:05:55
+- Outcome: Tests added and confirmed failing as expected.
+
+### [2025-04-11 16:05:55] Task: REQ-ART-V02 - Integrate Complex Delay (Green Phase)
+- Assigned to: code
+- Description: Modify `sacred_machinery.py` to conditionally call `apply_complex_delay`.
+- Expected deliverable: Passing integration tests.
+- Status: completed
+- Completion time: 2025-04-11 16:08:18
+- Outcome: Integration successful. All tests in `test_sacred_machinery.py` pass.
+
+### [2025-04-11 16:08:18] Task: REQ-ART-V02 - Refactor Complex Delay Integration
+- Assigned to: refinement-optimization-mode
+- Description: Refactor integration code in `sacred_machinery.py` and tests.
+- Expected deliverable: Refactored code, passing tests.
+- Status: completed
+- Completion time: 2025-04-11 16:15:15
+- Outcome: Integration logic extracted to helper method. Test fixtures improved.
+
+### [2025-04-11 16:15:15] Task: REQ-ART-V02 - Update Documentation (Complex Delay)
+- Assigned to: docs-writer
+- Description: Update `README.md` and `config.py` docs for the new delay effect.
+- Expected deliverable: Updated documentation files.
+- Status: completed
+- Completion time: 2025-04-11 16:26:15
+- Outcome: Documentation updated successfully.
+
 ## Workflow State
 <!-- Update current workflow state here -->

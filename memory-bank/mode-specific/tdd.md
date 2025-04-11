@@ -71,6 +71,30 @@
 - Zero-length input
 - Invalid parameter values (shift_factor)
 - No-op parameter value (shift_factor=1.0)
+
+
+### Test Plan: Complex Delay Effect (REQ-ART-V02) - 2025-04-11 15:36:35
+#### Unit Tests:
+- Test Case: Delay module/function/class exists / Expected: Import succeeds / Status: Failing
+- Test Case: Apply delay to mono signal / Expected: Output shape matches input, content differs / Status: Failing
+- Test Case: Apply delay to stereo signal / Expected: Output shape matches input (stereo), content differs / Status: Failing
+- Test Case: Changing delay_time_ms affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing feedback affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing wet_dry_mix affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing stereo_spread affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing lfo_rate_hz affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing lfo_depth affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing filter_low_hz affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing filter_high_hz affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Handle zero-length input / Expected: Output is zero-length / Status: Failing
+- Test Case: Handle invalid feedback / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid LFO rate / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid filter range / Expected: Raises ValidationError or ValueError / Status: Failing
+#### Integration Tests:
+- None yet (Focus is unit tests for the effect itself)
+#### Edge Cases Covered:
+- Zero-length input
+- Invalid parameter values (feedback, LFO rate, filter range)
 ## Test Cases
 <!-- List specific test cases (unit, integration) -->
 
@@ -160,6 +184,10 @@
 
 ### Fixture: formant_shift_params_no_shift - 2025-04-11 00:15:56
 - **Purpose**: Provides parameters for no formant shifting (shift_factor=1.0) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Testing no-op case for formant shift.
+
+
+### Fixture: default_delay_params - 2025-04-11 15:36:35
+- **Purpose**: Provides default parameters for complex delay (REQ-ART-V02) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for complex delay tests.
 <!-- Append test run summaries using the format below -->
 
 ### Test Run: 2025-04-08 10:41:13
@@ -182,6 +210,14 @@
 - **Env**: Local
 - **Suite**: `tests/synthesis/test_vox_dei.py -k test_robotic_effects_modify_audio`
 - **Result**: FAIL
+
+
+### Test Run: Complex Delay Effect (REQ-ART-V02 - Red Phase) - [2025-04-11 15:36:35]
+- **Trigger**: Manual (Anticipated)
+- **Env**: Local
+- **Suite**: `tests/synthesis/test_effects.py -k complex_delay`
+- **Result**: FAIL (Anticipated)
+- **Failures**: `test_complex_delay_module_exists`: `ImportError: cannot import name 'apply_complex_delay' from 'robotic_psalms.synthesis.effects'`, `ImportError: cannot import name 'DelayParameters' from 'robotic_psalms.synthesis.effects'` (or similar NameErrors during test collection).
 - **Failures**: `test_robotic_effects_modify_audio`: `AttributeError: <module 'robotic_psalms.synthesis.vox_dei' ...> does not have the attribute 'apply_robust_formant_shift'`
 ### TDD Cycle: High-Quality Reverb (REQ-ART-E01) - 2025-04-08 13:03:24
 - **Start**: 2025-04-08 13:01:51
@@ -206,4 +242,28 @@
 - **Red**: Modified `tests/synthesis/test_vox_dei.py` (`test_robotic_effects_modify_audio`) to assert call to `apply_robust_formant_shift`. Test fails with `AttributeError`.
 - **Green**: [Pending]
 - **Refactor**: [Pending]
+
+
+### TDD Cycle: Complex Delay Effect (REQ-ART-V02) - 2025-04-11 15:36:35
+- **Start**: 2025-04-11 15:36:16
+- **End**: 2025-04-11 15:36:35
+- **Red**: Tests created: Wrote failing tests in `tests/synthesis/test_effects.py` for `apply_complex_delay` and `DelayParameters` (target: `src/robotic_psalms/synthesis/effects.py`). Tests cover basic application, parameter control, input types, and edge cases. Failing due to `ImportError`/`NameError`.
+- **Green**: Implementation approach: Next step is to create the minimal placeholder implementations for `DelayParameters` (Pydantic model) and `apply_complex_delay` function in `src/robotic_psalms/synthesis/effects.py`.
+- **Refactor**: Improvements made: N/A (Red phase only)
+- **Outcomes**: Established test harness for the complex delay effect.
 - **Outcomes**: Confirmed TDD workflow for integration tests requires code changes in the target module (`vox_dei.py`).
+
+
+### TDD Cycle: Integration Test for `apply_complex_delay` - [2025-04-11 16:05:25]
+- **Start**: [2025-04-11 16:04:31]
+- **Red**: Added `test_process_psalm_applies_complex_delay_when_configured` and `test_process_psalm_does_not_apply_complex_delay_when_not_configured` to `tests/test_sacred_machinery.py`. Both tests fail during `@patch` setup with `AttributeError: ... does not have the attribute 'apply_complex_delay'`, confirming the function is not yet imported/used in `sacred_machinery.py`.
+- **Green**: [Pending]
+- **Refactor**: [Pending]
+- **Outcomes**: Confirmed Red phase for integration test. Ready for Green phase (modifying `sacred_machinery.py`).
+
+### Test Run: Integration Test for `apply_complex_delay` - [2025-04-11 16:05:25]
+- **Trigger**: Manual
+- **Env**: Local
+- **Suite**: `tests/test_sacred_machinery.py`
+- **Result**: FAIL
+- **Failures**: `test_process_psalm_applies_complex_delay_when_configured`: `AttributeError: ... does not have the attribute 'apply_complex_delay'`, `test_process_psalm_does_not_apply_complex_delay_when_not_configured`: `AttributeError: ... does not have the attribute 'apply_complex_delay'`

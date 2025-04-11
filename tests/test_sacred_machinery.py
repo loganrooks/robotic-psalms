@@ -2,10 +2,10 @@ import pytest
 import numpy as np
 from unittest.mock import patch, MagicMock, ANY # Add ANY
 from typing import cast # Added for casting
-from robotic_psalms.synthesis.effects import ReverbParameters # Add ReverbParameters
+from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters # Add ReverbParameters, DelayParameters
 
 # Import actual implementations
-from robotic_psalms.config import PsalmConfig, HauntingParameters, MixLevels, LiturgicalMode, ReverbConfig
+from robotic_psalms.config import PsalmConfig, HauntingParameters, MixLevels, LiturgicalMode, ReverbConfig, DelayConfig # Add DelayConfig
 from robotic_psalms.synthesis.sacred_machinery import SacredMachineryEngine, SynthesisResult
 from robotic_psalms.synthesis.vox_dei import VoxDeiSynthesizer, VoxDeiSynthesisError # Keep for side_effect
 
@@ -16,19 +16,21 @@ def default_config() -> PsalmConfig:
     return PsalmConfig()
 
 @pytest.fixture
-def engine(default_config: PsalmConfig) -> SacredMachineryEngine:
-    """Provides a SacredMachineryEngine instance with default config."""
-    # Patch VoxDeiSynthesizer during engine init to avoid real TTS calls
-    with patch('robotic_psalms.synthesis.sacred_machinery.VoxDeiSynthesizer', autospec=True) as mock_vox_init:
-        # Configure the mock instance created by the patch
-        mock_vox_instance = mock_vox_init.return_value
-        mock_vox_instance.sample_rate = 48000 # Match engine's default
-        # Ensure synthesize_text exists on the mock spec
-        mock_vox_instance.synthesize_text = MagicMock()
+def engine_factory():
+    """Factory fixture to create a patched SacredMachineryEngine instance."""
+    def _create_engine(config: PsalmConfig) -> SacredMachineryEngine:
+        with patch('robotic_psalms.synthesis.sacred_machinery.VoxDeiSynthesizer', autospec=True) as mock_vox_init:
+            mock_vox_instance = mock_vox_init.return_value
+            mock_vox_instance.sample_rate = 48000 # Match engine's default
+            mock_vox_instance.synthesize_text = MagicMock()
+            engine_instance = SacredMachineryEngine(config=config)
+            return engine_instance
+    return _create_engine
 
-        engine_instance = SacredMachineryEngine(config=default_config)
-        # engine_instance.vox_dei is now the mock_vox_instance
-        return engine_instance
+@pytest.fixture
+def engine(default_config: PsalmConfig, engine_factory) -> SacredMachineryEngine:
+    """Provides a SacredMachineryEngine instance with default config using the factory."""
+    return engine_factory(default_config)
 
 # --- Test process_psalm Success Case ---
 
@@ -103,18 +105,16 @@ def test_process_psalm_vocal_synthesis_error(engine: SacredMachineryEngine, capl
 
 # --- Test Effects Application ---
 
-@patch('robotic_psalms.synthesis.sacred_machinery.apply_high_quality_reverb', autospec=True) # Add patch
-def test_process_psalm_applies_haunting(mock_apply_reverb: MagicMock, default_config: PsalmConfig): # Add mock arg
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_high_quality_reverb', autospec=True)
+def test_process_psalm_applies_haunting(mock_apply_reverb: MagicMock, default_config: PsalmConfig, engine_factory):
     """Test that haunting effects attempt to call the new high-quality reverb."""
     # Modify config for strong haunting
-    default_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.8), spectral_freeze=0.5)
-    default_config.glitch_density = 0.0 # Disable glitch for isolation
+    test_config = default_config.model_copy(deep=True) # Use model_copy for safety
+    test_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.8), spectral_freeze=0.5)
+    test_config.glitch_density = 0.0 # Disable glitch for isolation
 
-    # Re-init engine with modified config, patching VoxDei again
-    with patch('robotic_psalms.synthesis.sacred_machinery.VoxDeiSynthesizer', autospec=True) as mock_vox_init:
-        mock_vox_instance = mock_vox_init.return_value
-        mock_vox_instance.sample_rate = 48000
-        engine = SacredMachineryEngine(config=default_config)
+    # Create engine with modified config using the factory
+    engine = engine_factory(test_config)
 
     psalm_text = "Haunting test"
     duration = 2.0
@@ -141,18 +141,16 @@ def test_process_psalm_applies_haunting(mock_apply_reverb: MagicMock, default_co
     cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
 
 
-def test_process_psalm_applies_glitch(default_config: PsalmConfig):
+def test_process_psalm_applies_glitch(default_config: PsalmConfig, engine_factory):
     """Test that glitch effects are applied when configured."""
     # Modify config for glitch
-    default_config.glitch_density = 0.8 # High density
+    test_config = default_config.model_copy(deep=True)
+    test_config.glitch_density = 0.8 # High density
     # Minimize haunting effects by setting to minimum allowed values
-    default_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.5), spectral_freeze=0.0)
+    test_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.5), spectral_freeze=0.0)
 
-    # Re-init engine with modified config
-    with patch('robotic_psalms.synthesis.sacred_machinery.VoxDeiSynthesizer', autospec=True) as mock_vox_init:
-        mock_vox_instance = mock_vox_init.return_value
-        mock_vox_instance.sample_rate = 48000
-        engine = SacredMachineryEngine(config=default_config)
+    # Create engine with modified config using the factory
+    engine = engine_factory(test_config)
 
     psalm_text = "Glitch test"
     duration = 2.0
@@ -169,6 +167,71 @@ def test_process_psalm_applies_glitch(default_config: PsalmConfig):
     cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
 
 # --- Test Helper Methods (Indirectly) ---
+
+
+# --- NEW TESTS FOR COMPLEX DELAY ---
+
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_complex_delay', autospec=True)
+def test_process_psalm_applies_complex_delay_when_configured(mock_apply_delay: MagicMock, default_config: PsalmConfig, engine_factory):
+    """Test that complex delay effect is applied when configured in PsalmConfig."""
+    # Modify config to enable delay
+    test_config = default_config.model_copy(deep=True)
+    test_delay_config = DelayConfig(delay_time_ms=500.0, feedback=0.3, wet_dry_mix=0.5)
+    test_config.delay_effect = test_delay_config
+    test_config.glitch_density = 0.0 # Disable glitch for isolation
+    test_config.haunting_intensity = HauntingParameters() # Use default haunting
+
+    # Create engine with modified config using the factory
+    engine = engine_factory(test_config)
+
+    psalm_text = "Delay test"
+    duration = 2.0
+    expected_samples = int(duration * engine.sample_rate)
+    # Provide simple input audio via the mock
+    input_vocals = np.ones(expected_samples, dtype=np.float32) * 0.5
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
+
+    # Process the psalm
+    result = engine.process_psalm(psalm_text, duration)
+
+    # Assert that the delay function was called (EXPECTED TO FAIL)
+    mock_apply_delay.assert_called_once()
+
+    # Check arguments (basic check using ANY for audio)
+    call_args = mock_apply_delay.call_args[0]
+    assert isinstance(call_args[0], np.ndarray) # audio data
+    assert call_args[1] == engine.sample_rate # sample rate
+    assert isinstance(call_args[2], DelayParameters) # DelayParameters instance
+    # Verify parameters passed correctly from config
+    assert call_args[2].delay_time_ms == test_delay_config.delay_time_ms
+    assert call_args[2].feedback == test_delay_config.feedback
+    assert call_args[2].wet_dry_mix == test_delay_config.wet_dry_mix
+
+    # Ensure synth was called
+    cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
+
+
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_complex_delay', autospec=True)
+def test_process_psalm_does_not_apply_complex_delay_when_not_configured(mock_apply_delay: MagicMock, engine: SacredMachineryEngine):
+    """Test that complex delay effect is NOT applied when not configured (default)."""
+    # Engine fixture uses default config where delay_effect is None
+
+    psalm_text = "No delay test"
+    duration = 2.0
+    expected_samples = int(duration * engine.sample_rate)
+    # Provide simple input audio via the mock
+    input_vocals = np.ones(expected_samples, dtype=np.float32) * 0.5
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
+
+    # Process the psalm
+    result = engine.process_psalm(psalm_text, duration)
+
+    # Assert that the delay function was NOT called
+    mock_apply_delay.assert_not_called()
+
+    # Ensure synth was called
+    cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
+
 
 def test_process_psalm_fit_to_length(engine: SacredMachineryEngine):
     """Test that components are correctly fitted to the target duration."""
@@ -194,17 +257,15 @@ def test_process_psalm_fit_to_length(engine: SacredMachineryEngine):
             component_audio = getattr(result, component_name)
             assert len(component_audio) == expected_samples, f"{component_name} should be fitted to target length"
 
-def test_process_psalm_mix_levels(default_config: PsalmConfig):
+def test_process_psalm_mix_levels(default_config: PsalmConfig, engine_factory):
     """Test that mix levels are applied."""
     # Set distinct mix levels
-    default_config.mix_levels = MixLevels(vocals=0.1, pads=0.2, percussion=0.3, drones=0.4)
+    test_config = default_config.model_copy(deep=True)
+    test_config.mix_levels = MixLevels(vocals=0.1, pads=0.2, percussion=0.3, drones=0.4)
     # No need to modify haunting/glitch here, we will mock the effect methods
 
-    # Re-init engine
-    with patch('robotic_psalms.synthesis.sacred_machinery.VoxDeiSynthesizer', autospec=True) as mock_vox_init:
-        mock_vox_instance = mock_vox_init.return_value
-        mock_vox_instance.sample_rate = 48000
-        engine = SacredMachineryEngine(config=default_config)
+    # Create engine with modified config using the factory
+    engine = engine_factory(test_config)
 
     psalm_text = "Mix test"
     duration = 1.0

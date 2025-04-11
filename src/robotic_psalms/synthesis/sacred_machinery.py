@@ -8,6 +8,7 @@ from scipy import signal
 from ..config import PsalmConfig, HauntingParameters, LiturgicalMode
 from .vox_dei import VoxDeiSynthesizer, VoxDeiSynthesisError
 from .effects import apply_high_quality_reverb, ReverbParameters
+from .effects import apply_complex_delay, DelayParameters
 from scipy.signal.windows import hann
 from dataclasses import dataclass
 
@@ -159,6 +160,8 @@ class SacredMachineryEngine:
                 self.logger.error(f"Failed to save vocals after normalization: {write_err}")
         # --- END DEBUG ---
 
+        # Apply complex delay effect if configured
+        combined = self._apply_configured_delay(combined)
         return SynthesisResult(
             vocals=vocals.astype(np.float32),
             pads=pads.astype(np.float32),
@@ -515,3 +518,22 @@ class SacredMachineryEngine:
         if peak > 1.0:
             return audio / peak
         return audio
+
+
+    def _apply_configured_delay(
+        self,
+        audio: npt.NDArray[np.float32]
+    ) -> npt.NDArray[np.float32]:
+        """Applies the complex delay effect if configured in self.config."""
+        if self.config.delay_effect is not None and self.config.delay_effect.wet_dry_mix > 0:
+            self.logger.debug("Applying complex delay effect...")
+            try:
+                delay_params = DelayParameters(**self.config.delay_effect.model_dump())
+                processed_audio = apply_complex_delay(audio, self.sample_rate, delay_params)
+                # Ensure audio is float32 after effect
+                return np.array(processed_audio, dtype=np.float32)
+            except Exception as delay_err:
+                self.logger.error(f"Failed to apply complex delay effect: {delay_err}")
+                return audio # Return original audio on error
+        else:
+            return audio # Return original if not configured or mix is zero

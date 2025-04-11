@@ -41,3 +41,22 @@
 
 ## Fixes Applied/Attempted
 <!-- Document code changes made -->
+
+### Issue: [DELAY-FEEDBACK-XFAIL] - `test_complex_delay_feedback_parameter` xfails due to identical output - [Status: Investigated] - [2025-04-11 15:57:30]
+- **Reported**: 2025-04-11 15:49:05 (Initial Task) / **Severity**: Medium / **Symptoms**: `tests/synthesis/test_effects.py::test_complex_delay_feedback_parameter` marked `xfail` because changing `feedback` (0.5 vs 0.8) in `apply_complex_delay` produced numerically identical outputs (`np.allclose` with `atol=1e-9`), even with `wet_dry_mix=1.0`.
+- **Investigation**:
+    1. Reviewed test: Used sine wave input, `wet_dry_mix=1.0`, `feedback=0.5` vs `0.8`, `atol=1e-9`. Logic sound, but sine wave might mask differences. [2025-04-11 15:49:51]
+    2. Reviewed implementation (`apply_complex_delay`): Confirmed `feedback` parameter correctly passed to `pedalboard.Delay`. [2025-04-11 15:50:02]
+    3. Modified test: Changed input to impulse signal. Ran tests: Still `xfailed`. [2025-04-11 15:50:29]
+    4. Modified test: Used impulse, increased `delay_time_ms` to 1000.0, used extreme feedback (0.1 vs 0.9). Ran tests: Still `xfailed`. [2025-04-11 15:50:55]
+    5. Checked `pedalboard` version: `0.9.16`. [2025-04-11 15:51:10]
+    6. Searched web for known issues with `pedalboard==0.9.16` `Delay` feedback: No relevant issues found. [2025-04-11 15:51:18]
+    7. Added temporary direct test (`test_direct_pedalboard_delay_feedback`) using `pedalboard.Delay` directly with impulse, 1000ms delay, 1.0 mix, 0.1 vs 0.9 feedback. [2025-04-11 15:51:36]
+    8. Fixed imports for direct test. [2025-04-11 15:53:03]
+    9. Ran tests: Direct test failed `AssertionError: Direct pedalboard.Delay test failed: feedback change had no effect`. [2025-04-11 15:53:13]
+    10. Removed temporary direct test. [2025-04-11 15:57:05]
+- **Root Cause**: The `feedback` parameter in `pedalboard.Delay` (version 0.9.16) does not produce numerically different outputs under the tested conditions (impulse signal, 1s delay, 1.0 mix, feedback 0.1 vs 0.9, `atol=1e-9`), even when used directly. The issue appears to be within the library itself. [2025-04-11 15:57:30]
+- **Fix Applied**: None. The issue lies within the external library.
+- **Verification**: N/A
+- **Related Issues**: None identified.
+- **Recommendation**: Keep `test_complex_delay_feedback_parameter` marked as `xfail`. Consider reporting the issue to the `pedalboard` developers or investigating alternative delay implementations if precise feedback control is critical.

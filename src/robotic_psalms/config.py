@@ -1,9 +1,7 @@
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator # Corrected import
 from dataclasses import dataclass
-
-
 
 
 class LiturgicalMode(str, Enum):
@@ -60,6 +58,64 @@ class ReverbConfig(BaseModel):
         description="Mix between the original (dry) and reverb (wet) signal (0.0 = dry, 1.0 = wet)."
     )
 
+# Moved DelayConfig here
+class DelayConfig(BaseModel):
+    """Configuration for the complex delay effect.
+
+    Mirrors the parameters in `synthesis.effects.DelayParameters`.
+    Note: Some parameters (stereo_spread, LFO, filters) are included for future
+    compatibility but are not currently utilized by the underlying `pedalboard.Delay` effect.
+    """
+    delay_time_ms: float = Field(
+        default=500.0,
+        gt=0.0,
+        description="Delay time in milliseconds."
+    )
+    feedback: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Feedback amount (0.0 to 1.0). Controls the number of repetitions."
+    )
+    wet_dry_mix: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Mix between the original (dry) and delayed (wet) signal (0.0 = dry, 1.0 = wet). Default 0.0 disables the effect."
+    )
+    stereo_spread: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Stereo spread of the delay taps (0.0 to 1.0). Currently unused."
+    )
+    lfo_rate_hz: float = Field(
+        default=1.0,
+        gt=0.0,
+        description="Rate of the Low-Frequency Oscillator (LFO) modulating the delay time, in Hz. Currently unused."
+    )
+    lfo_depth: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Depth of the LFO modulation (0.0 to 1.0). Currently unused."
+    )
+    filter_low_hz: float = Field(
+        default=20.0,
+        ge=20.0,
+        description="Low-cut filter frequency for the feedback path, in Hz. Currently unused."
+    )
+    filter_high_hz: float = Field(
+        default=20000.0,
+        le=22000.0, # Nyquist for 44.1kHz
+        description="High-cut filter frequency for the feedback path, in Hz. Currently unused."
+    )
+
+    @model_validator(mode='after')
+    def check_filter_order(self):
+        if self.filter_low_hz > self.filter_high_hz:
+            raise ValueError("filter_low_hz cannot be greater than filter_high_hz")
+        return self
 
 class HauntingParameters(BaseModel):
     """Parameters controlling ethereal qualities, including reverb and spectral freeze."""
@@ -74,7 +130,7 @@ class HauntingParameters(BaseModel):
         description="Amount of spectral freezing effect"
     )
 
-class VocalTimbre(BaseModel):
+class VocalTimbre(BaseModel): # Removed empty lines below
     """Three-way blend between voice types"""
     choirboy: float = Field(
         default=0.33,
@@ -184,6 +240,10 @@ class PsalmConfig(BaseModel):
         default_factory=HauntingParameters,
         description="Ethereal effect parameters"
     )
+    delay_effect: Optional[DelayConfig] = Field( # This was inserted correctly before
+        default=None,
+        description="Optional configuration for the complex delay effect. If None, the effect is disabled."
+    )
     voice_range: VoiceRange = Field(
         default_factory=VoiceRange,
         description="Voice range settings"
@@ -204,9 +264,7 @@ class PsalmConfig(BaseModel):
         default=None,
         description="Path to input MIDI file"
     )
-    
+
 
     class Config:
         use_enum_values = True
-
-

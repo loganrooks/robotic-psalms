@@ -124,6 +124,16 @@ vocal_timbre:
   android: 0.4
   machinery: 0.2
   formant_shift_factor: 1.2 # Shift formants up slightly (range 0.5-2.0)
+  delay_effect: # Optional complex delay effect
+    delay_time_ms: 500.0  # Delay time in milliseconds (float, > 0.0)
+    feedback: 0.3         # Feedback amount (float, 0.0 to 1.0) - NOTE: Test currently fails for this param
+    wet_dry_mix: 0.2      # Mix between original (dry) and delayed (wet) signal (float, 0.0 to 1.0)
+    # stereo_spread: 0.0    # Stereo spread (float, 0.0 to 1.0) - Currently unimplemented
+    # lfo_frequency: 0.0    # LFO frequency for delay time modulation (float, >= 0.0) - Currently unimplemented
+    # lfo_depth: 0.0        # LFO depth for delay time modulation (float, 0.0 to 1.0) - Currently unimplemented
+    # filter_cutoff: 20000.0 # Low-pass filter cutoff frequency in Hz (float, > 0.0) - Currently unimplemented
+    # filter_resonance: 0.0 # Filter resonance (float, >= 0.0) - Currently unimplemented
+
 ```
 
 ### Input Format
@@ -182,6 +192,16 @@ robotic-psalms examples/psalm.txt output.wav --config examples/config.yml --visu
   - `wet_dry_mix`: The balance between the original (dry) signal and the reverb (wet) signal (0.0 for full dry, 1.0 for full wet).
 - `spectral_freeze`: Amount of spectral time-stretching
 - `formant_shift_factor`: Adjusts vocal formants (0.5-2.0). Values > 1.0 raise formants (brighter/smaller perceived source), < 1.0 lowers them (darker/larger). Uses `pyworld` for robust shifting, preserving pitch better than simpler methods.
+- `delay_effect`: (Optional) Configuration for a complex delay effect applied to the final output. If this section is omitted or `wet_dry_mix` is set to 0, the effect is disabled.
+  - `delay_time_ms`: The primary delay time in milliseconds (e.g., `500.0`). Must be greater than 0.
+  - `feedback`: The amount of the delayed signal fed back into the delay line (0.0 to 1.0). Higher values create more repetitions. *Note: The unit test for this parameter currently fails due to limitations in the underlying `pedalboard.Delay` implementation.*
+  - `wet_dry_mix`: The balance between the original (dry) signal and the delayed (wet) signal (0.0 for full dry, 1.0 for full wet).
+  - `stereo_spread`: *Currently unimplemented.* Intended to control stereo width.
+  - `lfo_frequency`: *Currently unimplemented.* Intended for LFO modulation of delay time.
+  - `lfo_depth`: *Currently unimplemented.* Intended for LFO modulation depth.
+  - `filter_cutoff`: *Currently unimplemented.* Intended for filtering the delayed signal.
+  - `filter_resonance`: *Currently unimplemented.* Intended for filter resonance.
+
 
 ### Voice Timbre
 Blend between three voice characteristics:

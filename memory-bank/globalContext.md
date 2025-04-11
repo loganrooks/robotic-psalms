@@ -55,6 +55,13 @@
 - **Justification:** Bypasses Python library integration issues and leverages the known working command-line tool. Provides a robust way to get audio data.
 - **Alternatives Considered:** Further debugging Python libraries, switching to Piper/Coqui TTS (deferred).
 
+
+
+#### [2025-04-08 14:47:14] - Decision: Use `pedalboard` for Initial Reverb Implementation
+- **Context:** Requirement REQ-ART-E01 calls for a high-quality reverb effect. Minimal implementation is needed to pass initial tests.
+- **Decision:** Use the `pedalboard.Reverb` class for the initial implementation of `apply_high_quality_reverb`.
+- **Justification:** `pedalboard` is a capable audio effects library, suggested in the task guidance. It provides a readily available reverb effect suitable for a minimal implementation. Parameter mapping from `ReverbParameters` (defined by tests) to `pedalboard.Reverb` parameters is feasible, although some parameters like `pre_delay` require simulation (padding).
+- **Alternatives Considered:** Implementing a reverb algorithm from scratch (too complex for minimal implementation), using `scipy.signal.convolve` with an Impulse Response (requires finding/managing IR files).
 ## Progress
 *Milestones, completed tasks, overall status.*
 
@@ -81,3 +88,18 @@
 - **Status:** Completed.
 - **Deliverables:** Added unit tests to `tests/test_sacred_machinery.py` covering `process_psalm` success/error cases, effects application, and helper methods (indirectly). Debugged and fixed test failures related to mocking and validation.
 - **Coverage:** `sacred_machinery.py` improved from 13% to 73%.
+
+
+#### [2025-04-08 14:47:14] - Task: Implement Minimal High-Quality Reverb (REQ-ART-E01 - Green Phase)
+- **Status:** Completed.
+- **Deliverables:** Created `src/robotic_psalms/synthesis/effects.py` with `ReverbParameters` model and `apply_high_quality_reverb` function using `pedalboard`. Added `pedalboard` dependency to `pyproject.toml`. Updated `tests/synthesis/test_effects.py` to handle Pydantic v2 and reverb length changes. All tests pass.
+
+
+#### [2025-04-08 14:54:13] - Task: Update Integration Tests for High-Quality Reverb (REQ-ART-E01 - Integration TDD Red Phase)
+- **Status:** Completed (Red Phase).
+- **Deliverables:** Modified `tests/test_sacred_machinery.py` (`test_process_psalm_applies_haunting`) to assert call to `apply_high_quality_reverb`. Test fails with `AttributeError` as expected.
+
+
+#### [2025-04-08 15:35:52] - Task: Update Documentation for Reverb Integration (REQ-ART-E01 - Documentation)
+- **Status:** Completed.
+- **Deliverables:** Updated `README.md` configuration example and parameter guide. Updated docstrings and code in `src/robotic_psalms/config.py` (added `ReverbConfig`, modified `HauntingParameters`) and `src/robotic_psalms/synthesis/sacred_machinery.py` (updated docstrings, replaced old reverb logic with call to `apply_high_quality_reverb`, removed `_generate_reverb_ir`).

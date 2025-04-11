@@ -1,3 +1,19 @@
+
+
+### TDD Cycle: Integration Test for `apply_high_quality_reverb` - [2025-04-08 14:55:15]
+- **Start**: [2025-04-08 14:54:13]
+- **Red**: Modified `tests/test_sacred_machinery.py` (`test_process_psalm_applies_haunting`) to assert call to `apply_high_quality_reverb`. Test fails with `AttributeError`.
+- **Green**: [Pending]
+- **Refactor**: [Pending]
+- **Outcomes**: Confirmed TDD workflow for integration tests requires code changes in the target module (`sacred_machinery.py`).
+
+
+### Test Run: Integration Test for `apply_high_quality_reverb` - [2025-04-08 14:55:15]
+- **Trigger**: Manual
+- **Env**: Local
+- **Suite**: `tests/test_sacred_machinery.py`
+- **Result**: FAIL
+- **Failures**: `test_process_psalm_applies_haunting`: `AttributeError: <module 'robotic_psalms.synthesis.sacred_machinery' from '/home/rookslog/robotic-psalms/src/robotic_psalms/synthesis/sacred_machinery.py'> does not have the attribute 'apply_high_quality_reverb'`
 # Tester (TDD) Specific Memory
 
 *This file stores context, notes, and decisions specific to the Tester (TDD) mode.*
@@ -8,6 +24,24 @@
 <!-- Describe the component/feature being tested -->
 
 
+
+
+### Test Plan: High-Quality Reverb (REQ-ART-E01) - 2025-04-08 13:03:24
+#### Unit Tests:
+- Test Case: Reverb module/function/class exists / Expected: Import succeeds / Status: Failing
+- Test Case: Apply reverb to mono signal / Expected: Output shape matches input, content differs / Status: Failing
+- Test Case: Apply reverb to stereo signal / Expected: Output shape matches input (stereo), content differs / Status: Failing
+- Test Case: Changing decay_time affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing wet_dry_mix affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing pre_delay affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Handle zero-length input / Expected: Output is zero-length / Status: Failing
+- Test Case: Handle invalid decay_time / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid wet_dry_mix / Expected: Raises ValidationError or ValueError / Status: Failing
+#### Integration Tests:
+- None yet (Focus is unit tests for the effect itself)
+#### Edge Cases Covered:
+- Zero-length input
+- Invalid parameter values (via Pydantic/ValueError)
 ### Test Plan: Vocal Synthesis Fix - 2025-04-08 07:04:40
 #### Unit Tests:
 - Test Case: TTS engine generates non-empty float32 audio data / Expected: `np.ndarray` (float32, size > 0) / Status: Written
@@ -89,6 +123,16 @@
 ## Test Fixtures
 <!-- Append new fixtures using the format below -->
 
+
+
+### Fixture: dry_mono_signal - 2025-04-08 13:03:24
+- **Purpose**: Provides a standard 1-second 440Hz sine wave mono signal (float32) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Input for reverb tests.
+
+### Fixture: dry_stereo_signal - 2025-04-08 13:03:24
+- **Purpose**: Provides a standard 1-second 440Hz sine wave stereo signal (float32) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Input for stereo reverb tests.
+
+### Fixture: default_reverb_params - 2025-04-08 13:03:24
+- **Purpose**: Provides a default set of `ReverbParameters` based on REQ-ART-E01 / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for reverb tests.
 ## Test Execution Results
 <!-- Append test run summaries using the format below -->
 
@@ -102,3 +146,13 @@
 - **Trigger**: Manual / **Env**: Local / **Suite**: tests/
 - **Result**: PASS / **Summary**: 41 Passed / 0 Failed / 0 Skipped
 - **Report Link**: N/A / **Failures**: None
+
+
+
+### TDD Cycle: High-Quality Reverb (REQ-ART-E01) - 2025-04-08 13:03:24
+- **Start**: 2025-04-08 13:01:51
+- **End**: 2025-04-08 13:03:24
+- **Red**: Tests created: Wrote failing tests in `tests/synthesis/test_effects.py` for `apply_high_quality_reverb` and `ReverbParameters` (target: `src/robotic_psalms/synthesis/effects.py`). Tests cover basic application, parameter control, input types, and edge cases. Failing due to `ImportError`.
+- **Green**: Implementation approach: Next step is to create the `src/robotic_psalms/synthesis/effects.py` module with minimal placeholder implementations for `ReverbParameters` (Pydantic model) and `apply_high_quality_reverb` function to resolve the `ImportError` and make tests runnable (though likely still failing assertions).
+- **Refactor**: Improvements made: N/A (Red phase only)
+- **Outcomes**: Established test harness for the high-quality reverb effect.

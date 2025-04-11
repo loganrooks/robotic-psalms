@@ -92,3 +92,41 @@
     - Updated `README.md`: System Requirements, Python Requirements, Installation, Troubleshooting, Acknowledgments, added Development Status/Roadmap section, added link to `docs/index.md`.
     - Updated `src/robotic_psalms/architecture.md`: Technical Dependencies, added Implementation Notes on refactoring and future direction.
 - **Status:** Documentation files updated. Preparing Memory Bank update and task completion.
+
+
+
+### [2025-04-08 13:03:24] - Task: Write Failing Tests for High-Quality Reverb (REQ-ART-E01)
+- **Focus:** Create failing unit tests (Red phase) for a new high-quality reverb implementation (`apply_high_quality_reverb` in `src/robotic_psalms/synthesis/effects.py`).
+- **Actions:** Created `tests/synthesis/test_effects.py` with tests covering basic application, parameter control (decay, mix, pre-delay), mono/stereo input, zero-length input, and invalid parameter handling.
+- **Status:** Red phase complete. Tests are failing as expected due to `ImportError` (module/function not yet implemented). Ready for Green phase (implementation).
+
+
+
+### [2025-04-08 14:47:14] - Task: Implement Minimal High-Quality Reverb (REQ-ART-E01 - Green Phase)
+- **Focus:** Implement `ReverbParameters` model and `apply_high_quality_reverb` function in `src/robotic_psalms/synthesis/effects.py` to pass tests in `tests/synthesis/test_effects.py`.
+- **Approach:** Used `pedalboard.Reverb` for the effect. Added `pedalboard` dependency. Implemented basic pre-delay via padding. Updated Pydantic model config and test assertions to handle Pydantic v2 and reverb tail length changes.
+- **Files Created/Modified:** `src/robotic_psalms/synthesis/effects.py`, `tests/synthesis/test_effects.py`, `pyproject.toml`.
+- **Status:** Implementation complete. All tests in `tests/synthesis/test_effects.py` pass. Preparing Memory Bank update and task completion.
+
+
+
+### [2025-04-08 14:50:57] - Task: Refactor High-Quality Reverb (REQ-ART-E01 - Refactor Phase)
+- **Focus:** Refactor `src/robotic_psalms/synthesis/effects.py` and `tests/synthesis/test_effects.py` for clarity and maintainability.
+- **Actions:**
+    - Added constants and improved comments for parameter mapping in `effects.py`.
+    - Removed irrelevant commented-out tests in `test_effects.py`.
+    - Confirmed all tests pass post-refactoring.
+- **Status:** Completed. Preparing Memory Bank update and task completion.
+
+
+
+### [2025-04-08 14:54:13] - Task: Update Integration Tests for High-Quality Reverb (REQ-ART-E01 - Integration TDD Red Phase)
+- **Focus:** Modify `tests/test_sacred_machinery.py` to assert that `SacredMachineryEngine` calls the new `apply_high_quality_reverb` function.
+- **Actions:** Modified `test_process_psalm_applies_haunting` using `@patch` to mock `apply_high_quality_reverb` within the `sacred_machinery` module scope and assert it's called.
+- **Status:** Red phase complete. Test `test_process_psalm_applies_haunting` fails with `AttributeError` as expected, confirming the function is not yet integrated into `sacred_machinery.py`. Ready for Green phase (modifying `sacred_machinery.py`).
+
+
+
+### [2025-04-08 15:35:31] - Task: Update Documentation for Reverb Integration (REQ-ART-E01 - Documentation)
+- **Focus:** Updated `README.md`, `src/robotic_psalms/config.py` docstrings, and `src/robotic_psalms/synthesis/sacred_machinery.py` docstrings/code to reflect the new high-quality reverb implementation (`apply_high_quality_reverb`, `ReverbConfig`).
+- **Status:** Completed.

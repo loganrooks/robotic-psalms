@@ -3,6 +3,46 @@
 *This file tracks the immediate focus, ongoing tasks, and unresolved questions for the current session.*
 
 ---
+### [2025-04-11 17:52:50] - Task: Check/Update Chorus Docstrings (REQ-ART-V03 - Documentation Part)
+- **Focus:** Verify docstrings for `ChorusParameters` (in `effects.py`) and `PsalmConfig.chorus_params` (in `config.py`).
+- **Actions:**
+    - Read `src/robotic_psalms/config.py`.
+    - Read `src/robotic_psalms/synthesis/effects.py`.
+    - Analyzed docstrings for clarity, accuracy, and completeness.
+- **Status:** Docstrings checked and found to be adequate. No changes required. Preparing Memory Bank update and completion.
+
+---
+
+
+### [2025-04-11 17:51:30] - Task: Update Documentation for Chorus Effect (REQ-ART-V03 - Documentation)
+- **Focus:** Update `README.md` and coordinate update for `src/robotic_psalms/config.py` docstrings for the new `chorus_params` configuration.
+- **Actions:**
+    - Read `README.md`.
+    - Applied diffs to add `chorus_params` example config and parameter descriptions to `README.md`.
+    - Prepared Memory Bank updates.
+- **Status:** `README.md` update complete. Preparing to delegate `config.py` docstring check/update to `code` mode.
+
+
+### [2025-04-11 17:53:18] - Task: Implement Chorus Effect (REQ-ART-V03)
+- **Focus:** Completed full TDD cycle (implementation, integration, refactoring, documentation) for the Chorus effect using `pedalboard.Chorus`. Integrated conditionally into `SacredMachineryEngine`.
+- **Status:** Completed. Core tests passing (known xfail for ignored `num_voices` parameter). Documentation updated.
+- **Note:** `num_voices` parameter currently ignored by implementation.
+---
+
+
+### [2025-04-11 17:46:11] - Task: Integrate Chorus Effect into SacredMachineryEngine (REQ-ART-V03 - Integration Phase)
+- **Focus:** Integrate the `apply_chorus` effect into the `SacredMachineryEngine` processing chain, controlled by `PsalmConfig`.
+- **Actions:**
+    - Added `ChorusParameters` import and `chorus_params: Optional[ChorusParameters]` field to `PsalmConfig` in `src/robotic_psalms/config.py`.
+    - Added `apply_chorus` and `ChorusParameters` imports to `src/robotic_psalms/synthesis/sacred_machinery.py`.
+    - Created `_apply_configured_chorus` helper method in `SacredMachineryEngine`.
+    - Called `_apply_configured_chorus` in `process_psalm` after normalization and before delay.
+    - Ran `pytest tests`.
+- **Status:** Integration complete. All tests pass (81 passed, 7 xfailed). Preparing Memory Bank update and completion.
+
+---
+
+
 ### [2025-04-11 17:29:23] - Task: Update Documentation for Atmospheric Filters (REQ-ART-V02 - Documentation Phase)
 - **Focus:** Update `README.md` to document `ResonantFilterParameters` and `BandpassFilterParameters`.
 - **Actions:**

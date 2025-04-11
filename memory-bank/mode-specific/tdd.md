@@ -120,6 +120,32 @@
 #### Edge Cases Covered:
 - Zero-length input
 - Invalid parameter values (cutoff, resonance, center_freq, q)
+
+
+### Test Plan: Chorus Effect (REQ-ART-V03) - [2025-04-11 17:34:21]
+#### Unit Tests:
+- Test Case: Chorus module/function/class exists / Expected: Import succeeds / Status: Failing
+- Test Case: Apply chorus to mono signal / Expected: Output shape matches input, content differs / Status: Failing
+- Test Case: Apply chorus to stereo signal / Expected: Output shape matches input (stereo), content differs / Status: Failing
+- Test Case: Changing rate_hz affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing depth affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing delay_ms affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing feedback affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing num_voices affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing wet_dry_mix affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Handle zero-length input / Expected: Output is zero-length / Status: Failing
+- Test Case: Handle invalid rate_hz / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid depth / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid delay_ms / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid feedback / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid num_voices / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid wet_dry_mix / Expected: Raises ValidationError or ValueError / Status: Failing
+#### Integration Tests:
+- None yet (Focus is unit tests for the effect)
+#### Edge Cases Covered:
+- Zero-length input
+- Invalid parameter values (rate, depth, delay, feedback, num_voices, mix)
+
 <!-- List specific test cases (unit, integration) -->
 
 ## Refactoring Targets (Post-Pass)
@@ -227,6 +253,11 @@
 ### Fixture: default_bandpass_filter_params - [2025-04-11 16:31:08]
 - **Purpose**: Provides default parameters for bandpass filter / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for bandpass filter tests.
 
+
+### Fixture: default_chorus_params - [2025-04-11 17:34:21]
+- **Purpose**: Provides default parameters for chorus effect (REQ-ART-V03) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for chorus tests.
+
+
 ### Test Run: 2025-04-08 10:41:13
 - **Trigger**: Manual / **Env**: Local / **Suite**: tests/synthesis/
 - **Result**: PASS / **Summary**: 30 Passed / 0 Failed / 0 Skipped
@@ -307,6 +338,16 @@
 - **Green**: Implementation approach: Next step is to create minimal placeholder implementations for the functions and Pydantic models in `src/robotic_psalms/synthesis/effects.py`.
 - **Refactor**: Improvements made: N/A (Red phase only)
 - **Outcomes**: Established test harness for atmospheric filtering effects.
+
+
+### TDD Cycle: Chorus Effect (REQ-ART-V03 - Red Phase) - [2025-04-11 17:34:21]
+- **Start**: [2025-04-11 17:33:05]
+- **End**: [2025-04-11 17:34:21]
+- **Red**: Tests created: Wrote failing tests in `tests/synthesis/test_effects.py` for `apply_chorus` and `ChorusParameters`. Tests cover existence, basic application (mono/stereo), parameter control (rate, depth, delay, feedback, num_voices, mix), and edge cases (zero-length, invalid params). Failing due to `ImportError`/`NameError` (Pylance: "unknown import symbol").
+- **Green**: Implementation approach: Next step is to create minimal placeholder implementations for the function and Pydantic model in `src/robotic_psalms/synthesis/effects.py`.
+- **Refactor**: Improvements made: N/A (Red phase only)
+- **Outcomes**: Established test harness for the chorus effect.
+
 ### Test Run: Integration Test for `apply_complex_delay` - [2025-04-11 16:05:25]
 - **Trigger**: Manual
 - **Env**: Local
@@ -321,3 +362,12 @@
 - **Suite**: `tests/synthesis/test_effects.py -k atmospheric`
 - **Result**: FAIL (Anticipated)
 - **Failures**: `test_atmospheric_filter_modules_exist`: `ImportError: cannot import name 'apply_resonant_filter' from 'robotic_psalms.synthesis.effects'`, `ImportError: cannot import name 'ResonantFilterParameters' ...`, etc. (or similar NameErrors/Pylance errors during test collection).
+
+
+### Test Run: Chorus Effect (REQ-ART-V03 - Red Phase) - [2025-04-11 17:34:21]
+- **Trigger**: Manual (Anticipated)
+- **Env**: Local
+- **Suite**: `tests/synthesis/test_effects.py -k chorus`
+- **Result**: FAIL (Anticipated)
+- **Failures**: `test_chorus_module_exists`: `ImportError: cannot import name 'apply_chorus' from 'robotic_psalms.synthesis.effects'`, `ImportError: cannot import name 'ChorusParameters' ...`, etc. (or similar NameErrors/Pylance errors during test collection).
+

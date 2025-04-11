@@ -2,9 +2,11 @@ import pytest
 import numpy as np
 from unittest.mock import patch, MagicMock, ANY # Add ANY
 from typing import cast # Added for casting
+from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters, ChorusParameters # Add ChorusParameters
 from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters # Add ReverbParameters, DelayParameters
 
 # Import actual implementations
+from robotic_psalms.config import PsalmConfig, HauntingParameters, MixLevels, LiturgicalMode, ReverbConfig, DelayConfig # Remove ChorusConfig
 from robotic_psalms.config import PsalmConfig, HauntingParameters, MixLevels, LiturgicalMode, ReverbConfig, DelayConfig # Add DelayConfig
 from robotic_psalms.synthesis.sacred_machinery import SacredMachineryEngine, SynthesisResult
 from robotic_psalms.synthesis.vox_dei import VoxDeiSynthesizer, VoxDeiSynthesisError # Keep for side_effect
@@ -232,6 +234,103 @@ def test_process_psalm_does_not_apply_complex_delay_when_not_configured(mock_app
     # Ensure synth was called
     cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
 
+
+
+
+# --- NEW TESTS FOR CHORUS ---
+
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_chorus', autospec=True)
+def test_process_psalm_applies_chorus_when_configured(mock_apply_chorus: MagicMock, default_config: PsalmConfig, engine_factory):
+    """Test that chorus effect is applied when configured in PsalmConfig."""
+    # Modify config to enable chorus
+    test_config = default_config.model_copy(deep=True)
+    # Instantiate ChorusParameters directly as ChorusConfig doesn't exist in config.py
+    test_chorus_params = ChorusParameters(rate_hz=1.0, depth=0.5, delay_ms=7.0, feedback=0.2, num_voices=3, wet_dry_mix=0.6) # Corrected param name and added num_voices
+    test_config.chorus_params = test_chorus_params
+    test_config.glitch_density = 0.0 # Disable glitch for isolation
+    test_config.haunting_intensity = HauntingParameters() # Use default haunting
+    test_config.delay_effect = None # Disable delay for isolation
+
+    # Create engine with modified config using the factory
+    engine = engine_factory(test_config)
+
+    psalm_text = "Chorus test"
+    duration = 2.0
+    expected_samples = int(duration * engine.sample_rate)
+    # Provide simple input audio via the mock
+    input_vocals = np.ones(expected_samples, dtype=np.float32) * 0.5
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
+
+    # Process the psalm
+    result = engine.process_psalm(psalm_text, duration)
+
+    # Assert that the chorus function was called
+    mock_apply_chorus.assert_called_once()
+
+    # Check arguments (basic check using ANY for audio)
+    call_args = mock_apply_chorus.call_args[0]
+    assert isinstance(call_args[0], np.ndarray) # audio data
+    assert call_args[1] == engine.sample_rate # sample rate
+    assert isinstance(call_args[2], ChorusParameters) # ChorusParameters instance
+    # Verify parameters passed correctly from config
+    assert call_args[2].rate_hz == test_chorus_params.rate_hz
+    assert call_args[2].depth == test_chorus_params.depth
+    assert call_args[2].delay_ms == test_chorus_params.delay_ms # Corrected param name
+    assert call_args[2].feedback == test_chorus_params.feedback
+    assert call_args[2].wet_dry_mix == test_chorus_params.wet_dry_mix
+
+    # Ensure synth was called
+    cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
+
+
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_chorus', autospec=True)
+def test_process_psalm_does_not_apply_chorus_when_not_configured(mock_apply_chorus: MagicMock, engine: SacredMachineryEngine):
+    """Test that chorus effect is NOT applied when not configured (default)."""
+    # Engine fixture uses default config where chorus_params is None
+
+    psalm_text = "No chorus test"
+    duration = 2.0
+    expected_samples = int(duration * engine.sample_rate)
+    # Provide simple input audio via the mock
+    input_vocals = np.ones(expected_samples, dtype=np.float32) * 0.5
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
+
+    # Process the psalm
+    result = engine.process_psalm(psalm_text, duration)
+
+    # Assert that the chorus function was NOT called
+    mock_apply_chorus.assert_not_called()
+
+    # Ensure synth was called
+    cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
+
+
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_chorus', autospec=True)
+def test_process_psalm_does_not_apply_chorus_when_mix_is_zero(mock_apply_chorus: MagicMock, default_config: PsalmConfig, engine_factory):
+    """Test that chorus effect is NOT applied when configured but mix is zero."""
+    # Modify config to enable chorus but set mix to 0
+    test_config = default_config.model_copy(deep=True)
+    test_chorus_params = ChorusParameters(rate_hz=1.0, depth=0.5, delay_ms=7.0, feedback=0.2, num_voices=3, wet_dry_mix=0.0) # Corrected param name and added num_voices
+    test_config.chorus_params = test_chorus_params
+
+    # Create engine with modified config using the factory
+    engine = engine_factory(test_config)
+
+    psalm_text = "Zero mix chorus test"
+    duration = 2.0
+    expected_samples = int(duration * engine.sample_rate)
+    # Provide simple input audio via the mock
+    input_vocals = np.ones(expected_samples, dtype=np.float32) * 0.5
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
+
+    # Process the psalm
+    result = engine.process_psalm(psalm_text, duration)
+
+    # Assert that the chorus function was NOT called
+    mock_apply_chorus.assert_not_called()
+
+    # Ensure synth was called
+    cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
 
 def test_process_psalm_fit_to_length(engine: SacredMachineryEngine):
     """Test that components are correctly fitted to the target duration."""

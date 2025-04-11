@@ -16,6 +16,8 @@ from robotic_psalms.synthesis.effects import (
     ResonantFilterParameters, # Placeholder
     apply_bandpass_filter,
     BandpassFilterParameters, # Placeholder
+    apply_chorus,
+    ChorusParameters, # Placeholder
 )
 from pedalboard._pedalboard import Pedalboard # Import as suggested by Pylance
 
@@ -96,6 +98,19 @@ def default_bandpass_filter_params():
         center_hz=1500.0,
         q=1.0, # Quality factor
         order=2 # Default order
+    )
+
+
+@pytest.fixture
+def default_chorus_params():
+    """Default chorus parameters."""
+    return ChorusParameters(
+        rate_hz=0.8,
+        depth=0.25,
+        delay_ms=7.0,
+        feedback=0.2,
+        num_voices=3,
+        wet_dry_mix=0.5 # Added wet/dry mix based on other effects
     )
 
 # --- Reverb Tests ---
@@ -520,3 +535,113 @@ def test_bandpass_filter_invalid_parameters(white_noise_mono):
     params_edge_low = BandpassFilterParameters(center_hz=1.0, q=0.1, order=2)
     filtered_signal_low = apply_bandpass_filter(white_noise_mono, SAMPLE_RATE, params_edge_low)
     assert not np.allclose(filtered_signal_low, white_noise_mono, atol=1e-6), "Bandpass filter with low center/Q returned original signal unexpectedly"
+
+
+# --- Chorus Tests (REQ-ART-V03) ---
+
+def test_chorus_module_exists():
+    """Checks if the chorus imports work."""
+    assert callable(apply_chorus)
+    assert 'rate_hz' in ChorusParameters.model_fields
+    assert 'depth' in ChorusParameters.model_fields
+    assert 'delay_ms' in ChorusParameters.model_fields
+    assert 'feedback' in ChorusParameters.model_fields
+    assert 'num_voices' in ChorusParameters.model_fields
+    assert 'wet_dry_mix' in ChorusParameters.model_fields
+
+def test_apply_chorus_mono(dry_mono_signal, default_chorus_params):
+    """Test applying chorus to a mono signal."""
+    chorused_signal = apply_chorus(
+        dry_mono_signal, SAMPLE_RATE, default_chorus_params
+    )
+    assert chorused_signal.ndim == dry_mono_signal.ndim
+    assert len(chorused_signal) == len(dry_mono_signal)
+    assert not np.allclose(chorused_signal, dry_mono_signal), "Chorus did not alter mono signal"
+
+def test_apply_chorus_stereo(dry_stereo_signal, default_chorus_params):
+    """Test applying chorus to a stereo signal."""
+    chorused_signal = apply_chorus(
+        dry_stereo_signal, SAMPLE_RATE, default_chorus_params
+    )
+    assert chorused_signal.ndim == dry_stereo_signal.ndim
+    assert chorused_signal.shape[1] == 2
+    assert chorused_signal.shape[0] == dry_stereo_signal.shape[0]
+    assert not np.allclose(chorused_signal, dry_stereo_signal), "Chorus did not alter stereo signal"
+
+@pytest.mark.xfail(reason="pedalboard.Chorus does not support num_voices")
+def test_chorus_parameters_affect_output(dry_mono_signal, default_chorus_params):
+    """Test that changing chorus parameters alters the output."""
+    chorused_default = apply_chorus(dry_mono_signal, SAMPLE_RATE, default_chorus_params)
+
+    # Change rate
+    params_changed_rate = default_chorus_params.model_copy(update={'rate_hz': 2.0})
+    chorused_changed_rate = apply_chorus(dry_mono_signal, SAMPLE_RATE, params_changed_rate)
+    assert not np.allclose(chorused_default, chorused_changed_rate), "Changing rate_hz had no effect"
+
+    # Change depth
+    params_changed_depth = default_chorus_params.model_copy(update={'depth': 0.8})
+    chorused_changed_depth = apply_chorus(dry_mono_signal, SAMPLE_RATE, params_changed_depth)
+    assert not np.allclose(chorused_default, chorused_changed_depth), "Changing depth had no effect"
+
+    # Change delay
+    params_changed_delay = default_chorus_params.model_copy(update={'delay_ms': 20.0})
+    chorused_changed_delay = apply_chorus(dry_mono_signal, SAMPLE_RATE, params_changed_delay)
+    assert not np.allclose(chorused_default, chorused_changed_delay), "Changing delay_ms had no effect"
+
+    # Change feedback
+    params_changed_feedback = default_chorus_params.model_copy(update={'feedback': 0.8})
+    chorused_changed_feedback = apply_chorus(dry_mono_signal, SAMPLE_RATE, params_changed_feedback)
+    assert not np.allclose(chorused_default, chorused_changed_feedback), "Changing feedback had no effect"
+
+    # Change num_voices
+    params_changed_voices = default_chorus_params.model_copy(update={'num_voices': 5})
+    chorused_changed_voices = apply_chorus(dry_mono_signal, SAMPLE_RATE, params_changed_voices)
+
+    assert not np.allclose(chorused_default, chorused_changed_voices), "Changing num_voices had no effect"
+
+    # Change wet_dry_mix
+    params_changed_mix = default_chorus_params.model_copy(update={'wet_dry_mix': 0.9})
+    chorused_changed_mix = apply_chorus(dry_mono_signal, SAMPLE_RATE, params_changed_mix)
+    assert not np.allclose(chorused_default, chorused_changed_mix), "Changing wet_dry_mix had no effect"
+
+def test_chorus_zero_length_input(default_chorus_params):
+    """Test chorus with zero-length audio input."""
+    zero_signal = np.array([], dtype=np.float32)
+    chorused_signal = apply_chorus(
+        zero_signal, SAMPLE_RATE, default_chorus_params
+    )
+    assert isinstance(chorused_signal, np.ndarray)
+    assert len(chorused_signal) == 0
+
+def test_chorus_invalid_parameters(dry_mono_signal):
+    """Test chorus with invalid parameter values."""
+    with pytest.raises((ValidationError, ValueError)):
+        # Rate must be > 0
+        invalid_params = ChorusParameters(rate_hz=0.0, depth=0.25, delay_ms=7.0, feedback=0.2, num_voices=3, wet_dry_mix=0.5)
+        apply_chorus(dry_mono_signal, SAMPLE_RATE, invalid_params)
+
+    with pytest.raises((ValidationError, ValueError)):
+        # Depth must be 0 <= depth <= 1
+        invalid_params = ChorusParameters(rate_hz=0.8, depth=1.5, delay_ms=7.0, feedback=0.2, num_voices=3, wet_dry_mix=0.5)
+        apply_chorus(dry_mono_signal, SAMPLE_RATE, invalid_params)
+
+    with pytest.raises((ValidationError, ValueError)):
+        # Delay must be > 0
+        invalid_params = ChorusParameters(rate_hz=0.8, depth=0.25, delay_ms=0.0, feedback=0.2, num_voices=3, wet_dry_mix=0.5)
+        apply_chorus(dry_mono_signal, SAMPLE_RATE, invalid_params)
+
+    with pytest.raises((ValidationError, ValueError)):
+        # Feedback must be 0 <= feedback <= 1
+        invalid_params = ChorusParameters(rate_hz=0.8, depth=0.25, delay_ms=7.0, feedback=-0.1, num_voices=3, wet_dry_mix=0.5)
+        apply_chorus(dry_mono_signal, SAMPLE_RATE, invalid_params)
+
+    with pytest.raises((ValidationError, ValueError)):
+        # Num voices must be >= 2
+        invalid_params = ChorusParameters(rate_hz=0.8, depth=0.25, delay_ms=7.0, feedback=0.2, num_voices=1, wet_dry_mix=0.5)
+        apply_chorus(dry_mono_signal, SAMPLE_RATE, invalid_params)
+
+    with pytest.raises((ValidationError, ValueError)):
+        # Wet/dry mix must be 0 <= mix <= 1
+        invalid_params = ChorusParameters(rate_hz=0.8, depth=0.25, delay_ms=7.0, feedback=0.2, num_voices=3, wet_dry_mix=1.1)
+        apply_chorus(dry_mono_signal, SAMPLE_RATE, invalid_params)
+

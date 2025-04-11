@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Optional
+from .synthesis.effects import ResonantFilterParameters, BandpassFilterParameters, ChorusParameters
 from .synthesis.effects import ResonantFilterParameters, BandpassFilterParameters
 from pydantic import BaseModel, Field, model_validator # Corrected import
 from dataclasses import dataclass
@@ -252,6 +253,10 @@ class PsalmConfig(BaseModel):
     bandpass_filter_params: Optional[BandpassFilterParameters] = Field(
         default=None,
         description="Optional configuration for the band-pass filter effect. If None, the effect is disabled. Takes precedence over resonant filter if both are defined."
+    )
+    chorus_params: Optional[ChorusParameters] = Field(
+        default=None,
+        description="Optional configuration for the chorus effect. If None, the effect is disabled."
     )
     voice_range: VoiceRange = Field(
         default_factory=VoiceRange,

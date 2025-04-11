@@ -140,7 +140,13 @@ vocal_timbre:
       center_hz: 1000.0   # Center frequency in Hz (float, > 0.0)
       q: 2.0            # Quality factor (Q) (float, > 0.0)
       order: 2          # Filter order (integer, > 0, default: 2)
-
+    chorus_params: # Optional chorus effect applied to the vocal timbre
+      rate_hz: 1.5          # Chorus modulation rate in Hz (float, > 0.0)
+      depth: 0.25           # Chorus modulation depth (float, 0.0 to 1.0)
+      delay_ms: 7.0         # Base delay time for chorus voices in milliseconds (float, > 0.0)
+      feedback: 0.0         # Feedback amount for chorus voices (float, 0.0 to 1.0)
+      wet_dry_mix: 0.5      # Mix between original (dry) and chorus (wet) signal (float, 0.0 to 1.0)
+      # num_voices: 3       # Number of chorus voices (integer, >= 2) - Currently ignored by implementation
 ```
 
 ### Input Format
@@ -215,7 +221,13 @@ robotic-psalms examples/psalm.txt output.wav --config examples/config.yml --visu
   - `center_hz`: The center frequency of the bandpass filter in Hz (e.g., `1000.0`). Must be greater than 0.
   - `q`: The quality factor (Q) of the filter (e.g., `2.0`). Higher values result in a narrower bandwidth. Must be greater than 0.
   - `order`: The order of the Butterworth filter (e.g., `2`). Higher orders create a steeper rolloff. Must be greater than 0, defaults to 2.
-
+- `chorus_params`: (Optional) Configuration for a chorus effect applied to the vocal timbre. If this section is omitted or `wet_dry_mix` is set to 0, the effect is disabled.
+  - `rate_hz`: The modulation frequency of the chorus effect in Hertz (e.g., `1.5`). Must be greater than 0.
+  - `depth`: The depth of the chorus modulation (0.0 to 1.0). Controls the intensity of the pitch variation.
+  - `delay_ms`: The base delay time for the chorus voices in milliseconds (e.g., `7.0`). Must be greater than 0.
+  - `feedback`: The amount of the chorus signal fed back into the effect (0.0 to 1.0). Can create a more resonant or flanging sound at higher values.
+  - `wet_dry_mix`: The balance between the original (dry) signal and the chorus (wet) signal (0.0 for full dry, 1.0 for full wet).
+  - `num_voices`: *Currently ignored by the implementation.* Intended to control the number of chorus voices.
 
 ### Voice Timbre
 Blend between three voice characteristics:

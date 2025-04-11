@@ -5,6 +5,10 @@
 ---
 
 
+### Plan Item: Update Chorus Effect Docs (REQ-ART-V03) - [2025-04-11 17:51:30]
+- **Type**: Guide / **Audience**: User/Dev / **Outline**: 1. Update README (Example, Param Guide) 2. Delegate config.py docstring update / **Status**: README Done, Delegating config.py / **Owner**: docs-writer -> code / **Source**: User Task REQ-ART-V03 / **Location**: README.md, src/robotic_psalms/config.py
+
+
 ### Plan Item: Update Complex Delay Docs (REQ-ART-V02) - [2025-04-11 16:26:15]
 - **Type**: Guide / **Audience**: User/Dev / **Outline**: 1. Update README (Example, Param Guide) 2. Verify config.py docstrings / **Status**: Done / **Owner**: docs-writer / **Source**: User Task REQ-ART-V02 / **Location**: README.md, src/robotic_psalms/config.py
 

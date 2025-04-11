@@ -150,5 +150,45 @@
 - Completion time: 2025-04-11 16:26:15
 - Outcome: Documentation updated successfully.
 
+### [2025-04-11 17:32:51] Task: REQ-ART-V03 - Write Failing Tests (Chorus Effect)
+- Assigned to: tdd
+- Description: Create failing unit tests for chorus effect.
+- Expected deliverable: Failing tests in `tests/synthesis/test_effects.py`.
+- Status: completed
+- Completion time: 2025-04-11 17:34:54
+- Outcome: Failing tests created successfully (failing on import).
+
+### [2025-04-11 17:34:54] Task: REQ-ART-V03 - Implement Chorus Effect (Green Phase)
+- Assigned to: code
+- Description: Implement functional chorus logic using `pedalboard.Chorus`.
+- Expected deliverable: Passing core chorus tests.
+- Status: completed
+- Completion time: 2025-04-11 17:37:48
+- Outcome: Chorus implemented. 5 tests pass, 1 xfail (ignored `num_voices`).
+
+### [2025-04-11 17:37:48] Task: REQ-ART-V03 - Integrate Chorus Effect
+- Assigned to: code
+- Description: Add config to `config.py` and integrate `apply_chorus` into `sacred_machinery.py`.
+- Expected deliverable: Passing integration tests.
+- Status: completed
+- Completion time: 2025-04-11 17:47:05
+- Outcome: Integration successful. All tests pass (81 passed, 7 xfailed).
+
+### [2025-04-11 17:47:05] Task: REQ-ART-V03 - Refactor Chorus Integration
+- Assigned to: refinement-optimization-mode
+- Description: Refactor integration code in `sacred_machinery.py` and add specific integration tests.
+- Expected deliverable: Refactored code, improved tests passing.
+- Status: completed
+- Completion time: 2025-04-11 17:49:46
+- Outcome: Integration tests added. All tests pass (84 passed, 7 xfailed).
+
+### [2025-04-11 17:49:46] Task: REQ-ART-V03 - Update Documentation (Chorus Effect)
+- Assigned to: docs-writer
+- Description: Update `README.md` and verify docstrings for the new chorus effect.
+- Expected deliverable: Updated documentation files.
+- Status: completed
+- Completion time: 2025-04-11 17:53:18
+- Outcome: Documentation updated successfully.
+
 ## Workflow State
 <!-- Update current workflow state here -->

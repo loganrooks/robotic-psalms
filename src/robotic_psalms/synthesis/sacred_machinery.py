@@ -9,6 +9,7 @@ from ..config import PsalmConfig, HauntingParameters, LiturgicalMode
 from .vox_dei import VoxDeiSynthesizer, VoxDeiSynthesisError
 from .effects import apply_high_quality_reverb, ReverbParameters
 from .effects import apply_complex_delay, DelayParameters
+from .effects import apply_chorus, ChorusParameters
 from scipy.signal.windows import hann
 from dataclasses import dataclass
 
@@ -161,6 +162,9 @@ class SacredMachineryEngine:
         # --- END DEBUG ---
 
         # Apply complex delay effect if configured
+        # Apply chorus effect if configured
+        combined = self._apply_configured_chorus(combined)
+
         combined = self._apply_configured_delay(combined)
         return SynthesisResult(
             vocals=vocals.astype(np.float32),
@@ -518,6 +522,26 @@ class SacredMachineryEngine:
         if peak > 1.0:
             return audio / peak
         return audio
+
+
+
+    def _apply_configured_chorus(
+        self,
+        audio: npt.NDArray[np.float32]
+    ) -> npt.NDArray[np.float32]:
+        """Applies the chorus effect if configured in self.config."""
+        if self.config.chorus_params is not None and self.config.chorus_params.wet_dry_mix > 0:
+            self.logger.debug("Applying chorus effect...")
+            try:
+                chorus_params = ChorusParameters(**self.config.chorus_params.model_dump())
+                processed_audio = apply_chorus(audio, self.sample_rate, chorus_params)
+                # Ensure audio is float32 after effect
+                return np.array(processed_audio, dtype=np.float32)
+            except Exception as chorus_err:
+                self.logger.error(f"Failed to apply chorus effect: {chorus_err}")
+                return audio # Return original audio on error
+        else:
+            return audio # Return original if not configured or mix is zero
 
 
     def _apply_configured_delay(

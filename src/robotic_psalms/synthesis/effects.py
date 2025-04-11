@@ -77,6 +77,19 @@ class BandpassFilterParameters(BaseModel):
     # Removed validator check_filter_range, handled in apply_bandpass_filter
 
 
+
+
+class ChorusParameters(BaseModel):
+    """Parameters for the chorus effect."""
+    rate_hz: float = Field(..., gt=0.0, description="Rate of the LFO modulating the delay time in Hz.")
+    depth: float = Field(..., ge=0.0, le=1.0, description="Depth of the LFO modulation (0.0 to 1.0).")
+    delay_ms: float = Field(..., gt=0.0, description="Base delay time in milliseconds.")
+    feedback: float = Field(..., ge=0.0, le=1.0, description="Feedback amount (0.0 to 1.0).")
+    num_voices: int = Field(..., ge=2, description="Number of chorus voices. [Note: Ignored by current pedalboard.Chorus implementation]")
+    wet_dry_mix: float = Field(..., ge=0.0, le=1.0, description="Mix between wet (chorus) and dry (original) signal (0=dry, 1=wet).")
+
+    model_config = ConfigDict(extra='forbid')
+
 # --- Effect Functions ---
 
 def apply_high_quality_reverb(audio: np.ndarray, sample_rate: int, params: ReverbParameters) -> np.ndarray:
@@ -424,3 +437,67 @@ def apply_bandpass_filter(audio: np.ndarray, sample_rate: int, params: BandpassF
 
     # Return float32
     return filtered_audio.astype(np.float32)
+
+
+def apply_chorus(audio: np.ndarray, sample_rate: int, params: ChorusParameters) -> np.ndarray:
+    """
+    Applies a chorus effect using pedalboard.Chorus.
+
+    Args:
+        audio: Input audio signal as a NumPy array (mono or stereo).
+        sample_rate: Sample rate of the audio signal.
+        params: An instance of ChorusParameters containing effect settings.
+
+    Returns:
+        The processed audio signal with chorus applied (float32).
+    """
+    if audio.size == 0:
+        return np.array([], dtype=np.float32)
+
+    # Import Chorus here to avoid potential circular imports if effects were split
+    try:
+        from pedalboard import Chorus
+    except ImportError:
+        raise ImportError("Pedalboard library is required for the chorus effect. Please install it.")
+
+    # Instantiate the chorus effect
+    # Note: pedalboard.Chorus does not have a 'num_voices' parameter.
+    chorus_effect = Chorus(
+        rate_hz=params.rate_hz,
+        depth=params.depth,
+        centre_delay_ms=params.delay_ms, # Map delay_ms to centre_delay_ms
+        feedback=params.feedback,
+        mix=params.wet_dry_mix # Map wet_dry_mix to mix
+    )
+
+    # Create a Pedalboard instance with the chorus effect
+    board = Pedalboard([chorus_effect])
+
+    # Process the audio (pedalboard expects float32)
+    audio_float32 = audio.astype(np.float32)
+    chorused_signal = board(audio_float32, sample_rate=sample_rate)
+
+    # Ensure output shape matches input channel count if possible
+    # Pedalboard Chorus usually outputs stereo, even for mono input
+    if audio.ndim == 1 and chorused_signal.ndim == 2:
+        # If input was mono, decide if output should be mono (average channels) or keep stereo
+        # For now, let's keep the stereo output as it's characteristic of chorus
+        pass # Keep stereo output
+    elif audio.ndim == 2 and chorused_signal.ndim == 1 and audio.shape[1] == 1:
+         # This case is unlikely with Chorus but handle defensively
+         chorused_signal = chorused_signal.reshape(-1, 1)
+
+    # Ensure output length matches input length (pedalboard chorus shouldn't change length)
+    if chorused_signal.shape[0] != audio.shape[0]:
+        # This shouldn't happen with Chorus, but handle defensively
+        target_len = audio.shape[0]
+        current_len = chorused_signal.shape[0]
+        if current_len > target_len:
+            chorused_signal = chorused_signal[:target_len, ...]
+        else:
+            padding_shape = (target_len - current_len,) + chorused_signal.shape[1:]
+            padding = np.zeros(padding_shape, dtype=chorused_signal.dtype)
+            chorused_signal = np.concatenate((chorused_signal, padding), axis=0)
+
+    return chorused_signal.astype(np.float32) # Return float32
+

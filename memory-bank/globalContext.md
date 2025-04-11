@@ -65,6 +65,18 @@
 ## Progress
 *Milestones, completed tasks, overall status.*
 
+#### [2025-04-11 17:52:50] - Task: Update Documentation for Chorus Effect (REQ-ART-V03 - Documentation)
+- **Status:** Completed.
+- **Deliverables:** Updated `README.md` with example configuration and parameter descriptions for `chorus_params`. Checked docstrings in `src/robotic_psalms/config.py` and `src/robotic_psalms/synthesis/effects.py` related to `ChorusParameters` and found them adequate.
+---
+
+
+#### [2025-04-11 17:46:28] - Feature: Chorus Effect Integration (REQ-ART-V03 Part)
+- **Status:** Completed.
+- **Deliverables:** Integrated `apply_chorus` function into `SacredMachineryEngine` processing chain (`src/robotic_psalms/synthesis/sacred_machinery.py`). Added `chorus_params: Optional[ChorusParameters]` configuration to `PsalmConfig` (`src/robotic_psalms/config.py`). Effect is applied conditionally based on configuration. All tests pass (81 passed, 7 xfailed).
+---
+
+
 #### [2025-04-11 17:29:34] - Task: Update Documentation for Atmospheric Filters (REQ-ART-V02 - Documentation Phase)
 - **Status:** Completed.
 - **Deliverables:** Updated `README.md` with example configuration and parameter descriptions for `resonant_filter` (Resonant Low-Pass) and `bandpass_filter` (Bandpass).
@@ -163,4 +175,11 @@
 - **Status:** Completed (Core Functionality).
 - **Deliverables:** Implemented `apply_complex_delay` function and `DelayParameters`/`DelayConfig` models using `pedalboard.Delay` in `src/robotic_psalms/synthesis/effects.py` and `src/robotic_psalms/config.py`. Integrated conditionally into `SacredMachineryEngine`. Core tests passing, documentation updated.
 - **Notes:** Tests for advanced parameters (stereo spread, LFO, filtering) marked `xfail` as these are not supported by `pedalboard.Delay`. Feedback parameter test also `xfail` due to suspected library issue.
+---
+
+
+#### [2025-04-11 17:53:36] - Feature: Chorus Effect (REQ-ART-V03)
+- **Status:** Completed.
+- **Deliverables:** Implemented `apply_chorus` function and `ChorusParameters`/`ChorusConfig` models using `pedalboard.Chorus` in `src/robotic_psalms/synthesis/effects.py` and `src/robotic_psalms/config.py`. Integrated conditionally into `SacredMachineryEngine`. Core tests passing, documentation updated.
+- **Notes:** `num_voices` parameter ignored by implementation. Test for `num_voices` marked `xfail`.
 ---

@@ -51,3 +51,13 @@
 - **Metrics After**: N/A
 - **Related Debt**: N/A
 - **Related Issue**: REQ-ART-V02
+
+
+### Optimization: [2025-04-11 17:49:26] - Add Tests for Chorus Integration (REQ-ART-V03)
+- **Target**: `tests/test_sacred_machinery.py`
+- **Type**: Testability/Verification/Clarity
+- **Desc**: Added 3 new tests (`test_process_psalm_applies_chorus_when_configured`, `test_process_psalm_does_not_apply_chorus_when_not_configured`, `test_process_psalm_does_not_apply_chorus_when_mix_is_zero`) to explicitly verify the conditional application of the chorus effect based on `PsalmConfig.chorus_params`. Corrected parameter usage (`delay_ms`, `num_voices`) in tests based on `effects.ChorusParameters` definition. Confirmed test suite passes (84 passed, 7 xfailed).
+- **Metrics Before**: N/A
+- **Metrics After**: N/A
+- **Related Debt**: N/A
+- **Related Issue**: REQ-ART-V03

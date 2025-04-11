@@ -96,6 +96,30 @@
 - Zero-length input
 - Invalid parameter values (feedback, LFO rate, filter range)
 ## Test Cases
+
+
+### Test Plan: Atmospheric Filtering (REQ-ART-V02) - [2025-04-11 16:31:08]
+#### Unit Tests:
+- Test Case: Filter modules/functions/classes exist / Expected: Import succeeds / Status: Failing
+- Test Case: Apply resonant filter to mono signal / Expected: Output shape matches input, content differs / Status: Failing
+- Test Case: Apply resonant filter to stereo signal / Expected: Output shape matches input (stereo), content differs / Status: Failing
+- Test Case: Changing resonant filter cutoff affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing resonant filter resonance affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Resonant filter attenuates high frequencies (RMS check) / Expected: Output RMS < Input RMS / Status: Failing
+- Test Case: Apply bandpass filter to mono signal / Expected: Output shape matches input, content differs / Status: Failing
+- Test Case: Apply bandpass filter to stereo signal / Expected: Output shape matches input (stereo), content differs / Status: Failing
+- Test Case: Changing bandpass filter center frequency affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing bandpass filter Q affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Bandpass filter reduces energy (RMS check) / Expected: Output RMS < Input RMS / Status: Failing
+- Test Case: Handle zero-length input (resonant) / Expected: Output is zero-length / Status: Failing
+- Test Case: Handle zero-length input (bandpass) / Expected: Output is zero-length / Status: Failing
+- Test Case: Handle invalid resonant filter parameters / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid bandpass filter parameters / Expected: Raises ValidationError or ValueError / Status: Failing
+#### Integration Tests:
+- None yet (Focus is unit tests for the effects)
+#### Edge Cases Covered:
+- Zero-length input
+- Invalid parameter values (cutoff, resonance, center_freq, q)
 <!-- List specific test cases (unit, integration) -->
 
 ## Refactoring Targets (Post-Pass)
@@ -190,6 +214,19 @@
 - **Purpose**: Provides default parameters for complex delay (REQ-ART-V02) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for complex delay tests.
 <!-- Append test run summaries using the format below -->
 
+
+### Fixture: white_noise_mono - [2025-04-11 16:31:08]
+- **Purpose**: Provides standard mono white noise signal (float32) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Input for filter tests requiring broad frequency content.
+
+### Fixture: white_noise_stereo - [2025-04-11 16:31:08]
+- **Purpose**: Provides standard stereo white noise signal (float32) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Input for stereo filter tests.
+
+### Fixture: default_resonant_filter_params - [2025-04-11 16:31:08]
+- **Purpose**: Provides default parameters for resonant low-pass filter / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for resonant filter tests.
+
+### Fixture: default_bandpass_filter_params - [2025-04-11 16:31:08]
+- **Purpose**: Provides default parameters for bandpass filter / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for bandpass filter tests.
+
 ### Test Run: 2025-04-08 10:41:13
 - **Trigger**: Manual / **Env**: Local / **Suite**: tests/synthesis/
 - **Result**: PASS / **Summary**: 30 Passed / 0 Failed / 0 Skipped
@@ -261,9 +298,26 @@
 - **Refactor**: [Pending]
 - **Outcomes**: Confirmed Red phase for integration test. Ready for Green phase (modifying `sacred_machinery.py`).
 
+
+
+### TDD Cycle: Atmospheric Filtering (REQ-ART-V02 - Red Phase) - [2025-04-11 16:31:08]
+- **Start**: [2025-04-11 16:28:54]
+- **End**: [2025-04-11 16:31:08]
+- **Red**: Tests created: Wrote failing tests in `tests/synthesis/test_effects.py` for `apply_resonant_filter`, `ResonantFilterParameters`, `apply_bandpass_filter`, `BandpassFilterParameters`. Tests cover existence, basic application, parameter control, conceptual frequency checks, and edge cases. Failing due to `ImportError`/`NameError`.
+- **Green**: Implementation approach: Next step is to create minimal placeholder implementations for the functions and Pydantic models in `src/robotic_psalms/synthesis/effects.py`.
+- **Refactor**: Improvements made: N/A (Red phase only)
+- **Outcomes**: Established test harness for atmospheric filtering effects.
 ### Test Run: Integration Test for `apply_complex_delay` - [2025-04-11 16:05:25]
 - **Trigger**: Manual
 - **Env**: Local
 - **Suite**: `tests/test_sacred_machinery.py`
 - **Result**: FAIL
 - **Failures**: `test_process_psalm_applies_complex_delay_when_configured`: `AttributeError: ... does not have the attribute 'apply_complex_delay'`, `test_process_psalm_does_not_apply_complex_delay_when_not_configured`: `AttributeError: ... does not have the attribute 'apply_complex_delay'`
+
+
+### Test Run: Atmospheric Filtering (REQ-ART-V02 - Red Phase) - [2025-04-11 16:31:08]
+- **Trigger**: Manual (Anticipated)
+- **Env**: Local
+- **Suite**: `tests/synthesis/test_effects.py -k atmospheric`
+- **Result**: FAIL (Anticipated)
+- **Failures**: `test_atmospheric_filter_modules_exist`: `ImportError: cannot import name 'apply_resonant_filter' from 'robotic_psalms.synthesis.effects'`, `ImportError: cannot import name 'ResonantFilterParameters' ...`, etc. (or similar NameErrors/Pylance errors during test collection).

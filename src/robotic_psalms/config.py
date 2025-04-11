@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Optional
+from .synthesis.effects import ResonantFilterParameters, BandpassFilterParameters
 from pydantic import BaseModel, Field, model_validator # Corrected import
 from dataclasses import dataclass
 
@@ -243,6 +244,14 @@ class PsalmConfig(BaseModel):
     delay_effect: Optional[DelayConfig] = Field( # This was inserted correctly before
         default=None,
         description="Optional configuration for the complex delay effect. If None, the effect is disabled."
+    )
+    resonant_filter_params: Optional[ResonantFilterParameters] = Field(
+        default=None,
+        description="Optional configuration for the resonant low-pass filter effect. If None, the effect is disabled."
+    )
+    bandpass_filter_params: Optional[BandpassFilterParameters] = Field(
+        default=None,
+        description="Optional configuration for the band-pass filter effect. If None, the effect is disabled. Takes precedence over resonant filter if both are defined."
     )
     voice_range: VoiceRange = Field(
         default_factory=VoiceRange,

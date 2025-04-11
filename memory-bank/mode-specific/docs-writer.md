@@ -16,6 +16,10 @@
 ### Plan Item: Update Core Documentation - [2025-04-08 12:31:26]
 - **Type**: Guide / **Audience**: User/Dev / **Outline**: 1. Update README (Requirements, Install, Troubleshooting, Roadmap) 2. Update architecture.md (Dependencies, Notes) 3. Create docs/index.md / **Status**: Done / **Owner**: docs-writer / **Source**: User Task / **Location**: README.md, src/robotic_psalms/architecture.md, docs/index.md
 
+
+### Plan Item: Update Atmospheric Filter Docs (REQ-ART-V02) - [2025-04-11 17:29:48]
+- **Type**: Guide / **Audience**: User/Dev / **Outline**: 1. Update README (Example, Param Guide) / **Status**: Done / **Owner**: docs-writer / **Source**: User Task REQ-ART-V02 / **Location**: README.md
+
 ## Documentation Scope
 <!-- Describe the documentation task -->
 

@@ -10,7 +10,7 @@ from scipy import signal
 from ..config import PsalmConfig, VocalTimbre
 # Corrected imports for TTS engines and base class
 from .tts.base import TTSEngine, ParameterEnum
-from .effects import FormantShiftParameters, apply_robust_formant_shift
+from .effects import FormantShiftParameters, apply_robust_formant_shift, ResonantFilterParameters, BandpassFilterParameters, apply_rbj_lowpass_filter, apply_bandpass_filter
 from .tts.engines.espeak import EspeakNGWrapper
 
 
@@ -152,17 +152,26 @@ class VoxDeiSynthesizer:
                 except Exception as write_err:
                     self.logger.error(f"Failed to save audio after formant shift: {write_err}")
             # --- END DEBUG ---
-            audio = self._apply_timbre_blend(audio)
-            # --- DEBUG: Save audio after timbre blend ---
+            # Apply atmospheric filters based on config (Bandpass takes precedence)
+            if self.config.bandpass_filter_params:
+                self.logger.debug("Applying bandpass filter...")
+                audio = apply_bandpass_filter(audio, self.sample_rate, params=self.config.bandpass_filter_params)
+            elif self.config.resonant_filter_params:
+                self.logger.debug("Applying resonant low-pass filter...")
+                audio = apply_rbj_lowpass_filter(audio, self.sample_rate, params=self.config.resonant_filter_params)
+            else:
+                self.logger.debug("No atmospheric filter configured.")
+
+            # --- DEBUG: Save audio after atmospheric filter ---
             if self.logger.isEnabledFor(logging.DEBUG):
-                import soundfile as sf # Import moved here
-                from pathlib import Path # Import moved here
+                import soundfile as sf
+                from pathlib import Path
                 try:
-                    timbre_blend_path = Path("debug_vocals_03_after_timbre_blend.wav")
-                    sf.write(timbre_blend_path, audio, synth_sample_rate)
-                    self.logger.debug(f"Saved audio after timbre blend to {timbre_blend_path}")
+                    filter_path = Path("debug_vocals_03_after_filter.wav")
+                    sf.write(filter_path, audio, synth_sample_rate)
+                    self.logger.debug(f"Saved audio after atmospheric filter to {filter_path}")
                 except Exception as write_err:
-                    self.logger.error(f"Failed to save audio after timbre blend: {write_err}")
+                    self.logger.error(f"Failed to save audio after atmospheric filter: {write_err}")
             # --- END DEBUG ---
 
             # Boost vocal output - ensure float32
@@ -195,126 +204,3 @@ class VoxDeiSynthesizer:
             # Return original audio on error to avoid breaking the chain
             return audio
 
-    def _apply_timbre_blend(
-        self,
-        audio: npt.NDArray[np.float32]
-    ) -> npt.NDArray[np.float32]:
-        """Apply final timbre adjustments based on blend settings"""
-        timbre: VocalTimbre = self.config.vocal_timbre
-        result = np.zeros_like(audio, dtype=np.float32) # Initialize with float32
-
-        # Apply filters based on timbre weights
-        if timbre.choirboy > 1e-6: # Use epsilon for float comparison
-            result += self._choir_filter(audio) * float(timbre.choirboy)
-        if timbre.android > 1e-6:
-            result += self._android_filter(audio) * float(timbre.android)
-        if timbre.machinery > 1e-6:
-            result += self._machinery_filter(audio) * float(timbre.machinery)
-
-        # Normalize if sum of weights exceeds 1 or amplitudes clip
-        total_weight = float(timbre.choirboy + timbre.android + timbre.machinery)
-        max_amp = np.max(np.abs(result))
-
-        # Normalize if total weight is significant and clipping occurs, or if total weight > 1
-        if max_amp > 1.0 or (total_weight > 1.0 and max_amp > 1e-6):
-             # Normalize by the maximum potential amplitude based on weights, or actual max amp
-             norm_factor = max(total_weight, max_amp)
-             if norm_factor > 1e-6: # Avoid division by zero
-                 result /= norm_factor
-
-        return result.astype(np.float32) # Ensure final type
-
-    def _choir_filter(
-        self,
-        audio: npt.NDArray[np.float32]
-    ) -> npt.NDArray[np.float32]:
-        """Apply angelic choir characteristics (lowpass + chorus)"""
-        # sosfiltfilt requires input length > padlen (default is often related to filter order, seems to be 15 here)
-        if audio.shape[0] <= _MIN_SOSFILTFILT_LEN:
-            self.logger.warning(f"Audio length ({audio.shape[0]}) too short for choir filter (needs > {_MIN_SOSFILTFILT_LEN}). Skipping.")
-            return audio
-
-        # Gentle lowpass filter (adjust cutoff frequency as needed)
-        # Cutoff relative to Nyquist frequency (sample_rate / 2)
-        cutoff_norm = 8000 / (self.sample_rate / 2)
-        # Use SOS format for stability
-        sos = signal.butter(4, min(cutoff_norm, 0.99), btype='low', output='sos')
-        filtered = signal.sosfiltfilt(sos, audio)
-
-        # Simple chorus effect
-        chorus = np.zeros_like(audio)
-        delays_ms = [15, 25, 35] # Delays in milliseconds
-        max_delay_samples = int(max(delays_ms) * self.sample_rate / 1000)
-        padded_audio = np.pad(filtered, (max_delay_samples, 0), mode='constant')
-        depth = 0.3 # Chorus depth
-
-        for delay_ms in delays_ms:
-            delay_samples = int(delay_ms * self.sample_rate / 1000)
-            # Ensure slicing is correct
-            delayed_signal = padded_audio[max_delay_samples - delay_samples : len(padded_audio) - delay_samples]
-            # Add delayed signal (lengths should match due to padding and slicing)
-            chorus += delayed_signal * (depth / len(delays_ms)) # Average contribution
-        # Combine original filtered signal with chorus
-        # Ensure lengths match
-        final_output = filtered + chorus
-
-        return final_output.astype(np.float32)
-
-    def _android_filter(
-        self,
-        audio: npt.NDArray[np.float32]
-    ) -> npt.NDArray[np.float32]:
-        """Apply android voice characteristics (bandpass + ring mod)"""
-        # sosfiltfilt requires input length > padlen (default is often related to filter order, seems to be 15 here)
-        if audio.shape[0] <= _MIN_SOSFILTFILT_LEN:
-            self.logger.warning(f"Audio length ({audio.shape[0]}) too short for android filter (needs > {_MIN_SOSFILTFILT_LEN}). Skipping.")
-            return audio
-
-        # Bandpass filter (adjust frequencies as needed)
-        low_cut_norm = 300 / (self.sample_rate / 2)
-        high_cut_norm = 3400 / (self.sample_rate / 2)
-        # Ensure valid frequency range
-        if low_cut_norm >= high_cut_norm or low_cut_norm <= 0 or high_cut_norm >= 1.0:
-             self.logger.warning(f"Invalid bandpass range: {low_cut_norm*self.sample_rate/2:.1f}-{high_cut_norm*self.sample_rate/2:.1f} Hz. Skipping filter.")
-             return audio # Return original if range is invalid
-
-        # Use SOS format for stability
-        sos = signal.butter(6, [low_cut_norm, high_cut_norm], btype='band', output='sos')
-        filtered = signal.sosfiltfilt(sos, audio)
-
-        # Subtle ring modulation
-        t = np.arange(len(filtered)) / self.sample_rate
-        carrier_freq = 50 # Lower frequency for more subtle effect
-        carrier = np.sin(2 * np.pi * carrier_freq * t)
-        modulation_index = 0.2 # Keep it subtle
-
-        result = filtered * (1 + modulation_index * carrier)
-        return result.astype(np.float32)
-
-    def _machinery_filter(
-        self,
-        audio: npt.NDArray[np.float32]
-    ) -> npt.NDArray[np.float32]:
-        """Apply machinery characteristics (highpass + distortion/resonance)"""
-        # sosfiltfilt requires input length > padlen (default is often related to filter order, seems to be 15 here)
-        if audio.shape[0] <= _MIN_SOSFILTFILT_LEN:
-            self.logger.warning(f"Audio length ({audio.shape[0]}) too short for machinery filter (needs > {_MIN_SOSFILTFILT_LEN}). Skipping.")
-            return audio
-
-        # Highpass filter
-        cutoff_norm = 1000 / (self.sample_rate / 2) # Higher cutoff for metallic feel
-        # Use SOS format for stability
-        sos = signal.butter(6, min(cutoff_norm, 0.99), btype='high', output='sos')
-        filtered = signal.sosfiltfilt(sos, audio)
-
-        # Add metallic resonance (simulated comb filter or distortion)
-        # Simple soft clipping distortion
-        distortion_level = 1.5
-        distorted = np.tanh(filtered * distortion_level)
-
-        # Normalize amplitude after distortion
-        max_amp = np.max(np.abs(distorted))
-        if max_amp > 1e-6:
-             distorted /= max_amp
-
-        return distorted.astype(np.float32)

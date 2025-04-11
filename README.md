@@ -133,6 +133,13 @@ vocal_timbre:
     # lfo_depth: 0.0        # LFO depth for delay time modulation (float, 0.0 to 1.0) - Currently unimplemented
     # filter_cutoff: 20000.0 # Low-pass filter cutoff frequency in Hz (float, > 0.0) - Currently unimplemented
     # filter_resonance: 0.0 # Filter resonance (float, >= 0.0) - Currently unimplemented
+    resonant_filter: # Optional resonant low-pass filter (RBJ Biquad)
+      cutoff_hz: 5000.0   # Cutoff frequency in Hz (float, > 0.0)
+      q: 1.0            # Resonance factor (Q) (float, > 0.0)
+    bandpass_filter: # Optional bandpass filter (Butterworth)
+      center_hz: 1000.0   # Center frequency in Hz (float, > 0.0)
+      q: 2.0            # Quality factor (Q) (float, > 0.0)
+      order: 2          # Filter order (integer, > 0, default: 2)
 
 ```
 
@@ -201,6 +208,13 @@ robotic-psalms examples/psalm.txt output.wav --config examples/config.yml --visu
   - `lfo_depth`: *Currently unimplemented.* Intended for LFO modulation depth.
   - `filter_cutoff`: *Currently unimplemented.* Intended for filtering the delayed signal.
   - `filter_resonance`: *Currently unimplemented.* Intended for filter resonance.
+- `resonant_filter`: (Optional) Configuration for a resonant low-pass filter applied to the vocal timbre. Uses an RBJ Biquad implementation.
+  - `cutoff_hz`: The filter's cutoff frequency in Hz (e.g., `5000.0`). Must be greater than 0.
+  - `q`: The resonance factor (Q) (e.g., `1.0`). Higher values create a sharper peak at the cutoff. Must be greater than 0.
+- `bandpass_filter`: (Optional) Configuration for a bandpass filter applied to the vocal timbre. Uses a Butterworth implementation.
+  - `center_hz`: The center frequency of the bandpass filter in Hz (e.g., `1000.0`). Must be greater than 0.
+  - `q`: The quality factor (Q) of the filter (e.g., `2.0`). Higher values result in a narrower bandwidth. Must be greater than 0.
+  - `order`: The order of the Butterworth filter (e.g., `2`). Higher orders create a steeper rolloff. Must be greater than 0, defaults to 2.
 
 
 ### Voice Timbre

@@ -23,6 +23,22 @@
 - **Notes**: This completes the integration step for the complex delay effect. All tests in `tests/test_sacred_machinery.py`, including the specific integration tests for this feature, now pass.
 
 
+### Implementation: Minimal Atmospheric Filters (REQ-ART-V02 - Green Phase Start) - 2025-04-11 17:01:26
+- **Approach**: Implemented the minimal Pydantic models (`ResonantFilterParameters`, `BandpassFilterParameters`) with basic fields (`cutoff_hz`, `resonance`, `center_hz`, `q`) and validation (`gt=0.0`). Implemented the function signatures for `apply_resonant_filter` and `apply_bandpass_filter` with type hints and minimal bodies (`return audio.copy()`) to resolve import errors.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Added models and functions).
+- **Notes**: This minimal implementation successfully resolves the `ImportError` reported by the `tdd` mode for `tests/synthesis/test_effects.py`. Tests related to these filters now collect and run, failing on assertions as expected because the functions do not yet modify the audio. Ready for functional implementation.
+
+
+
+### Implementation: Functional Atmospheric Filters (REQ-ART-V02) - 2025-04-11 17:04:21
+- **Approach**:
+    - Implemented `apply_bandpass_filter` using `scipy.signal.butter(N=2, btype='bandpass', output='sos')`. Calculated normalized cutoff frequencies from `center_hz` and `q`, ensuring they are clipped below Nyquist and `low < high`. Applied filter using `scipy.signal.sosfiltfilt`.
+    - Implemented `apply_resonant_filter` using RBJ Audio EQ Cookbook formulas for a 2nd-order lowpass filter to incorporate the `resonance` parameter as Q. Calculated transfer function coefficients (`b`, `a`), converted them to second-order sections using `scipy.signal.tf2sos`, and applied the filter using `scipy.signal.sosfiltfilt`.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Modified functions, added imports `scipy.signal`, `math`).
+- **Notes**: The initial attempt for `apply_resonant_filter` using `signal.butter('lowpass')` failed tests because Butterworth doesn't directly use resonance/Q for low/high pass. Switching to RBJ formulas resolved this. All relevant tests in `tests/synthesis/test_effects.py` now pass.
+
+
+
 ## Current Implementation Focus
 <!-- Describe the code being worked on -->
 

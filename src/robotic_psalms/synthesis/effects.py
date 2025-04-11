@@ -2,12 +2,10 @@ import numpy as np
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from pedalboard import Delay, Reverb
 from pedalboard._pedalboard import Pedalboard # Import as suggested by Pylance
-
-# Define validation ranges based on common sense and test cases
-# import librosa # Not used in reverb, delay, or formant shift sections
-# import parselmouth # Not used in reverb, delay, or formant shift sections
-import pyworld as pw # Use pw alias for formant shifting
+from scipy import signal # Added for filters
+import math # Added for RBJ filter calculations
 from scipy.interpolate import interp1d # Used for formant shifting spectral warping
+import pyworld as pw # Use pw alias for formant shifting
 
 # Pedalboard's Reverb defaults: room_size=0.5, damping=0.5, wet_level=0.33, dry_level=0.4, width=1.0, freeze_mode=0.0
 # We'll map our params where possible. Pedalboard doesn't have direct decay_time, pre_delay, diffusion.
@@ -21,6 +19,7 @@ MIN_DECAY_S = 0.1
 MAX_DECAY_S = 10.0
 MIN_ROOM_SIZE = 0.1
 MAX_ROOM_SIZE = 1.0
+
 class ReverbParameters(BaseModel):
     """Parameters for the high-quality reverb effect."""
     decay_time: float = Field(..., ge=0.0, description="Conceptual reverb decay time (maps to room size). Larger values mean longer reverb.")
@@ -31,221 +30,6 @@ class ReverbParameters(BaseModel):
 
     model_config = ConfigDict(extra='forbid') # Ensure no unexpected parameters are passed
 
-def apply_high_quality_reverb(audio: np.ndarray, sample_rate: int, params: ReverbParameters) -> np.ndarray:
-    """
-    Applies a high-quality reverb effect to an audio signal using pedalboard.
-
-    Args:
-        audio: Input audio signal as a NumPy array (mono or stereo).
-        sample_rate: Sample rate of the audio signal.
-        params: An instance of ReverbParameters containing effect settings.
-
-    Returns:
-        The processed audio signal with reverb applied.
-    """
-    if audio.size == 0:
-        return np.array([], dtype=audio.dtype)
-
-    # Map ReverbParameters to pedalboard.Reverb parameters
-    # Conceptual mapping: decay_time -> room_size (0-1 range)
-    # Map decay_time (e.g., 0.1s-10s) linearly to pedalboard's room_size (0.1-1.0)
-    normalized_decay = (params.decay_time - MIN_DECAY_S) / (MAX_DECAY_S - MIN_DECAY_S)
-    room_size = np.clip(normalized_decay * (MAX_ROOM_SIZE - MIN_ROOM_SIZE) + MIN_ROOM_SIZE, 0.0, 1.0)
-
-    # Map wet_dry_mix to wet_level and dry_level
-    # Simple linear crossfade:
-    wet_level = params.wet_dry_mix
-    dry_level = 1.0 - params.wet_dry_mix
-    # Note: Pedalboard's levels might not sum to 1 for constant power.
-    # A more perceptually accurate mapping might be needed later.
-
-    reverb_effect = Reverb( # Use direct import
-        room_size=room_size,
-        damping=params.damping,
-        wet_level=wet_level,
-        dry_level=dry_level,
-        # Conceptually map diffusion (0-1) to stereo width (0-1).
-        # Simple scaling, could be refined. Pedalboard's default width is 1.0.
-        width=np.clip(params.diffusion, 0.0, 1.0)
-        # pre_delay is not available in pedalboard.Reverb
-    )
-
-    # Pedalboard expects float32
-    audio_float32 = audio.astype(np.float32)
-
-    # Simulate pre-delay by adding silence
-    pre_delay_samples = int(params.pre_delay * sample_rate)
-    if pre_delay_samples > 0:
-        padding_shape = (pre_delay_samples,) + audio_float32.shape[1:] # Add padding dims if stereo
-        padding = np.zeros(padding_shape, dtype=audio_float32.dtype)
-        audio_padded = np.concatenate((padding, audio_float32), axis=0)
-    else:
-        audio_padded = audio_float32
-
-    # Apply effect
-    # Pedalboard handles mono/stereo automatically if input is (samples,) or (samples, channels)
-    # Apply effect using a Pedalboard instance
-    reverb_board = Pedalboard([reverb_effect]) # No sample_rate here
-    reverberated_signal = reverb_board(audio_padded, sample_rate=sample_rate) # Pass sample_rate here
-
-    # The output length will be input_length + pre_delay_samples + reverb_tail
-    # We need to combine the original dry signal (with pre-delay) and the wet signal correctly
-    # For simplicity in this minimal implementation, let's assume the pedalboard's dry_level
-    # handles mixing the original *padded* signal. The output length will naturally be longer.
-    # A more complex implementation might mix the original *unpadded* dry signal with the
-    # *reverberated* signal, aligning them based on pre_delay.
-    wet_signal = reverberated_signal # Use the output directly for now
-
-    # Ensure output shape matches input channel count, though length might change
-    if audio.ndim == 1 and wet_signal.ndim == 2 and wet_signal.shape[1] == 1:
-        # If input was mono but output is (n, 1), flatten it
-        wet_signal = wet_signal.flatten()
-    elif audio.ndim == 2 and wet_signal.ndim == 1 and audio.shape[1] == 1:
-         # If input was (n, 1) and output is mono, reshape it
-         wet_signal = wet_signal.reshape(-1, 1)
-
-
-    # Pedalboard might change the length slightly, the tests allow for this (>=)
-    # Return in original dtype if possible, though effects usually work best in float
-    # For now, return float32 as pedalboard outputs
-    return wet_signal
-
-
-# --- Formant Shifting --- 
-
-class FormantShiftParameters(BaseModel):
-    """Parameters for the robust formant shifting effect."""
-    shift_factor: float = Field(..., gt=0.0, description="Factor by which to shift formants. >1 shifts up, <1 shifts down.")
-
-    model_config = ConfigDict(extra='forbid')
-
-def apply_robust_formant_shift(audio: np.ndarray, sample_rate: int, params: FormantShiftParameters) -> np.ndarray:
-    """
-    Applies formant shifting while preserving pitch using the WORLD vocoder.
-
-    Analyzes the audio into F0, spectral envelope (SP), and aperiodicity (AP).
-    Warps the spectral envelope's frequency axis according to the shift_factor.
-    Resynthesizes the audio using the original F0, original AP, and the warped SP.
-
-    Args:
-        audio: Input audio signal as a NumPy array (mono or stereo).
-        sample_rate: Sample rate of the audio signal.
-        params: An instance of FormantShiftParameters containing effect settings.
-
-    Returns:
-        The processed audio signal with formants shifted.
-    """
-    if audio.size == 0:
-        return np.array([], dtype=audio.dtype)
-
-    # If shift_factor is 1.0, no change is needed.
-    if np.isclose(params.shift_factor, 1.0):
-        return audio.copy()
-
-    original_dtype = audio.dtype
-    # pyworld expects float64
-    audio_float64 = audio.astype(np.float64)
-
-    # Handle stereo by processing channels independently
-    if audio_float64.ndim == 2:
-        shifted_channels = []
-        for i in range(audio_float64.shape[1]):
-            channel_audio = np.ascontiguousarray(audio_float64[:, i]) # Ensure contiguous
-            shifted_channel = _apply_formant_shift_mono(channel_audio, sample_rate, params.shift_factor)
-            shifted_channels.append(shifted_channel)
-        # Stack channels back together
-        shifted_audio = np.stack(shifted_channels, axis=-1)
-    elif audio_float64.ndim == 1:
-        audio_float64 = np.ascontiguousarray(audio_float64) # Ensure contiguous
-        shifted_audio = _apply_formant_shift_mono(audio_float64, sample_rate, params.shift_factor)
-    else:
-        raise ValueError("Input audio must be 1D (mono) or 2D (stereo)")
-
-    # Convert back to original dtype if needed, though float is often preferred for effects
-    # Let's return float64 for now, consistent with pyworld output
-    # return shifted_audio.astype(original_dtype)
-    return shifted_audio
-
-
-def _apply_formant_shift_mono(x: np.ndarray, fs: int, shift_factor: float) -> np.ndarray:
-    """Helper function to apply formant shift to a mono float64 signal."""
-    # Ensure input is float64 and contiguous (redundant check, but safe)
-    x = np.ascontiguousarray(x, dtype=np.float64)
-
-    # --- WORLD Analysis ---
-    # Use default DIO/Harvest parameters for F0 estimation
-    f0, t = pw.dio(x, fs) # type: ignore
-    # Refine F0 using Stonemask
-    f0 = pw.stonemask(x, f0, t, fs) # type: ignore
-    # Estimate spectral envelope using CheapTrick
-    sp = pw.cheaptrick(x, f0, t, fs) # type: ignore
-    # Estimate aperiodicity using D4C
-    ap = pw.d4c(x, f0, t, fs) # type: ignore
-
-    # --- Warp Spectral Envelope ---
-    sp_warped = _warp_spectral_envelope(sp, fs, shift_factor)
-
-    # --- WORLD Synthesis ---
-    # Ensure f0 is C-contiguous double array for synthesis
-    f0_cont = np.ascontiguousarray(f0, dtype=np.float64)
-    # Ensure sp_warped and ap are also contiguous float64 (should be from warping/analysis)
-    sp_warped_cont = np.ascontiguousarray(sp_warped, dtype=np.float64)
-    ap_cont = np.ascontiguousarray(ap, dtype=np.float64)
-
-    # Synthesize using original F0, warped SP, original AP
-    y = pw.synthesize(f0_cont, sp_warped_cont, ap_cont, fs) # type: ignore
-
-    # Ensure output length matches input length (synthesis might slightly alter it)
-    if len(y) > len(x):
-        y = y[:len(x)]
-    elif len(y) < len(x):
-        padding = np.zeros(len(x) - len(y), dtype=np.float64)
-        y = np.concatenate((y, padding))
-
-    return y.astype(np.float64) # Return float64
-
-
-# Helper function for spectral warping based on research report
-def _warp_spectral_envelope(sp: np.ndarray, fs: int, formant_shift_ratio: float) -> np.ndarray:
-    """
-    Warps the spectral envelope frequency axis using interpolation.
-
-    Args:
-        sp: Spectral envelope from pyworld (frames x frequency_bins), float64.
-        fs: Sample rate.
-        formant_shift_ratio: Factor to shift formants (>1 up, <1 down).
-
-    Returns:
-        Warped spectral envelope, float64.
-    """
-    num_frames, num_bins = sp.shape
-    # CheapTrick uses fft_size / 2 + 1 bins. Calculate fft_size from num_bins.
-    fft_size = (num_bins - 1) * 2
-    original_freqs = np.linspace(0, fs / 2, num_bins)
-    # Frequencies from which to sample the *original* envelope
-    warped_freqs = original_freqs / formant_shift_ratio
-
-    sp_warped = np.zeros_like(sp)
-
-    for i in range(num_frames):
-        # Create interpolation function based on original envelope values at warped frequencies
-        interp_func = interp1d(
-            warped_freqs, sp[i], kind='linear', bounds_error=False,
-            # Extrapolate using edge values of the original envelope
-            fill_value="extrapolate" # type: ignore
-        )
-        # Evaluate the interpolation function at the original frequencies to get the warped envelope
-        sp_warped[i] = interp_func(original_freqs)
-
-    # Ensure non-negative values (numerical precision might cause small negatives)
-    # Use a small positive floor based on pyworld examples/recommendations
-    sp_warped[sp_warped < 1e-16] = 1e-16
-
-    # Ensure output is float64 for pyworld synthesis
-    return sp_warped.astype(np.float64)
-
-
-# --- Complex Delay ---
 
 class DelayParameters(BaseModel):
     """Parameters for the complex delay effect."""
@@ -262,16 +46,103 @@ class DelayParameters(BaseModel):
 
     @model_validator(mode='after')
     def check_filter_range(self) -> 'DelayParameters':
+        """Validates that filter_low_hz is not greater than filter_high_hz."""
         if self.filter_low_hz > self.filter_high_hz:
             raise ValueError("filter_low_hz cannot be greater than filter_high_hz")
         return self
 
 
+class FormantShiftParameters(BaseModel):
+    """Parameters for the robust formant shifting effect."""
+    shift_factor: float = Field(..., gt=0.0, description="Factor by which to shift formants. >1 shifts up, <1 shifts down.")
+
+    model_config = ConfigDict(extra='forbid')
+
+
+class ResonantFilterParameters(BaseModel):
+    """Parameters for the resonant low-pass filter effect (RBJ Biquad implementation)."""
+    cutoff_hz: float = Field(..., gt=0.0, description="Cutoff frequency in Hz.")
+    q: float = Field(..., gt=0.0, description="Resonance factor (Q). Higher values mean a sharper peak at the cutoff frequency.") # Renamed from resonance
+
+    model_config = ConfigDict(extra='forbid')
+
+
+class BandpassFilterParameters(BaseModel):
+    """Parameters for the bandpass filter effect (Butterworth implementation)."""
+    center_hz: float = Field(..., gt=0.0, description="Center frequency of the bandpass filter in Hz.")
+    q: float = Field(..., gt=0.0, description="Quality factor (Q) of the bandpass filter. Higher values mean a narrower bandwidth.")
+    order: int = Field(2, gt=0, description="Order of the Butterworth filter. Higher orders provide steeper rolloff.") # Added order parameter
+
+    model_config = ConfigDict(extra='forbid')
+    # Removed validator check_filter_range, handled in apply_bandpass_filter
+
+
+# --- Effect Functions ---
+
+def apply_high_quality_reverb(audio: np.ndarray, sample_rate: int, params: ReverbParameters) -> np.ndarray:
+    """
+    Applies a high-quality reverb effect using pedalboard.Reverb.
+
+    Args:
+        audio: Input audio signal as a NumPy array (mono or stereo).
+        sample_rate: Sample rate of the audio signal.
+        params: An instance of ReverbParameters containing effect settings.
+
+    Returns:
+        The processed audio signal with reverb applied (float32).
+    """
+    if audio.size == 0:
+        return np.array([], dtype=np.float32) # Return float32 for consistency
+
+    # Map ReverbParameters to pedalboard.Reverb parameters
+    normalized_decay = np.clip((params.decay_time - MIN_DECAY_S) / (MAX_DECAY_S - MIN_DECAY_S), 0.0, 1.0)
+    room_size = normalized_decay * (MAX_ROOM_SIZE - MIN_ROOM_SIZE) + MIN_ROOM_SIZE
+
+    wet_level = params.wet_dry_mix
+    dry_level = 1.0 - params.wet_dry_mix
+    width = np.clip(params.diffusion, 0.0, 1.0) # Map diffusion to width
+
+    reverb_effect = Reverb(
+        room_size=room_size,
+        damping=params.damping,
+        wet_level=wet_level,
+        dry_level=dry_level,
+        width=width
+    )
+
+    # Pedalboard expects float32
+    audio_float32 = audio.astype(np.float32)
+
+    # Simulate pre-delay by adding silence (if any)
+    pre_delay_samples = int(params.pre_delay * sample_rate)
+    if pre_delay_samples > 0:
+        padding_shape = (pre_delay_samples,) + audio_float32.shape[1:] if audio_float32.ndim > 1 else (pre_delay_samples,)
+        padding = np.zeros(padding_shape, dtype=np.float32)
+        audio_padded = np.concatenate((padding, audio_float32), axis=0)
+    else:
+        audio_padded = audio_float32
+
+    # Apply effect using a Pedalboard instance
+    reverb_board = Pedalboard([reverb_effect])
+    reverberated_signal = reverb_board(audio_padded, sample_rate=sample_rate)
+
+    # Ensure output shape matches input channel count if possible
+    # Output length will be longer due to reverb tail and pre-delay padding
+    if audio.ndim == 1 and reverberated_signal.ndim == 2 and reverberated_signal.shape[1] == 1:
+        reverberated_signal = reverberated_signal.flatten()
+    elif audio.ndim == 2 and reverberated_signal.ndim == 1 and audio.shape[1] == 1:
+        # If input was stereo (shape like (n, 1)) and output is mono (shape like (m,)), reshape output
+        reverberated_signal = reverberated_signal.reshape(-1, 1)
+    # Note: If input is stereo (n, 2) and output is mono (m,), this code doesn't handle it.
+    # Pedalboard.Reverb typically preserves channel count, so this is unlikely.
+
+    return reverberated_signal.astype(np.float32) # Return float32
+
+
 def apply_complex_delay(audio: np.ndarray, sample_rate: int, params: DelayParameters) -> np.ndarray:
     """
-    Applies a complex delay effect to an audio signal using pedalboard.Delay.
-    Focuses on delay_time, feedback, and mix for initial TDD green phase.
-    Other parameters (spread, LFO, filters) are ignored in this implementation.
+    Applies a complex delay effect using pedalboard.Delay.
+    Focuses on delay_time, feedback, and mix. Other parameters are ignored.
 
     Args:
         audio: Input audio signal as a NumPy array (mono or stereo).
@@ -279,40 +150,277 @@ def apply_complex_delay(audio: np.ndarray, sample_rate: int, params: DelayParame
         params: An instance of DelayParameters containing effect settings.
 
     Returns:
-        The processed audio signal with delay applied.
+        The processed audio signal with delay applied (float32).
     """
     if audio.size == 0:
-        return np.array([], dtype=audio.dtype)
+        return np.array([], dtype=np.float32)
 
-    # Map parameters from DelayParameters to pedalboard.Delay arguments
     delay_seconds = params.delay_time_ms / 1000.0
-    feedback = params.feedback
-    mix = params.wet_dry_mix # pedalboard.Delay uses 'mix' (0=dry, 1=wet)
 
     # Instantiate the delay effect
-    delay_effect = Delay( # Use direct import
+    delay_effect = Delay(
         delay_seconds=delay_seconds,
-        feedback=feedback, # Note: Known upstream issue in pedalboard.Delay may affect feedback behavior.
-        mix=mix
-        # Note: stereo_spread, LFO parameters, and filter parameters from
-        # DelayParameters are not directly supported by pedalboard.Delay
-        # and are ignored in this implementation.
+        feedback=params.feedback,
+        mix=params.wet_dry_mix # pedalboard.Delay uses 'mix' (0=dry, 1=wet)
     )
 
     # Create a Pedalboard instance with the delay effect
-    board = Pedalboard([delay_effect]) # No sample_rate here
+    board = Pedalboard([delay_effect])
 
     # Process the audio (pedalboard expects float32)
     audio_float32 = audio.astype(np.float32)
-    delayed_signal = board(audio_float32, sample_rate=sample_rate) # Pass sample_rate here
+    delayed_signal = board(audio_float32, sample_rate=sample_rate)
 
-    # Ensure output shape matches input channel count, though length might change
+    # Ensure output shape matches input channel count if possible
     if audio.ndim == 1 and delayed_signal.ndim == 2 and delayed_signal.shape[1] == 1:
-        # If input was mono but output is (n, 1), flatten it
         delayed_signal = delayed_signal.flatten()
     elif audio.ndim == 2 and delayed_signal.ndim == 1 and audio.shape[1] == 1:
-         # If input was (n, 1) and output is mono, reshape it
          delayed_signal = delayed_signal.reshape(-1, 1)
 
-    # Return float32 as pedalboard outputs
-    return delayed_signal
+    return delayed_signal.astype(np.float32) # Return float32
+
+
+def _apply_formant_shift_mono(x: np.ndarray, fs: int, shift_factor: float) -> np.ndarray:
+    """Helper function to apply formant shift to a mono float64 signal using WORLD."""
+    x = np.ascontiguousarray(x, dtype=np.float64) # Ensure input is float64 and contiguous
+
+    # --- WORLD Analysis ---
+    # Use default DIO/Harvest parameters for F0 estimation
+    f0, t = pw.dio(x, fs) # type: ignore # Fundamental frequency
+    f0 = pw.stonemask(x, f0, t, fs) # type: ignore # Refine F0
+    sp = pw.cheaptrick(x, f0, t, fs) # type: ignore # Spectral envelope
+    ap = pw.d4c(x, f0, t, fs) # type: ignore # Aperiodicity
+
+    # --- Warp Spectral Envelope ---
+    sp_warped = _warp_spectral_envelope(sp, fs, shift_factor)
+
+    # --- WORLD Synthesis ---
+    # Ensure arrays are C-contiguous double for synthesis
+    f0_cont = np.ascontiguousarray(f0, dtype=np.float64)
+    sp_warped_cont = np.ascontiguousarray(sp_warped, dtype=np.float64)
+    ap_cont = np.ascontiguousarray(ap, dtype=np.float64)
+
+    y = pw.synthesize(f0_cont, sp_warped_cont, ap_cont, fs) # type: ignore
+
+    # Ensure output length matches input length
+    if len(y) > len(x):
+        y = y[:len(x)]
+    elif len(y) < len(x):
+        padding = np.zeros(len(x) - len(y), dtype=np.float64)
+        y = np.concatenate((y, padding))
+
+    return y.astype(np.float64) # Return float64 as per pyworld's output
+
+
+def _warp_spectral_envelope(sp: np.ndarray, fs: int, formant_shift_ratio: float) -> np.ndarray:
+    """
+    Warps the spectral envelope frequency axis using linear interpolation.
+    Used internally by apply_robust_formant_shift.
+
+    Args:
+        sp: Spectral envelope from pyworld (frames x frequency_bins), float64.
+        fs: Sample rate.
+        formant_shift_ratio: Factor to shift formants (>1 shifts up, <1 shifts down).
+
+    Returns:
+        Warped spectral envelope, float64.
+    """
+    num_frames, num_bins = sp.shape
+    fft_size = (num_bins - 1) * 2 # Calculate FFT size from number of bins
+
+    original_freqs = np.linspace(0, fs / 2, num_bins) # Frequencies corresponding to the bins
+    # Frequencies from which to sample the *original* envelope to create the *warped* envelope
+    warped_freqs = original_freqs / formant_shift_ratio
+
+    sp_warped = np.zeros_like(sp) # Initialize warped envelope
+
+    # Iterate through each frame (time slice) of the spectrogram
+    for i in range(num_frames):
+        # Create an interpolation function based on the original envelope's values at the warped frequencies
+        interp_func = interp1d(
+            warped_freqs, sp[i], kind='linear', bounds_error=False,
+            # Use 'extrapolate' to handle frequencies outside the original range
+            # This uses the edge values of the original envelope for extrapolation
+            fill_value="extrapolate" # type: ignore # Pylance doesn't recognize 'extrapolate' string
+        )
+        # Evaluate the interpolation function at the original frequencies
+        # This maps the values from the warped frequency scale back onto the original frequency scale
+        sp_warped[i] = interp_func(original_freqs)
+
+    # Ensure non-negative values (numerical precision might cause small negatives)
+    # Use a small positive floor based on pyworld examples/recommendations
+    sp_warped[sp_warped < 1e-16] = 1e-16
+
+    return sp_warped.astype(np.float64) # Ensure output is float64
+
+
+def apply_robust_formant_shift(audio: np.ndarray, sample_rate: int, params: FormantShiftParameters) -> np.ndarray:
+    """
+    Applies formant shifting while preserving pitch using the WORLD vocoder.
+    Handles mono or stereo input.
+
+    Args:
+        audio: Input audio signal as a NumPy array (mono or stereo).
+        sample_rate: Sample rate of the audio signal.
+        params: An instance of FormantShiftParameters containing effect settings.
+
+    Returns:
+        The processed audio signal with formants shifted (float64).
+    """
+    if audio.size == 0:
+        return np.array([], dtype=np.float64)
+
+    # If shift_factor is 1.0, no change is needed. Return a copy.
+    if np.isclose(params.shift_factor, 1.0):
+        return audio.astype(np.float64).copy() # Return float64 copy
+
+    original_dtype = audio.dtype # Keep original dtype info if needed later
+    audio_float64 = audio.astype(np.float64)
+
+    if audio_float64.ndim == 1: # Mono input
+        shifted_audio = _apply_formant_shift_mono(audio_float64, sample_rate, params.shift_factor)
+    elif audio_float64.ndim == 2: # Stereo input
+        # Process each channel independently
+        shifted_channels = []
+        for i in range(audio_float64.shape[1]):
+            channel_audio = np.ascontiguousarray(audio_float64[:, i])
+            shifted_channel = _apply_formant_shift_mono(channel_audio, sample_rate, params.shift_factor)
+            shifted_channels.append(shifted_channel)
+        # Stack channels back together
+        shifted_audio = np.stack(shifted_channels, axis=-1)
+    else:
+        raise ValueError("Input audio must be 1D (mono) or 2D (stereo)")
+
+    # Return float64 as per _apply_formant_shift_mono's output
+    return shifted_audio
+
+
+def apply_rbj_lowpass_filter(audio: np.ndarray, sample_rate: int, params: ResonantFilterParameters) -> np.ndarray:
+    """
+    Applies a resonant low-pass filter using RBJ Biquad design (zero-phase).
+
+    Args:
+        audio: Input audio signal as a NumPy array (mono or stereo).
+        sample_rate: Sample rate of the audio signal.
+        params: An instance of ResonantFilterParameters containing cutoff frequency and Q.
+
+    Returns:
+        The processed audio signal with the filter applied (float32).
+    """
+    if audio.size == 0:
+        return np.array([], dtype=np.float32) # Return float32 for consistency
+
+    nyquist = sample_rate / 2.0
+    # Clip cutoff frequency to be slightly below Nyquist to avoid issues with filter design
+    cutoff_hz = np.clip(params.cutoff_hz, 0.01, nyquist * 0.999) # Ensure cutoff is positive and below Nyquist
+    # Ensure Q is positive and reasonably small if zero/negative provided (avoids instability)
+    q = max(0.1, params.q) # Use 0.1 as a minimum Q
+
+    # RBJ Lowpass Filter coefficient calculation (from RBJ Audio EQ Cookbook)
+    w0 = 2 * math.pi * cutoff_hz / sample_rate
+    alpha = math.sin(w0) / (2 * q)
+    cos_w0 = math.cos(w0)
+
+    b0 = (1 - cos_w0) / 2
+    b1 = 1 - cos_w0
+    b2 = (1 - cos_w0) / 2
+    a0 = 1 + alpha
+    a1 = -2 * cos_w0
+    a2 = 1 - alpha
+
+    # Normalize coefficients so a0 = 1
+    b = np.array([b0, b1, b2]) / a0
+    a = np.array([a0, a1, a2]) / a0 # a[0] is now 1
+
+    # Convert to second-order sections (SOS) for numerical stability
+    sos = signal.tf2sos(b, a)
+
+    # Apply filter using sosfiltfilt (zero-phase filtering)
+    # Process in float32 for consistency
+    audio_float = audio.astype(np.float32)
+    filtered_audio = signal.sosfiltfilt(sos, audio_float, axis=0)
+
+    # Ensure output shape matches input channel count
+    if audio.ndim == 1 and filtered_audio.ndim == 2 and filtered_audio.shape[1] == 1:
+        filtered_audio = filtered_audio.flatten()
+    elif audio.ndim == 2 and filtered_audio.ndim == 1 and audio.shape[1] == 1:
+         filtered_audio = filtered_audio.reshape(-1, 1)
+
+    # Return float32
+    return filtered_audio.astype(np.float32)
+
+
+def apply_bandpass_filter(audio: np.ndarray, sample_rate: int, params: BandpassFilterParameters) -> np.ndarray:
+    """
+    Applies a bandpass filter effect using a Butterworth filter (sosfiltfilt, zero-phase).
+
+    Args:
+        audio: Input audio signal as a NumPy array (mono or stereo).
+        sample_rate: Sample rate of the audio signal.
+        params: An instance of BandpassFilterParameters containing center frequency, Q, and order.
+
+    Returns:
+        The processed audio signal with the filter applied (float32).
+    """
+    if audio.size == 0:
+        return np.array([], dtype=np.float32) # Return float32 for consistency
+
+    nyquist = sample_rate / 2.0
+
+    # Ensure Q is positive to avoid division by zero or negative bandwidth
+    q = max(0.01, params.q) # Use a small positive minimum Q
+
+    # Calculate bandwidth from center frequency and Q
+    bandwidth = params.center_hz / q
+
+    # Calculate lower and upper cutoff frequencies
+    low_cutoff = params.center_hz - bandwidth / 2.0
+    high_cutoff = params.center_hz + bandwidth / 2.0
+
+    # Clip frequencies to be within the valid Nyquist range [0, nyquist]
+    # Also ensure low_cutoff is slightly above 0 for stability
+    low_cutoff_clipped = max(0.01, low_cutoff)
+    high_cutoff_clipped = min(high_cutoff, nyquist * 0.999) # Use a slightly smaller factor than 1.0
+
+    # Check if the resulting frequency range is valid (low < high)
+    if low_cutoff_clipped >= high_cutoff_clipped:
+        # If clipping results in an invalid range (e.g., Q is too small, or center_hz is too close to 0 or nyquist)
+        # Try to create a minimal valid band around the intended center_hz, or return original if impossible
+        center_freq_clipped = np.clip(params.center_hz, 0.01, nyquist * 0.998)
+        min_bw_hz = 0.01 # Define a minimum bandwidth in Hz to prevent zero or negative bandwidth
+
+        # Recalculate low and high cutoffs based on the clipped center and minimum bandwidth
+        low_cutoff_clipped = max(0.01, center_freq_clipped - min_bw_hz / 2)
+        high_cutoff_clipped = min(nyquist * 0.999, center_freq_clipped + min_bw_hz / 2)
+
+        # Final check: if still invalid, return original audio with a warning
+        if low_cutoff_clipped >= high_cutoff_clipped:
+            print(f"Warning: Bandpass filter parameters (center={params.center_hz}, Q={params.q}, order={params.order}) "
+                  f"result in invalid frequency range [{low_cutoff_clipped:.2f}, {high_cutoff_clipped:.2f}] "
+                  f"after clipping. Returning original audio.")
+            return audio.astype(np.float32).copy() # Return float32 copy
+        else:
+             print(f"Warning: Bandpass filter parameters resulted in invalid range. "
+                   f"Using adjusted range: [{low_cutoff_clipped:.2f}, {high_cutoff_clipped:.2f}]")
+
+    # Normalize frequencies to Nyquist frequency (0 to 1 range)
+    low_normalized = low_cutoff_clipped / nyquist
+    high_normalized = high_cutoff_clipped / nyquist
+
+    # Design the Butterworth bandpass filter using second-order sections (SOS)
+    # Use the order specified in params
+    sos = signal.butter(N=params.order, Wn=[low_normalized, high_normalized], btype='bandpass', output='sos')
+
+    # Apply the filter using sosfiltfilt (zero-phase filtering)
+    # Process in float32 for consistency
+    audio_float = audio.astype(np.float32)
+    filtered_audio = signal.sosfiltfilt(sos, audio_float, axis=0)
+
+    # Ensure output shape matches input channel count
+    if audio.ndim == 1 and filtered_audio.ndim == 2 and filtered_audio.shape[1] == 1:
+        filtered_audio = filtered_audio.flatten()
+    elif audio.ndim == 2 and filtered_audio.ndim == 1 and audio.shape[1] == 1:
+         filtered_audio = filtered_audio.reshape(-1, 1)
+
+    # Return float32
+    return filtered_audio.astype(np.float32)

@@ -65,6 +65,18 @@
 ## Progress
 *Milestones, completed tasks, overall status.*
 
+#### [2025-04-11 17:29:34] - Task: Update Documentation for Atmospheric Filters (REQ-ART-V02 - Documentation Phase)
+- **Status:** Completed.
+- **Deliverables:** Updated `README.md` with example configuration and parameter descriptions for `resonant_filter` (Resonant Low-Pass) and `bandpass_filter` (Bandpass).
+---
+
+
+
+#### [2025-04-11 17:04:11] - Feature: Atmospheric Filters (REQ-ART-V02 Part)
+- **Status:** Completed.
+- **Deliverables:** Implemented `apply_resonant_filter` and `apply_bandpass_filter` in `src/robotic_psalms/synthesis/effects.py`. Used `scipy.signal.butter` for bandpass and RBJ formulas + `scipy.signal.tf2sos` for resonant lowpass. All relevant tests in `tests/synthesis/test_effects.py` pass (35 passed, 6 xfailed).
+---
+
 
 #### [2025-04-11 16:26:00] - Task: Update Documentation for Complex Delay Integration (REQ-ART-V02 - Documentation)
 - **Status:** Completed.

@@ -135,28 +135,9 @@ def test_synthesize_text_synth_exception(mock_synth, caplog):
 
 # --- Processing Edge Case Tests (via synthesize_text) ---
 
-# Test for invalid bandpass range warning in android filter
-@patch.object(EspeakNGWrapper, 'synth') # Mock synth
-def test_synthesize_text_invalid_bandpass_range(mock_synth, caplog):
-    """Test warning logged for invalid bandpass range in android filter."""
-    # Return some valid audio and sample rate from mock synth
-    sample_rate = 22050 # Use a standard rate here; the synthesizer's rate is overridden later
-    mock_synth.return_value = (np.sin(np.linspace(0, 440 * 2 * np.pi, 1000)).astype(np.float32), sample_rate) # Short audio
-
-    config = PsalmConfig()
-    config.vocal_timbre.android = 1.0 # Ensure android filter is active
-    config.vocal_timbre.choirboy = 0.0
-    config.vocal_timbre.machinery = 0.0
-
-    # Use a very low sample rate to force an invalid range [300, 3400] Hz
-    low_sample_rate = 4000
-    synthesizer = VoxDeiSynthesizer(config=config, sample_rate=low_sample_rate)
-
-    with caplog.at_level(logging.WARNING):
-        synthesizer.synthesize_text("Test bandpass")
-
-    assert "Invalid bandpass range" in caplog.text
-    mock_synth.assert_called_once()
+# Note: The test 'test_synthesize_text_invalid_bandpass_range' was removed
+# as it tested a warning from the old _android_filter which is now obsolete.
+# Filter parameter validation is handled within the effects functions and their tests.
 
 # Note: Testing internal normalization/padding logic via public interface is complex.
 # Coverage for those specific lines might remain lower without direct private method tests.

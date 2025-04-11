@@ -3,6 +3,54 @@
 *This file tracks the immediate focus, ongoing tasks, and unresolved questions for the current session.*
 
 ---
+### [2025-04-11 17:29:23] - Task: Update Documentation for Atmospheric Filters (REQ-ART-V02 - Documentation Phase)
+- **Focus:** Update `README.md` to document `ResonantFilterParameters` and `BandpassFilterParameters`.
+- **Actions:**
+    - Read `README.md`.
+    - Read `src/robotic_psalms/synthesis/effects.py` to get filter parameter details.
+    - Inserted documentation for `resonant_filter` and `bandpass_filter` into the example config and Parameter Guide sections of `README.md`.
+- **Status:** Documentation updated in `README.md`. Preparing Memory Bank update and completion.
+
+---
+
+
+### [2025-04-11 17:03:52] - Task: Implement Functional Atmospheric Filters (REQ-ART-V02 - Green Phase)
+- **Focus:** Implement functional logic for `apply_resonant_filter` and `apply_bandpass_filter` in `src/robotic_psalms/synthesis/effects.py` to pass tests.
+- **Actions:**
+    - Read `src/robotic_psalms/synthesis/effects.py`.
+    - Imported `scipy.signal` and `math`.
+    - Implemented `apply_bandpass_filter` using `scipy.signal.butter(N=2, btype='bandpass', output='sos')` and `scipy.signal.sosfiltfilt`, calculating cutoffs from `center_hz` and `q`, with clipping.
+    - Implemented `apply_resonant_filter` using RBJ Audio EQ Cookbook formulas for a 2nd-order lowpass filter (incorporating `resonance` as Q), converted coefficients to SOS using `scipy.signal.tf2sos`, and applied with `scipy.signal.sosfiltfilt`.
+    - Ran `pytest tests/synthesis/test_effects.py`.
+- **Status:** Implementation complete. All relevant tests (35 passed, 6 xfailed) in `tests/synthesis/test_effects.py` pass. Ready for Memory Bank update and completion.
+
+---
+
+
+### [2025-04-11 17:01:13] - Task: Implement Minimal Atmospheric Filters (REQ-ART-V02 - Green Phase Start)
+- **Focus:** Add minimal Pydantic models (`ResonantFilterParameters`, `BandpassFilterParameters`) and function signatures (`apply_resonant_filter`, `apply_bandpass_filter`) to `src/robotic_psalms/synthesis/effects.py`.
+- **Actions:**
+    - Read `src/robotic_psalms/synthesis/effects.py`.
+    - Inserted Pydantic models with basic fields (`cutoff_hz`, `resonance`, `center_hz`, `q`) and validation (`gt=0.0`).
+    - Inserted function signatures with type hints and minimal bodies (`return audio.copy()`).
+    - Ran `pytest tests/synthesis/test_effects.py -k filter`.
+- **Status:** Minimal implementation complete. Import errors during test collection are resolved. Tests now run and fail on assertions as expected (8 failed, 5 passed, 2 xfailed). Ready for Green phase (functional filter implementation).
+
+---
+
+
+### [2025-04-11 16:30:50] - Task: Write Failing Tests for Atmospheric Filtering (REQ-ART-V02 - Red Phase)
+- **Focus:** Create failing unit tests in `tests/synthesis/test_effects.py` for new atmospheric filtering effects (`apply_resonant_filter`, `apply_bandpass_filter`, `ResonantFilterParameters`, `BandpassFilterParameters`).
+- **Actions:**
+    - Added placeholder imports for the new effects/models.
+    - Added fixtures for white noise signals (`white_noise_mono`, `white_noise_stereo`) and default parameters (`default_resonant_filter_params`, `default_bandpass_filter_params`).
+    - Added tests covering existence, basic application (mono/stereo), parameter control, conceptual frequency checks (RMS), and edge cases (zero-length, invalid params).
+    - Corrected indentation errors introduced during insertion.
+- **Status:** Red phase complete. Tests added to `tests/synthesis/test_effects.py`. Tests are failing as expected due to `ImportError`/`NameError` (Pylance: "unknown import symbol"), confirming the implementation is missing. Ready for Green phase.
+
+---
+
+
 ### [2025-04-11 16:25:50] - Task: Update Documentation for Complex Delay Integration (REQ-ART-V02 - Documentation)
 - **Focus:** Update `README.md` and check `src/robotic_psalms/config.py` docstrings for the new `delay_effect` configuration.
 - **Actions:**

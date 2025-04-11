@@ -146,6 +146,53 @@
 - Zero-length input
 - Invalid parameter values (rate, depth, delay, feedback, num_voices, mix)
 
+
+
+### Test Plan: Complex Pad Generation (REQ-ART-A01 - Initial Complexity) - [2025-04-11 18:04:00]
+#### Unit Tests:
+- Test Case: Pad generation basic properties (dtype, length, amplitude) / Expected: Correct properties / Status: Passing
+- Test Case: Pad spectral richness (>15 peaks > 1% max) / Expected: Rich spectrum / Status: Passing (Current impl. meets this)
+- Test Case: Pad spectral evolution (start vs end spectra differ, atol=1e-6) / Expected: Evolving spectrum / Status: Passing (Current impl. meets this)
+- Test Case: Pad non-repetitive (segments differ, atol=1e-12) / Expected: Non-repetitive segments / Status: Passing (Current impl. meets this)
+#### Integration Tests:
+- None yet.
+#### Edge Cases Covered:
+- Zero-length duration (handled in basic properties test).
+
+
+
+### Test Plan: Rich Drone Generation (REQ-ART-A02 - Initial Complexity) - [2025-04-11 18:08:05]
+#### Unit Tests:
+- Test Case: Drone generation basic properties (dtype, length, amplitude) / Expected: Correct properties / Status: Passing
+- Test Case: Drone spectral richness (>5 peaks > 5% max) / Expected: Rich spectrum / Status: Passing (Current impl. meets this)
+- Test Case: Drone spectral evolution (start vs end spectra differ, atol=1e-5) / Expected: Evolving spectrum / Status: Passing (Current impl. meets this)
+- Test Case: Drone non-repetitive (segments differ, atol=1e-10) / Expected: Non-repetitive segments / Status: Passing (Current impl. meets this)
+#### Integration Tests:
+- None yet.
+#### Edge Cases Covered:
+- Zero-length duration (handled in basic properties test).
+
+
+
+### Test Plan: Smooth Spectral Freeze (REQ-ART-E02) - [2025-04-11 18:11:30]
+#### Unit Tests:
+- Test Case: Spectral freeze module/function/class exists / Expected: Import succeeds / Status: Failing
+- Test Case: Apply spectral freeze to mono signal / Expected: Output shape matches input, content differs / Status: Failing
+- Test Case: Apply spectral freeze to stereo signal / Expected: Output shape matches input (stereo), content differs / Status: Failing
+- Test Case: Output contains sustained texture (conceptual RMS check) / Expected: Significant RMS after freeze point / Status: Failing
+- Test Case: Changing freeze_point affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing blend_amount affects output / Expected: Output differs from default, 0.0 blend ~= original / Status: Failing
+- Test Case: Changing fade_duration affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Handle zero-length input / Expected: Output is zero-length / Status: Failing
+- Test Case: Handle invalid freeze_point / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid blend_amount / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid fade_duration / Expected: Raises ValidationError or ValueError / Status: Failing
+#### Integration Tests:
+- None yet (Focus is unit tests for the effect)
+#### Edge Cases Covered:
+- Zero-length input
+- Invalid parameter values (freeze_point, blend_amount, fade_duration)
+- Blend amount extremes (0.0, 1.0)
 <!-- List specific test cases (unit, integration) -->
 
 ## Refactoring Targets (Post-Pass)
@@ -257,6 +304,13 @@
 ### Fixture: default_chorus_params - [2025-04-11 17:34:21]
 - **Purpose**: Provides default parameters for chorus effect (REQ-ART-V03) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for chorus tests.
 
+
+
+### Fixture: chirp_signal_mono - [2025-04-11 18:11:30]
+- **Purpose**: Provides a mono chirp signal (log frequency sweep 100Hz-5kHz) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Input for spectral freeze tests requiring changing spectral content.
+
+### Fixture: default_spectral_freeze_params - [2025-04-11 18:11:30]
+- **Purpose**: Provides default parameters for smooth spectral freeze (REQ-ART-E02) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for spectral freeze tests.
 
 ### Test Run: 2025-04-08 10:41:13
 - **Trigger**: Manual / **Env**: Local / **Suite**: tests/synthesis/
@@ -371,3 +425,54 @@
 - **Result**: FAIL (Anticipated)
 - **Failures**: `test_chorus_module_exists`: `ImportError: cannot import name 'apply_chorus' from 'robotic_psalms.synthesis.effects'`, `ImportError: cannot import name 'ChorusParameters' ...`, etc. (or similar NameErrors/Pylance errors during test collection).
 
+
+
+### TDD Cycle: Complex Pad Generation (REQ-ART-A01 - Initial Complexity) - [2025-04-11 18:04:00]
+- **Start**: [2025-04-11 17:59:15]
+- **End**: [2025-04-11 18:04:00]
+- **Red**: Added tests for pad complexity (spectral richness, evolution, non-repetition) targeting `_generate_pads`. Initial tests passed unexpectedly. Assertions were made stricter (peak count > 15, atol=1e-6, atol=1e-12). Tests *still* passed.
+- **Green**: N/A (Tests passed against existing code).
+- **Refactor**: Renamed tests to remove `_fails` suffix.
+- **Outcomes**: The current `_generate_pads` implementation (sine+sawtooth mix with LFO) already meets the complexity criteria defined by the tests written. Achieving the *intended* Red phase for REQ-ART-A01 requires more sophisticated tests (e.g., analyzing harmonic relationships, modulation depth/rate, statistical properties) in a future cycle.
+
+
+
+### TDD Cycle: Rich Drone Generation (REQ-ART-A02 - Initial Complexity) - [2025-04-11 18:08:05]
+- **Start**: [2025-04-11 18:06:43]
+- **End**: [2025-04-11 18:08:05]
+- **Red**: Added tests for drone complexity (spectral richness, evolution, non-repetition) targeting `_generate_drones`. Tests passed unexpectedly against the current implementation.
+- **Green**: N/A (Tests passed against existing code).
+- **Refactor**: Renamed tests to remove `_fails` suffix.
+- **Outcomes**: The current `_generate_drones` implementation already meets the complexity criteria defined by the tests written. Achieving the *intended* Red phase for REQ-ART-A02 requires more sophisticated tests or requirement refinement.
+
+
+
+### TDD Cycle: Smooth Spectral Freeze (REQ-ART-E02 - Red Phase) - [2025-04-11 18:11:30]
+- **Start**: [2025-04-11 18:10:34]
+- **End**: [2025-04-11 18:11:30]
+- **Red**: Tests created: Wrote failing tests in `tests/synthesis/test_effects.py` for `apply_smooth_spectral_freeze` and `SpectralFreezeParameters`. Tests cover existence, basic application, sustain, parameter control (`freeze_point`, `blend_amount`, `fade_duration`), and edge cases. Failing due to `ImportError`/`NameError` (Pylance: "unknown import symbol").
+- **Green**: Implementation approach: Next step is to create minimal placeholder implementations for the function and Pydantic model in `src/robotic_psalms/synthesis/effects.py`.
+- **Refactor**: Improvements made: N/A (Red phase only)
+- **Outcomes**: Established test harness for the smooth spectral freeze effect.
+
+
+
+### Test Run: Complex Pad Generation (REQ-ART-A01 - Initial Complexity) - [2025-04-11 18:03:36]
+- **Trigger**: Manual / **Env**: Local / **Suite**: `tests/test_sacred_machinery.py -k generate_pads`
+- **Result**: PASS / **Summary**: 6 Passed / 12 Deselected / 0 Failed
+- **Report Link**: N/A / **Failures**: None (Tests intended to fail passed)
+
+
+### Test Run: Rich Drone Generation (REQ-ART-A02 - Initial Complexity) - [2025-04-11 18:07:15]
+- **Trigger**: Manual / **Env**: Local / **Suite**: `tests/test_sacred_machinery.py -k generate_drones`
+- **Result**: PASS / **Summary**: 6 Passed / 18 Deselected / 0 Failed
+- **Report Link**: N/A / **Failures**: None (Tests intended to fail passed)
+
+
+
+### Test Run: Smooth Spectral Freeze (REQ-ART-E02 - Red Phase) - [2025-04-11 18:11:30]
+- **Trigger**: Manual (Anticipated)
+- **Env**: Local
+- **Suite**: `tests/synthesis/test_effects.py -k spectral_freeze`
+- **Result**: FAIL (Anticipated)
+- **Failures**: `test_spectral_freeze_module_exists`: `ImportError: cannot import name 'apply_smooth_spectral_freeze' from 'robotic_psalms.synthesis.effects'`, `ImportError: cannot import name 'SpectralFreezeParameters' ...`, etc. (or similar NameErrors/Pylance errors during test collection).

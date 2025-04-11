@@ -1,13 +1,12 @@
 import pytest
 import numpy as np
 from unittest.mock import patch, MagicMock, ANY # Add ANY
+import numpy.fft as fft
 from typing import cast # Added for casting
-from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters, ChorusParameters # Add ChorusParameters
-from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters # Add ReverbParameters, DelayParameters
+from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters, ChorusParameters, SpectralFreezeParameters # Add SpectralFreezeParameters
 
 # Import actual implementations
-from robotic_psalms.config import PsalmConfig, HauntingParameters, MixLevels, LiturgicalMode, ReverbConfig, DelayConfig # Remove ChorusConfig
-from robotic_psalms.config import PsalmConfig, HauntingParameters, MixLevels, LiturgicalMode, ReverbConfig, DelayConfig # Add DelayConfig
+from robotic_psalms.config import PsalmConfig, HauntingParameters, MixLevels, LiturgicalMode, ReverbConfig, DelayConfig # Consolidated imports
 from robotic_psalms.synthesis.sacred_machinery import SacredMachineryEngine, SynthesisResult
 from robotic_psalms.synthesis.vox_dei import VoxDeiSynthesizer, VoxDeiSynthesisError # Keep for side_effect
 
@@ -108,11 +107,14 @@ def test_process_psalm_vocal_synthesis_error(engine: SacredMachineryEngine, capl
 # --- Test Effects Application ---
 
 @patch('robotic_psalms.synthesis.sacred_machinery.apply_high_quality_reverb', autospec=True)
-def test_process_psalm_applies_haunting(mock_apply_reverb: MagicMock, default_config: PsalmConfig, engine_factory):
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_smooth_spectral_freeze', autospec=True)
+def test_process_psalm_applies_haunting(mock_apply_freeze: MagicMock, mock_apply_reverb: MagicMock, default_config: PsalmConfig, engine_factory):
     """Test that haunting effects attempt to call the new high-quality reverb."""
     # Modify config for strong haunting
-    test_config = default_config.model_copy(deep=True) # Use model_copy for safety
-    test_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.8), spectral_freeze=0.5)
+    test_config = default_config.model_copy(deep=True)
+    # Instantiate with new SpectralFreezeParameters structure
+    test_freeze_params = SpectralFreezeParameters(freeze_point=0.5, blend_amount=0.8, fade_duration=0.1)
+    test_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.8), spectral_freeze=test_freeze_params)
     test_config.glitch_density = 0.0 # Disable glitch for isolation
 
     # Create engine with modified config using the factory
@@ -125,21 +127,31 @@ def test_process_psalm_applies_haunting(mock_apply_reverb: MagicMock, default_co
     input_vocals = np.ones(expected_samples, dtype=np.float32) * 0.5
     cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
 
+    # Configure mocks to return a copy of the input audio to avoid type errors downstream
+    mock_apply_reverb.side_effect = lambda audio, sr, params: audio.copy()
+    mock_apply_freeze.side_effect = lambda audio, sr, params: audio.copy()
+
     result = engine.process_psalm(psalm_text, duration)
 
-    # Assert that the new reverb function was called (EXPECTED TO FAIL)
-    assert mock_apply_reverb.call_count == 3, f"Expected 3 calls, but got {mock_apply_reverb.call_count}"
-    # Check arguments (basic check using ANY for audio and params)
-    # We expect reverb params derived from config.haunting_intensity
-    mock_apply_reverb.assert_called_with(
-        ANY, # The audio data passed to reverb
-        engine.sample_rate,
-        ANY # Expecting ReverbParameters instance
-        # isinstance(mock_apply_reverb.call_args[0][2], ReverbParameters) # More specific check if needed later
-    )
+    # Assert reverb was called (should still pass if reverb logic is unchanged)
+    assert mock_apply_reverb.call_count == 3, "Reverb should be applied 3 times (vocals, pads, drones)"
+    mock_apply_reverb.assert_called_with(ANY, engine.sample_rate, ANY)
+    assert isinstance(mock_apply_reverb.call_args[0][2], ReverbParameters)
 
-    # Original assertion (commented out/removed as focus shifts to the call)
-    # assert not np.allclose(result.vocals, input_vocals, atol=1e-6), "Vocals should be modified by haunting effects"
+    # Assert that the spectral freeze function was called with the correct arguments
+    # We'll check the last call's arguments as an example
+    last_call_args = mock_apply_freeze.call_args_list[-1][0]
+    assert isinstance(last_call_args[0], np.ndarray) # audio data
+    assert last_call_args[1] == engine.sample_rate # sample rate
+    assert isinstance(last_call_args[2], SpectralFreezeParameters) # SpectralFreezeParameters instance
+    # Verify parameters passed correctly from config
+    assert last_call_args[2].freeze_point == test_freeze_params.freeze_point
+    assert last_call_args[2].blend_amount == test_freeze_params.blend_amount
+    assert last_call_args[2].fade_duration == test_freeze_params.fade_duration
+
+    # Check that the mock was called 3 times (for vocals, pads, drones)
+    assert mock_apply_freeze.call_count == 3
+
     cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
 
 
@@ -149,7 +161,7 @@ def test_process_psalm_applies_glitch(default_config: PsalmConfig, engine_factor
     test_config = default_config.model_copy(deep=True)
     test_config.glitch_density = 0.8 # High density
     # Minimize haunting effects by setting to minimum allowed values
-    test_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.5), spectral_freeze=0.0)
+    test_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.5), spectral_freeze=None) # Set to None instead of 0.0
 
     # Create engine with modified config using the factory
     engine = engine_factory(test_config)
@@ -413,3 +425,226 @@ def test_generate_methods_produce_output(engine: SacredMachineryEngine):
     # Percussion can be empty if no hits, so size > 0 is not guaranteed
     assert isinstance(result.percussion, np.ndarray) and result.percussion.dtype == np.float32
     assert result.drones.size > 0 and result.drones.dtype == np.float32
+
+
+# --- Test _generate_pads Method ---
+
+@pytest.mark.parametrize("duration", [1.0, 0.5, 3.14])
+def test_generate_pads_basic_properties(engine: SacredMachineryEngine, duration: float):
+    """Test basic properties of the generated pads."""
+    sample_rate = engine.sample_rate
+    expected_samples = int(duration * sample_rate)
+
+    pads = engine._generate_pads(duration)
+
+    assert isinstance(pads, np.ndarray)
+    assert pads.dtype == np.float32
+    # Allow slight length deviation due to internal calculations
+    assert abs(len(pads) - expected_samples) <= 1
+    if expected_samples > 0:
+        assert np.max(np.abs(pads)) <= 1.0, "Pad amplitude should be within [-1.0, 1.0]"
+    else:
+        assert len(pads) == 0
+
+
+def test_generate_pads_spectral_richness(engine: SacredMachineryEngine): # Renamed
+    """(FAILING TEST) Test that pads have spectral richness (more than simple tones)."""
+    duration = 2.0
+    sample_rate = engine.sample_rate
+    pads = engine._generate_pads(duration)
+    significant_peaks = 0 # Initialize
+
+    if len(pads) == 0:
+        pytest.skip("Generated pad is empty, cannot analyze spectrum.")
+
+    # Analyze spectrum (simple peak count - revised threshold logic)
+    spectrum = np.abs(fft.rfft(pads))
+    max_peak_value = np.max(spectrum) if spectrum.size > 0 else 0
+    # Use an absolute threshold relative to the max peak, avoid normalization issues
+    threshold = max_peak_value * 0.01 # 1% of max peak value
+    # Count peaks significantly above the absolute threshold
+    significant_peaks = np.sum(spectrum > threshold) # Corrected variable used here
+    # Removed debug print
+
+    # Expecting more than a few peaks for a complex pad (e.g., > 15) - Increased threshold
+    # This assertion should now FAIL for the current simple implementation
+    # This assertion should now FAIL for the current simple implementation
+    assert significant_peaks > 15, f"Pad spectrum seems too simple (only {significant_peaks} peaks > {threshold:.4f})"
+
+
+def test_generate_pads_spectral_evolution(engine: SacredMachineryEngine): # Renamed
+    """(FAILING TEST) Test that pad spectrum evolves over time."""
+    duration = 4.0 # Longer duration to see evolution
+    sample_rate = engine.sample_rate
+    segment_duration = 0.5
+    segment_samples = int(segment_duration * sample_rate)
+
+    pads = engine._generate_pads(duration)
+    segment1 = np.array([], dtype=np.float32) # Initialize
+    segment2 = np.array([], dtype=np.float32) # Initialize
+    spectrum_start = np.array([], dtype=np.float32) # Initialize
+    spectrum_end = np.array([], dtype=np.float32) # Initialize
+
+    if len(pads) < 2 * segment_samples:
+        pytest.skip("Generated pad is too short to compare segments.")
+
+    # Get spectra of first and last segments
+    spectrum_start = np.abs(fft.rfft(pads[:segment_samples]))
+    spectrum_end = np.abs(fft.rfft(pads[-segment_samples:]))
+
+    # Normalize spectra
+    spectrum_start = spectrum_start / np.max(spectrum_start) if np.max(spectrum_start) > 0 else spectrum_start
+    spectrum_end = spectrum_end / np.max(spectrum_end) if np.max(spectrum_end) > 0 else spectrum_end
+    # Debug print moved here
+    diff = np.abs(spectrum_start - spectrum_end)
+    max_diff = np.max(diff) if diff.size > 0 else 0 # Handle empty diff case
+    # Removed debug print
+
+    # Assert that the spectra are NOT identical (allowing for very small tolerance)
+    # This assertion should now FAIL if only amplitude changes slightly
+    assert not np.allclose(spectrum_start, spectrum_end, atol=1e-6), "Pad spectrum does not seem to evolve significantly over time" # Decreased atol
+
+
+def test_generate_pads_non_repetitive(engine: SacredMachineryEngine): # Renamed
+    """(FAILING TEST) Test that pads are not perfectly repetitive."""
+    duration = 6.0 # Longer duration
+    sample_rate = engine.sample_rate
+    segment_duration = 1.0
+    segment_samples = int(segment_duration * sample_rate)
+
+    pads = engine._generate_pads(duration)
+
+    if len(pads) < 2 * segment_samples:
+        pytest.skip("Generated pad is too short to compare segments.")
+
+    # Compare first and second segments (adjust indices if needed)
+    segment1 = pads[:segment_samples]
+    segment2 = pads[segment_samples:2*segment_samples]
+    # Debug print moved here
+    diff_segments = np.abs(segment1 - segment2)
+    max_diff_segments = np.max(diff_segments)
+    # Removed debug print
+
+    # Assert that the segments are NOT identical (with tighter tolerance)
+    # This assertion should now FAIL if only minor LFO changes occur
+    assert not np.allclose(segment1, segment2, atol=1e-12), "Pad seems repetitive between segments (within tolerance)" # Extremely low tolerance
+
+
+# --- Test _generate_drones Method ---
+
+@pytest.mark.parametrize("duration", [1.0, 0.5, 3.14])
+def test_generate_drones_basic_properties(engine: SacredMachineryEngine, duration: float):
+    """Test basic properties of the generated drones."""
+    sample_rate = engine.sample_rate
+    expected_samples = int(duration * sample_rate)
+
+    drones = engine._generate_drones(duration)
+
+    assert isinstance(drones, np.ndarray)
+    assert drones.dtype == np.float32
+    # Allow slight length deviation due to internal calculations
+    assert abs(len(drones) - expected_samples) <= 1
+    if expected_samples > 0:
+        assert np.max(np.abs(drones)) <= 1.0, "Drone amplitude should be within [-1.0, 1.0]"
+        assert drones.size > 0, "Drones should not be empty for positive duration"
+    else:
+        assert len(drones) == 0
+
+def test_generate_drones_spectral_richness(engine: SacredMachineryEngine):
+    """(FAILING TEST) Test that drones have spectral richness (more than simple tones)."""
+    duration = 2.0
+    sample_rate = engine.sample_rate
+    drones = engine._generate_drones(duration)
+    significant_peaks = 0
+
+    if len(drones) == 0:
+        pytest.skip("Generated drone is empty, cannot analyze spectrum.")
+
+    # Analyze spectrum (simple peak count)
+    spectrum = np.abs(fft.rfft(drones))
+    max_peak_value = np.max(spectrum) if spectrum.size > 0 else 0
+    threshold = max_peak_value * 0.05 # 5% of max peak value (adjust if needed for drones)
+    significant_peaks = np.sum(spectrum > threshold)
+
+    # Expecting more than a few peaks for a complex drone (e.g., > 5)
+    # This assertion should FAIL for a simple sine/basic drone implementation
+    assert significant_peaks > 5, f"Drone spectrum seems too simple (only {significant_peaks} peaks > {threshold:.4f})"
+
+def test_generate_drones_spectral_evolution(engine: SacredMachineryEngine):
+    """(FAILING TEST) Test that drone spectrum evolves over time."""
+    duration = 4.0 # Longer duration to see evolution
+    sample_rate = engine.sample_rate
+    segment_duration = 0.5
+    segment_samples = int(segment_duration * sample_rate)
+
+    drones = engine._generate_drones(duration)
+    spectrum_start = np.array([], dtype=np.float32)
+    spectrum_end = np.array([], dtype=np.float32)
+
+    if len(drones) < 2 * segment_samples:
+        pytest.skip("Generated drone is too short to compare segments.")
+
+    # Get spectra of first and last segments
+    spectrum_start = np.abs(fft.rfft(drones[:segment_samples]))
+    spectrum_end = np.abs(fft.rfft(drones[-segment_samples:]))
+
+    # Normalize spectra if they are not empty
+    if np.max(spectrum_start) > 0:
+        spectrum_start = spectrum_start / np.max(spectrum_start)
+    if np.max(spectrum_end) > 0:
+        spectrum_end = spectrum_end / np.max(spectrum_end)
+
+    # Assert that the spectra are NOT identical (allowing for small tolerance)
+    # This assertion should FAIL if the drone is static
+    assert not np.allclose(spectrum_start, spectrum_end, atol=1e-5), "Drone spectrum does not seem to evolve significantly over time"
+
+def test_generate_drones_non_repetitive(engine: SacredMachineryEngine):
+    """(FAILING TEST) Test that drones are not perfectly repetitive."""
+    duration = 6.0 # Longer duration
+    sample_rate = engine.sample_rate
+    segment_duration = 1.0
+    segment_samples = int(segment_duration * sample_rate)
+
+    drones = engine._generate_drones(duration)
+
+    if len(drones) < 2 * segment_samples:
+        pytest.skip("Generated drone is too short to compare segments.")
+
+    # Compare first and second segments
+    segment1 = drones[:segment_samples]
+    segment2 = drones[segment_samples:2*segment_samples]
+
+    # Assert that the segments are NOT identical (with very tight tolerance)
+    # This assertion should FAIL if the drone is perfectly looping/static
+    assert not np.allclose(segment1, segment2, atol=1e-10), "Drone seems repetitive between segments (within tolerance)"
+
+
+# --- NEW TESTS FOR SPECTRAL FREEZE INTEGRATION ---
+
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_smooth_spectral_freeze', autospec=True)
+def test_process_psalm_does_not_apply_spectral_freeze_when_none(mock_apply_freeze: MagicMock, default_config: PsalmConfig, engine_factory):
+    """Test that spectral freeze is NOT applied when HauntingParameters.spectral_freeze is None."""
+    test_config = default_config.model_copy(deep=True)
+    # Explicitly set spectral_freeze to None
+    test_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.8), spectral_freeze=None)
+    test_config.glitch_density = 0.0 # Disable glitch for isolation
+
+    # Create engine with modified config using the factory
+    engine = engine_factory(test_config)
+
+    psalm_text = "No freeze test"
+    duration = 2.0
+    expected_samples = int(duration * engine.sample_rate)
+    # Provide simple input audio via the mock
+    input_vocals = np.ones(expected_samples, dtype=np.float32) * 0.5
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
+
+    # Process the psalm
+    result = engine.process_psalm(psalm_text, duration)
+
+    # Assert that the spectral freeze function was NOT called
+    mock_apply_freeze.assert_not_called()
+
+    # Ensure synth was called
+    cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
+

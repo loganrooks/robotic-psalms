@@ -61,3 +61,23 @@
 - **Metrics After**: N/A
 - **Related Debt**: N/A
 - **Related Issue**: REQ-ART-V03
+
+
+### Optimization: [2025-04-11 18:22:00] - Refactor Spectral Freeze Implementation (REQ-ART-E02)
+- **Target**: `src/robotic_psalms/synthesis/effects.py`
+- **Type**: Modularity/Readability
+- **Desc**: Refactored `apply_smooth_spectral_freeze`: Introduced constants `N_FFT` and `HOP_LENGTH`. Extracted logic for audio shape preparation (`_prepare_audio_for_librosa`), blend mask creation (`_create_blend_mask`), and audio shape restoration (`_restore_audio_shape`) into private helper functions. Updated main function to use helpers.
+- **Metrics Before**: N/A (Focus on code structure)
+- **Metrics After**: N/A
+- **Related Debt**: N/A
+- **Related Issue**: REQ-ART-E02
+
+### Optimization: 2025-04-11 18:32:30 - Refactor Spectral Freeze Integration Code & Tests (REQ-ART-E02)
+- **Target**: `src/robotic_psalms/synthesis/sacred_machinery.py`, `tests/test_sacred_machinery.py`
+- **Type**: Readability/Maintainability/Correctness
+- **Desc**: Refactored `sacred_machinery.py`: Removed unused imports (`typing.Protocol`, `typing.runtime_checkable`, `scipy.signal.windows.hann`), added comment to length adjustment in `_apply_haunting_effects`, removed redundant `np.array()` cast. Refactored `test_sacred_machinery.py`: Consolidated duplicate `PsalmConfig` imports, corrected reverb mock call count assertion in `test_process_psalm_applies_haunting` from `>= 1` to `== 3`. Confirmed all 25 tests pass.
+- **Metrics Before**: N/A
+- **Metrics After**: N/A
+- **Related Debt**: N/A
+- **Related Issue**: REQ-ART-E02
+

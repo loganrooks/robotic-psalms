@@ -65,6 +65,13 @@
 ## Progress
 *Milestones, completed tasks, overall status.*
 
+#### [2025-04-11 18:34:42] - Task: Update Documentation for Spectral Freeze Integration (REQ-ART-E02 - Documentation)
+- **Status:** Completed.
+- **Deliverables:** Updated `README.md` with example configuration and parameter descriptions for the nested `spectral_freeze` structure (`SpectralFreezeParameters`). Verified docstrings in `src/robotic_psalms/config.py` and `src/robotic_psalms/synthesis/effects.py` are adequate.
+---
+
+
+
 #### [2025-04-11 17:52:50] - Task: Update Documentation for Chorus Effect (REQ-ART-V03 - Documentation)
 - **Status:** Completed.
 - **Deliverables:** Updated `README.md` with example configuration and parameter descriptions for `chorus_params`. Checked docstrings in `src/robotic_psalms/config.py` and `src/robotic_psalms/synthesis/effects.py` related to `ChorusParameters` and found them adequate.
@@ -182,4 +189,28 @@
 - **Status:** Completed.
 - **Deliverables:** Implemented `apply_chorus` function and `ChorusParameters`/`ChorusConfig` models using `pedalboard.Chorus` in `src/robotic_psalms/synthesis/effects.py` and `src/robotic_psalms/config.py`. Integrated conditionally into `SacredMachineryEngine`. Core tests passing, documentation updated.
 - **Notes:** `num_voices` parameter ignored by implementation. Test for `num_voices` marked `xfail`.
+---
+
+
+#### [2025-04-11 18:07:58] - Task: Write Failing Tests for Rich Drone Generation (REQ-ART-A02 - Red Phase Attempt)
+- **Status:** Deferred.
+- **Outcome:** Attempted to write failing tests for enhanced drone complexity (`_generate_drones`). Tests checking spectral richness, evolution, and non-repetition passed against the existing implementation. Further enhancement requires more sophisticated tests or requirements.
+---
+
+
+#### [2025-04-11 18:05:02] - Task: Write Failing Tests for Complex Pad Generation (REQ-ART-A01 - Red Phase Attempt)
+- **Status:** Deferred.
+- **Outcome:** Attempted to write failing tests for enhanced pad complexity (`_generate_pads`). Tests checking spectral richness, evolution, and non-repetition passed against the existing implementation. Further enhancement requires more sophisticated tests or requirements.
+---
+
+
+#### [2025-04-11 18:09:00] - Task: Write Failing Tests for Rich Drone Generation (REQ-ART-A02 - Red Phase Attempt)
+- **Status:** Deferred.
+- **Outcome:** Attempted to write failing tests for enhanced drone complexity (`_generate_drones`). Tests checking spectral richness, evolution, and non-repetition passed against the existing implementation. Further enhancement requires more sophisticated tests or requirements.
+---
+
+
+#### [2025-04-11 18:35:35] - Feature: Improved Spectral Freeze (REQ-ART-E02)
+- **Status:** Completed.
+- **Deliverables:** Implemented `apply_smooth_spectral_freeze` function and `SpectralFreezeParameters` model using `librosa` STFT in `src/robotic_psalms/synthesis/effects.py`. Integrated into `SacredMachineryEngine` (within `HauntingParameters`), replacing the old method. Relevant tests created/updated and passing. Documentation updated in `README.md`.
 ---

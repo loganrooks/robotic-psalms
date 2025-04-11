@@ -6,6 +6,7 @@ from scipy import signal # Added for filters
 import math # Added for RBJ filter calculations
 from scipy.interpolate import interp1d # Used for formant shifting spectral warping
 import pyworld as pw # Use pw alias for formant shifting
+import librosa # Added for spectral freeze
 
 # Pedalboard's Reverb defaults: room_size=0.5, damping=0.5, wet_level=0.33, dry_level=0.4, width=1.0, freeze_mode=0.0
 # We'll map our params where possible. Pedalboard doesn't have direct decay_time, pre_delay, diffusion.
@@ -89,6 +90,16 @@ class ChorusParameters(BaseModel):
     wet_dry_mix: float = Field(..., ge=0.0, le=1.0, description="Mix between wet (chorus) and dry (original) signal (0=dry, 1=wet).")
 
     model_config = ConfigDict(extra='forbid')
+
+
+class SpectralFreezeParameters(BaseModel):
+    """Parameters for the smooth spectral freeze effect."""
+    freeze_point: float = Field(..., ge=0.0, le=1.0, description="Normalized time point (0.0 to 1.0) in the audio to capture the spectrum from.")
+    blend_amount: float = Field(..., ge=0.0, le=1.0, description="Blend between the original and frozen spectrum (0.0=original, 1.0=frozen).")
+    fade_duration: float = Field(..., ge=0.0, description="Duration in seconds over which to fade the blend amount.")
+
+    model_config = ConfigDict(extra='forbid')
+
 
 # --- Effect Functions ---
 
@@ -501,3 +512,175 @@ def apply_chorus(audio: np.ndarray, sample_rate: int, params: ChorusParameters) 
 
     return chorused_signal.astype(np.float32) # Return float32
 
+
+# --- Spectral Freeze Constants ---
+N_FFT = 2048
+HOP_LENGTH = 512
+
+
+# --- Spectral Freeze Helper Functions ---
+
+def _prepare_audio_for_librosa(audio_float32: np.ndarray) -> tuple[np.ndarray, int, tuple]:
+    """Prepares audio array shape for librosa STFT (channels first)."""
+    original_ndim = audio_float32.ndim
+    original_shape = audio_float32.shape
+
+    if original_ndim == 1:
+        # Mono: add channel dimension
+        audio_proc = audio_float32[np.newaxis, :]
+    elif original_ndim == 2:
+        # Stereo: ensure channels are the first dimension
+        if original_shape[0] > original_shape[1]: # samples x channels
+            audio_proc = audio_float32.T
+        else: # channels x samples
+            audio_proc = audio_float32
+    else:
+        raise ValueError("Input audio must be 1D (mono) or 2D (stereo)")
+
+    return audio_proc, original_ndim, original_shape
+
+
+def _create_blend_mask(params: SpectralFreezeParameters, sample_rate: int, hop_length: int, n_frames: int) -> np.ndarray:
+    """Creates the time-varying blend mask for spectral freeze."""
+    fade_frames = int(round(params.fade_duration * sample_rate / hop_length))
+    fade_frames = min(fade_frames, n_frames) # Clamp fade duration
+
+    if fade_frames <= 0 or params.blend_amount == 0 or n_frames == 0:
+        blend_mask = np.full(n_frames, params.blend_amount)
+    else:
+        ramp = np.linspace(0, params.blend_amount, fade_frames)
+        # Ensure plateau length is not negative
+        plateau_len = max(0, n_frames - fade_frames)
+        plateau = np.full(plateau_len, params.blend_amount)
+        blend_mask = np.concatenate((ramp, plateau))
+        # Ensure blend_mask length matches n_frames exactly if concatenation resulted in different length due to rounding
+        if len(blend_mask) != n_frames:
+             blend_mask = np.resize(blend_mask, n_frames)
+             if n_frames > 0: # Ensure last element is correct if resized
+                 blend_mask[-1] = params.blend_amount
+    return blend_mask
+
+
+def _restore_audio_shape(processed_audio: np.ndarray, original_ndim: int, original_shape: tuple) -> np.ndarray:
+    """Restores the processed audio array to its original shape."""
+    if original_ndim == 1 and processed_audio.shape[0] == 1:
+        # Input mono, output has channel dim -> flatten
+        output_audio = processed_audio[0]
+    elif original_ndim == 2 and original_shape[0] > original_shape[1]: # Input was samples x channels
+        # Output is channels x samples -> transpose back
+        output_audio = processed_audio.T
+    else: # Input was mono/channels x samples, output is channels x samples
+        output_audio = processed_audio
+
+    # Ensure final output shape is consistent if possible (e.g., handle potential squeeze)
+    # Check if output_audio is valid before accessing shape
+    if isinstance(output_audio, np.ndarray):
+        if output_audio.shape != original_shape and original_ndim == 1 and output_audio.ndim == 0:
+             # If input was mono and output somehow became scalar, reshape
+             output_audio = output_audio.reshape(original_shape)
+        elif output_audio.shape != original_shape and original_ndim == 2:
+             # If shapes mismatch for stereo, this might indicate an issue
+             # Attempt to reshape if total size matches
+             if output_audio.size == np.prod(original_shape):
+                 try:
+                     output_audio = output_audio.reshape(original_shape)
+                 except ValueError:
+                     print(f"Warning: Could not reshape processed audio {output_audio.shape} to original shape {original_shape}")
+             else:
+                  print(f"Warning: Processed audio size {output_audio.size} differs from original {np.prod(original_shape)}")
+    else: # If something went wrong, return an empty array matching original dtype
+        print("Warning: Audio processing failed during shape restoration.")
+        # Return original audio copy instead of empty array to be safer
+        # This requires passing original audio or handling failure differently.
+        # For now, returning empty array as before.
+        return np.array([], dtype=processed_audio.dtype)
+
+    return output_audio
+
+
+# --- Main Effect Function ---
+def apply_smooth_spectral_freeze(audio: np.ndarray, sample_rate: int, params: SpectralFreezeParameters) -> np.ndarray:
+    """
+    Applies a smooth spectral freeze effect using STFT.
+
+    Freezes the spectrum at a specified point and blends it with the original
+    audio over time, controlled by a fade-in duration.
+
+    Args:
+        audio: Input audio signal as a NumPy array (mono or stereo).
+               Expected shapes: (n_samples,) for mono, or (n_channels, n_samples)
+               or (n_samples, n_channels) for stereo.
+        sample_rate: Sample rate of the audio signal.
+        params: An instance of SpectralFreezeParameters containing effect settings.
+
+    Returns:
+        The processed audio signal with the spectral freeze effect applied (float32).
+    """
+    if audio.size == 0:
+        return np.array([], dtype=np.float32)
+
+    audio_float32 = audio.astype(np.float32)
+
+    # --- Prepare audio shape for librosa (channels first) ---
+    audio_proc, original_ndim, original_shape = _prepare_audio_for_librosa(audio_float32)
+    n_channels, n_samples = audio_proc.shape
+
+    # --- STFT Parameters ---
+    n_fft = N_FFT
+    hop_length = HOP_LENGTH
+
+    # --- Calculate STFT ---
+    stft_result = librosa.stft(y=audio_proc, n_fft=n_fft, hop_length=hop_length)
+    # Result shape is (n_channels, n_freq_bins, n_frames)
+    if stft_result.ndim == 2: # Handle case where librosa might return 2D for mono
+        stft_result = stft_result[np.newaxis, :, :]
+        n_channels = 1 # Ensure n_channels is 1
+
+    n_freq_bins, n_frames = stft_result.shape[1:]
+
+
+    # --- Determine Freeze Frame ---
+    # Ensure index is within bounds [0, n_frames - 1]
+    target_frame_index = min(int(round(params.freeze_point * (n_frames - 1))), n_frames - 1) if n_frames > 0 else 0
+
+
+    # --- Extract Magnitudes and Phase ---
+    magnitude = np.abs(stft_result)
+    phase = np.angle(stft_result)
+    frozen_magnitude = magnitude[:, :, target_frame_index] if n_frames > 0 else np.zeros((n_channels, n_freq_bins)) # Shape: (n_channels, n_freq_bins)
+
+
+    # --- Create Time-Varying Blend Mask ---
+    blend_mask = _create_blend_mask(params, sample_rate, hop_length, n_frames)
+
+
+    # Expand mask for broadcasting: (1, 1, n_frames)
+    blend_mask_expanded = blend_mask[np.newaxis, np.newaxis, :]
+    # Expand frozen magnitude for broadcasting: (n_channels, n_freq_bins, 1)
+    frozen_magnitude_expanded = frozen_magnitude[:, :, np.newaxis]
+
+    # --- Interpolate Magnitudes ---
+    # Ensure broadcasting works even if n_frames is 0 or 1
+    if n_frames > 0:
+        interpolated_magnitude = (1.0 - blend_mask_expanded) * magnitude + \
+                                 blend_mask_expanded * frozen_magnitude_expanded
+    else: # Handle case with no frames
+         interpolated_magnitude = np.zeros((n_channels, n_freq_bins, 0))
+
+
+    # --- Reconstruct STFT ---
+    final_stft = interpolated_magnitude * np.exp(1j * phase)
+
+    # --- Inverse STFT ---
+    # Ensure output length matches original input length
+    processed_audio = librosa.istft(final_stft, hop_length=hop_length, length=n_samples, win_length=n_fft) # Specify win_length
+
+    # --- Restore Original Shape ---
+    output_audio = _restore_audio_shape(processed_audio, original_ndim, original_shape)
+
+    # Final check for dtype and return
+    if not isinstance(output_audio, np.ndarray): # If something went wrong during restoration
+        print("Warning: Spectral freeze processing failed, returning original audio.")
+        return audio.astype(np.float32).copy()
+
+    return output_audio.astype(np.float32)

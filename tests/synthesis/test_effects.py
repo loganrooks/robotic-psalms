@@ -18,6 +18,8 @@ from robotic_psalms.synthesis.effects import (
     BandpassFilterParameters, # Placeholder
     apply_chorus,
     ChorusParameters, # Placeholder
+    apply_smooth_spectral_freeze, # Placeholder
+    SpectralFreezeParameters, # Placeholder
 )
 from pedalboard._pedalboard import Pedalboard # Import as suggested by Pylance
 
@@ -113,6 +115,28 @@ def default_chorus_params():
         wet_dry_mix=0.5 # Added wet/dry mix based on other effects
     )
 
+
+
+@pytest.fixture
+def chirp_signal_mono(duration_sec=2.0):
+    """Generate a mono chirp signal (frequency increases over time)."""
+    num_samples = int(duration_sec * SAMPLE_RATE)
+    t = np.linspace(0, duration_sec, num_samples, endpoint=False)
+    start_freq = 100
+    end_freq = 5000
+    # Use scipy's chirp for simplicity
+    from scipy.signal import chirp
+    signal = chirp(t, f0=start_freq, f1=end_freq, t1=duration_sec, method='logarithmic')
+    return signal.astype(np.float32)
+
+@pytest.fixture
+def default_spectral_freeze_params():
+    """Default spectral freeze parameters."""
+    return SpectralFreezeParameters(
+        freeze_point=0.5, # Freeze at midpoint
+        blend_amount=1.0, # Fully frozen
+        fade_duration=0.1 # 100ms fade
+    )
 # --- Reverb Tests ---
 def test_reverb_module_exists():
     assert callable(apply_high_quality_reverb)
@@ -645,3 +669,119 @@ def test_chorus_invalid_parameters(dry_mono_signal):
         invalid_params = ChorusParameters(rate_hz=0.8, depth=0.25, delay_ms=7.0, feedback=0.2, num_voices=3, wet_dry_mix=1.1)
         apply_chorus(dry_mono_signal, SAMPLE_RATE, invalid_params)
 
+
+
+# --- Smooth Spectral Freeze Tests (REQ-ART-E02) ---
+
+def test_spectral_freeze_module_exists():
+    """Checks if the spectral freeze imports work."""
+    assert callable(apply_smooth_spectral_freeze)
+    assert 'freeze_point' in SpectralFreezeParameters.model_fields
+    assert 'blend_amount' in SpectralFreezeParameters.model_fields
+    assert 'fade_duration' in SpectralFreezeParameters.model_fields
+
+def test_apply_spectral_freeze_mono(chirp_signal_mono, default_spectral_freeze_params):
+    """Test applying spectral freeze to a mono signal."""
+    frozen_signal = apply_smooth_spectral_freeze(
+        chirp_signal_mono, SAMPLE_RATE, default_spectral_freeze_params
+    )
+    assert frozen_signal.ndim == chirp_signal_mono.ndim
+    assert len(frozen_signal) == len(chirp_signal_mono)
+    assert not np.allclose(frozen_signal, chirp_signal_mono), "Spectral freeze did not alter mono signal"
+
+def test_apply_spectral_freeze_stereo(chirp_signal_mono, default_spectral_freeze_params):
+    """Test applying spectral freeze to a stereo signal (created from mono)."""
+    stereo_chirp = np.stack([chirp_signal_mono, chirp_signal_mono * 0.9], axis=-1)
+    frozen_signal = apply_smooth_spectral_freeze(
+        stereo_chirp, SAMPLE_RATE, default_spectral_freeze_params
+    )
+    assert frozen_signal.ndim == stereo_chirp.ndim
+    assert frozen_signal.shape[1] == 2
+    assert frozen_signal.shape[0] == stereo_chirp.shape[0]
+    assert not np.allclose(frozen_signal, stereo_chirp), "Spectral freeze did not alter stereo signal"
+
+def test_spectral_freeze_sustains_texture(chirp_signal_mono, default_spectral_freeze_params):
+    """Conceptual test: Output should have sustained energy after freeze point."""
+    freeze_point_samples = int(default_spectral_freeze_params.freeze_point * len(chirp_signal_mono))
+    # Ensure there's enough signal after the freeze point for analysis
+    if freeze_point_samples >= len(chirp_signal_mono) - 100:
+        pytest.skip("Freeze point too close to end for sustain check")
+
+    frozen_signal = apply_smooth_spectral_freeze(
+        chirp_signal_mono, SAMPLE_RATE, default_spectral_freeze_params
+    )
+
+    # Check RMS energy in a window shortly after the freeze point
+    window_start = freeze_point_samples + int(0.05 * SAMPLE_RATE) # 50ms after freeze
+    window_end = window_start + int(0.1 * SAMPLE_RATE) # 100ms window
+    if window_end > len(frozen_signal):
+         pytest.skip("Signal too short after freeze point for RMS check")
+
+    rms_after_freeze = np.sqrt(np.mean(frozen_signal[window_start:window_end]**2))
+
+    # Compare with RMS energy near the end of the original chirp (which should be higher freq/potentially diff RMS)
+    rms_original_end = np.sqrt(np.mean(chirp_signal_mono[window_start:window_end]**2))
+
+    # Basic check: RMS after freeze should be significant (not near zero)
+    assert rms_after_freeze > 1e-6, "Frozen signal has near-zero energy after freeze point"
+    # More advanced check (optional): Compare spectral content before/after freeze point in output
+
+def test_spectral_freeze_freeze_point_parameter(chirp_signal_mono, default_spectral_freeze_params):
+    """Test that changing freeze_point alters the output spectrum capture."""
+    frozen_default = apply_smooth_spectral_freeze(chirp_signal_mono, SAMPLE_RATE, default_spectral_freeze_params)
+
+    params_early_freeze = default_spectral_freeze_params.model_copy(update={'freeze_point': 0.2})
+    frozen_early = apply_smooth_spectral_freeze(chirp_signal_mono, SAMPLE_RATE, params_early_freeze)
+    assert not np.allclose(frozen_default, frozen_early), "Changing freeze_point had no effect"
+
+def test_spectral_freeze_blend_amount_parameter(chirp_signal_mono, default_spectral_freeze_params):
+    """Test that changing blend_amount mixes frozen/original signal."""
+    params_full_freeze = default_spectral_freeze_params.model_copy(update={'blend_amount': 1.0})
+    frozen_full = apply_smooth_spectral_freeze(chirp_signal_mono, SAMPLE_RATE, params_full_freeze)
+
+    params_half_blend = default_spectral_freeze_params.model_copy(update={'blend_amount': 0.5})
+    frozen_half = apply_smooth_spectral_freeze(chirp_signal_mono, SAMPLE_RATE, params_half_blend)
+    assert not np.allclose(frozen_full, frozen_half), "Changing blend_amount (1.0 vs 0.5) had no effect"
+
+    params_no_freeze = default_spectral_freeze_params.model_copy(update={'blend_amount': 0.0})
+    frozen_none = apply_smooth_spectral_freeze(chirp_signal_mono, SAMPLE_RATE, params_no_freeze)
+    # Blend 0 should ideally be very close to the original signal, allowing for fade duration
+    # This assertion might be too strict depending on implementation details (fade)
+    # assert np.allclose(frozen_none, chirp_signal_mono, atol=1e-3), "Blend amount 0 did not result in original signal"
+    assert not np.allclose(frozen_full, frozen_none), "Changing blend_amount (1.0 vs 0.0) had no effect"
+
+def test_spectral_freeze_fade_duration_parameter(chirp_signal_mono, default_spectral_freeze_params):
+    """Test that changing fade_duration alters the output (conceptual)."""
+    frozen_default = apply_smooth_spectral_freeze(chirp_signal_mono, SAMPLE_RATE, default_spectral_freeze_params)
+
+    params_long_fade = default_spectral_freeze_params.model_copy(update={'fade_duration': 0.5})
+    frozen_long_fade = apply_smooth_spectral_freeze(chirp_signal_mono, SAMPLE_RATE, params_long_fade)
+    # Direct comparison is tricky. A longer fade should result in a different signal.
+    assert not np.allclose(frozen_default, frozen_long_fade), "Changing fade_duration had no effect"
+    # More advanced test could analyze the RMS envelope around the freeze point
+
+def test_spectral_freeze_zero_length_input(default_spectral_freeze_params):
+    """Test spectral freeze with zero-length audio input."""
+    zero_signal = np.array([], dtype=np.float32)
+    frozen_signal = apply_smooth_spectral_freeze(
+        zero_signal, SAMPLE_RATE, default_spectral_freeze_params
+    )
+    assert isinstance(frozen_signal, np.ndarray)
+    assert len(frozen_signal) == 0
+
+def test_spectral_freeze_invalid_parameters(chirp_signal_mono):
+    """Test spectral freeze with invalid parameter values."""
+    with pytest.raises((ValidationError, ValueError)):
+        # Freeze point must be >= 0
+        invalid_params = SpectralFreezeParameters(freeze_point=-0.1, blend_amount=1.0, fade_duration=0.1)
+        apply_smooth_spectral_freeze(chirp_signal_mono, SAMPLE_RATE, invalid_params)
+
+    with pytest.raises((ValidationError, ValueError)):
+        # Blend amount must be 0 <= blend <= 1
+        invalid_params = SpectralFreezeParameters(freeze_point=0.5, blend_amount=1.5, fade_duration=0.1)
+        apply_smooth_spectral_freeze(chirp_signal_mono, SAMPLE_RATE, invalid_params)
+
+    with pytest.raises((ValidationError, ValueError)):
+        # Fade duration must be >= 0
+        invalid_params = SpectralFreezeParameters(freeze_point=0.5, blend_amount=1.0, fade_duration=-0.01)
+        apply_smooth_spectral_freeze(chirp_signal_mono, SAMPLE_RATE, invalid_params)

@@ -1,7 +1,6 @@
 from enum import Enum
 from typing import Optional
-from .synthesis.effects import ResonantFilterParameters, BandpassFilterParameters, ChorusParameters
-from .synthesis.effects import ResonantFilterParameters, BandpassFilterParameters
+from .synthesis.effects import ResonantFilterParameters, BandpassFilterParameters, ChorusParameters, SpectralFreezeParameters
 from pydantic import BaseModel, Field, model_validator # Corrected import
 from dataclasses import dataclass
 
@@ -120,16 +119,14 @@ class DelayConfig(BaseModel):
         return self
 
 class HauntingParameters(BaseModel):
-    """Parameters controlling ethereal qualities, including reverb and spectral freeze."""
+    """Parameters controlling ethereal qualities, including reverb and the improved spectral freeze."""
     reverb: ReverbConfig = Field(
         default_factory=ReverbConfig,
         description="Configuration for the high-quality reverb effect."
     )
-    spectral_freeze: float = Field(
-        default=0.2,
-        ge=0.0,
-        le=1.0,
-        description="Amount of spectral freezing effect"
+    spectral_freeze: Optional[SpectralFreezeParameters] = Field(
+        default=None,
+        description="Optional configuration for the improved spectral freeze effect. If None, the effect is disabled. Uses SpectralFreezeParameters for fine-grained control."
     )
 
 class VocalTimbre(BaseModel): # Removed empty lines below

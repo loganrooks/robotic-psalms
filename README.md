@@ -117,7 +117,10 @@ haunting_intensity:
     diffusion: 0.7        # Controls the density/smoothness of the reverb tail (float, 0.0 to 1.0)
     damping: 0.8          # High-frequency damping, makes reverb darker (float, 0.0 to 1.0)
     wet_dry_mix: 0.3      # Mix between original (dry) and reverb (wet) signal (float, 0.0 to 1.0)
-  spectral_freeze: 0.4
+  spectral_freeze: # Optional configuration for the improved spectral freeze effect
+    freeze_point: 0.5    # Normalized time point (0.0-1.0) to capture spectrum
+    blend_amount: 0.8    # Blend between original and frozen (0.0=original, 1.0=frozen)
+    fade_duration: 1.5   # Duration (seconds) to fade the blend amount
 
 vocal_timbre:
   choirboy: 0.4
@@ -203,7 +206,10 @@ robotic-psalms examples/psalm.txt output.wav --config examples/config.yml --visu
   - `diffusion`: Controls the density and smoothness of the reverb tail (0.0 to 1.0). Higher values are smoother.
   - `damping`: Controls how quickly high frequencies fade in the reverb tail (0.0 to 1.0). Higher values mean less damping (brighter reverb).
   - `wet_dry_mix`: The balance between the original (dry) signal and the reverb (wet) signal (0.0 for full dry, 1.0 for full wet).
-- `spectral_freeze`: Amount of spectral time-stretching
+- `spectral_freeze`: (Optional) Configuration for the smooth spectral freeze effect. If omitted or set to `null`, the effect is disabled.
+  - `freeze_point`: Normalized time point (0.0 to 1.0) in the audio to capture the spectrum from (e.g., `0.5` for the middle).
+  - `blend_amount`: Blend between the original and frozen spectrum (0.0 = original, 1.0 = fully frozen) (e.g., `0.8`).
+  - `fade_duration`: Duration in seconds over which to fade the `blend_amount` from 0 to its target value (e.g., `1.5`).
 - `formant_shift_factor`: Adjusts vocal formants (0.5-2.0). Values > 1.0 raise formants (brighter/smaller perceived source), < 1.0 lowers them (darker/larger). Uses `pyworld` for robust shifting, preserving pitch better than simpler methods.
 - `delay_effect`: (Optional) Configuration for a complex delay effect applied to the final output. If this section is omitted or `wet_dry_mix` is set to 0, the effect is disabled.
   - `delay_time_ms`: The primary delay time in milliseconds (e.g., `500.0`). Must be greater than 0.

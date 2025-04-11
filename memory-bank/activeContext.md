@@ -3,8 +3,124 @@
 *This file tracks the immediate focus, ongoing tasks, and unresolved questions for the current session.*
 
 ---
+### [2025-04-11 18:34:33] - Task: Update Documentation for Spectral Freeze Integration (REQ-ART-E02 - Documentation)
+- **Focus:** Update `README.md` and check docstrings in `config.py`/`effects.py` for the new `SpectralFreezeParameters`.
+- **Actions:**
+    - Read `README.md`.
+    - Read `src/robotic_psalms/config.py`.
+    - Read `src/robotic_psalms/synthesis/effects.py`.
+    - Applied diff to `README.md` to update example config and parameter guide for `spectral_freeze`.
+    - Confirmed docstrings in `config.py` and `effects.py` are adequate.
+- **Status:** Completed. Documentation updated.
+
+---
+
+
+### [2025-04-11 18:27:25] - Task: Update Integration Tests for Improved Spectral Freeze (REQ-ART-E02 - Integration TDD Red Phase)
+- **Focus:** Modify `tests/test_sacred_machinery.py` to use `SpectralFreezeParameters` and assert calls to `apply_smooth_spectral_freeze`.
+- **Actions:**
+    - Read `tests/test_sacred_machinery.py`.
+    - Applied diff to add `SpectralFreezeParameters` import, modify `test_process_psalm_applies_haunting` (mock, instantiate, assert call), and add `test_process_psalm_does_not_apply_spectral_freeze_when_none` (assert no call).
+    - Fixed Pylance error in `test_process_psalm_applies_glitch` (updated `HauntingParameters` instantiation).
+    - Added placeholder import for `apply_smooth_spectral_freeze` and `SpectralFreezeParameters` to `src/robotic_psalms/synthesis/sacred_machinery.py` to allow test patching.
+    - Updated `_apply_haunting_effects` in `sacred_machinery.py` with placeholder logic to resolve type errors and allow tests to run.
+    - Ran `pytest tests/test_sacred_machinery.py -k "spectral_freeze"`.
+- **Status:** Red phase complete. `test_process_psalm_applies_haunting` fails with `AssertionError` (mock not called), and `test_process_psalm_does_not_apply_spectral_freeze_when_none` passes, as expected. Ready for Green phase (implementing the call in `sacred_machinery.py`).
+
+---
+
+
+### [2025-04-11 18:24:34] - Task: Add Configuration for Improved Spectral Freeze
+- **Focus:** Modify `src/robotic_psalms/config.py` to replace `spectral_freeze: float` with `spectral_freeze: Optional[SpectralFreezeParameters]` in `HauntingParameters`.
+- **Actions:**
+    - Read `src/robotic_psalms/config.py`.
+    - Applied diff to import `SpectralFreezeParameters` and update the `HauntingParameters` model.
+- **Status:** Configuration update complete. Pylance errors detected in `sacred_machinery.py` and `test_sacred_machinery.py` due to the type change, indicating the need for integration work.
+
+---
+
+
+
+### [2025-04-11 18:35:16] - Task: Implement Improved Spectral Freeze (REQ-ART-E02)
+- **Focus:** Completed full TDD cycle (implementation, integration, refactoring, documentation) for the improved spectral freeze effect using `librosa` STFT. Replaced old method in `sacred_machinery.py` and updated config in `config.py`.
+- **Status:** Completed. All tests passing (excluding known xfails). Documentation updated.
+### [2025-04-11 18:15:40] - Task: Implement Minimal Spectral Freeze (REQ-ART-E02 - Green Phase Start)
+- **Focus:** Implement minimal `SpectralFreezeParameters` model and `apply_smooth_spectral_freeze` function signature in `src/robotic_psalms/synthesis/effects.py` to resolve test import errors.
+- **Actions:**
+    - Read `src/robotic_psalms/synthesis/effects.py`.
+    - Inserted `SpectralFreezeParameters` Pydantic model definition.
+    - Inserted `apply_smooth_spectral_freeze` function signature with minimal body (`return audio.astype(np.float32).copy()`).
+    - Encountered file corruption after attempting to insert functional logic with `insert_content`.
+    - Read corrupted file content.
+    - Used `write_to_file` to restore the file with the correct structure and the minimal placeholder implementation.
+    - Ran `pytest tests/synthesis/test_effects.py -k spectral_freeze`.
+- **Status:** Minimal implementation complete and verified. Import errors resolved. Tests collect and run, failing on assertions as expected. Ready for Green phase (functional implementation).
+
+---
+
+
+
+### [2025-04-11 18:13:28] - Task: Implement Minimal Spectral Freeze (REQ-ART-E02 - Green Phase Start)
+- **Focus:** Implement minimal `SpectralFreezeParameters` model and `apply_smooth_spectral_freeze` function signature in `src/robotic_psalms/synthesis/effects.py` to resolve test import errors.
+- **Actions:**
+    - Read `src/robotic_psalms/synthesis/effects.py`.
+    - Inserted `SpectralFreezeParameters` Pydantic model definition with fields `freeze_point`, `blend_amount`, `fade_duration` and basic validation.
+    - Inserted `apply_smooth_spectral_freeze` function signature with type hints and a minimal body (`return audio.astype(np.float32).copy()`).
+- **Status:** Minimal implementation complete. Ready to verify test collection/run via pytest.
+
+---
+
+
+
+### [2025-04-11 18:11:30] - Task: Write Failing Tests for Improved Spectral Freeze (REQ-ART-E02 - Red Phase)
+- **Focus:** Create failing tests in `tests/synthesis/test_effects.py` for a new `apply_smooth_spectral_freeze` function and `SpectralFreezeParameters` model, driving implementation of smoother, controllable spectral freeze.
+- **Actions:**
+    - Added placeholder imports for `apply_smooth_spectral_freeze` and `SpectralFreezeParameters` to `tests/synthesis/test_effects.py`.
+    - Added `chirp_signal_mono` fixture for spectrally changing input.
+    - Added `default_spectral_freeze_params` fixture.
+    - Added tests covering existence, basic application (mono/stereo), sustain verification, parameter control (`freeze_point`, `blend_amount`, `fade_duration`), and edge cases.
+    - Corrected import syntax errors after initial insertion.
+- **Status:** Red phase complete. Tests added to `tests/synthesis/test_effects.py`. Tests are failing as expected due to `ImportError`/`NameError` (Pylance: "unknown import symbol"), confirming the implementation is missing. Ready for Green phase (minimal implementation in `effects.py`).
+
+---
+
+
+### [2025-04-11 18:07:44] - Task: Write Failing Tests for Rich Drone Generation (REQ-ART-A02 - Red Phase Attempt)
+- **Focus:** Attempted to create failing tests in `tests/test_sacred_machinery.py` to drive enhancement of `_generate_drones` for richer harmonic content and evolution.
+- **Actions:**
+    - Read `tests/test_sacred_machinery.py`.
+    - Added tests (`test_generate_drones_basic_properties`, `test_generate_drones_spectral_richness_fails`, `test_generate_drones_spectral_evolution_fails`, `test_generate_drones_non_repetitive_fails`) targeting `_generate_drones`.
+    - Ran `pytest -k generate_drones`.
+    - Tests checking for spectral richness, evolution, and non-repetition *passed* against the existing implementation.
+    - Renamed tests to remove `_fails` suffix using `search_and_replace`.
+- **Outcome:** The current `_generate_drones` implementation meets the baseline complexity defined by these tests. The Red phase was not achieved.
+- **Status:** Deferring further enhancement of `REQ-ART-A02` pending definition of more sophisticated tests or requirements.
+
+---
+
+
+### [2025-04-11 18:04:00] - Task: Write Failing Tests for Complex Pad Generation (REQ-ART-A01 - Red Phase)
+- **Focus:** Create failing tests for `_generate_pads` complexity (spectral richness, evolution, non-repetition) in `tests/test_sacred_machinery.py`.
+- **Actions:**
+    - Added tests (`test_generate_pads_spectral_richness_fails`, etc.) with assertions for complexity.
+    - Ran tests; unexpectedly found they passed.
+    - Analyzed `_generate_pads` implementation (sine+sawtooth mix, LFO).
+    - Made test assertions stricter (increased peak count, decreased `atol`).
+    - Added/removed debug prints to diagnose passing tests.
+    - Confirmed tests pass even with strict assertions because the current implementation meets the defined criteria (e.g., >15 spectral peaks, LFO causes sufficient variation).
+    - Renamed tests to remove `_fails` suffix.
+- **Status:** Completed (Red phase not achieved as tests pass). Current implementation meets the complexity defined by these specific tests. Further complexity requires new, more sophisticated tests in a subsequent cycle.
+
+---
+
+
 ### [2025-04-11 17:52:50] - Task: Check/Update Chorus Docstrings (REQ-ART-V03 - Documentation Part)
 - **Focus:** Verify docstrings for `ChorusParameters` (in `effects.py`) and `PsalmConfig.chorus_params` (in `config.py`).
+
+### [2025-04-11 18:08:37] - Task: Write Failing Tests for Rich Drone Generation (REQ-ART-A02 - Red Phase Attempt)
+- **Focus:** Attempted to create failing tests in `tests/test_sacred_machinery.py` to drive enhancement of `_generate_drones` for richer harmonics and evolution.
+- **Outcome:** Tests checking for spectral richness, evolution, and non-repetition *passed* against the existing implementation.
+- **Status:** Red phase not achieved. Deferring further enhancement of `REQ-ART-A02` pending definition of more sophisticated tests or requirements.
 - **Actions:**
     - Read `src/robotic_psalms/config.py`.
     - Read `src/robotic_psalms/synthesis/effects.py`.
@@ -13,6 +129,11 @@
 
 ---
 
+
+### [2025-04-11 18:04:42] - Task: Write Failing Tests for Complex Pad Generation (REQ-ART-A01 - Red Phase Attempt)
+- **Focus:** Attempted to create failing tests in `tests/test_sacred_machinery.py` to drive enhancement of `_generate_pads` for more complex, evolving textures.
+- **Outcome:** Tests checking for spectral richness, evolution, and non-repetition *passed* against the existing implementation. This indicates the current implementation meets the baseline complexity defined by these tests.
+- **Status:** Red phase not achieved. Deferring further enhancement of `REQ-ART-A01` pending definition of more sophisticated tests or requirements.
 
 ### [2025-04-11 17:51:30] - Task: Update Documentation for Chorus Effect (REQ-ART-V03 - Documentation)
 - **Focus:** Update `README.md` and coordinate update for `src/robotic_psalms/config.py` docstrings for the new `chorus_params` configuration.

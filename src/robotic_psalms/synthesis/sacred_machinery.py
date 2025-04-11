@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional, Protocol, runtime_checkable, cast
+from typing import Any, Optional, cast # Removed Protocol, runtime_checkable
 from pathlib import Path
 import soundfile as sf
 import numpy as np
@@ -10,7 +10,8 @@ from .vox_dei import VoxDeiSynthesizer, VoxDeiSynthesisError
 from .effects import apply_high_quality_reverb, ReverbParameters
 from .effects import apply_complex_delay, DelayParameters
 from .effects import apply_chorus, ChorusParameters
-from scipy.signal.windows import hann
+from .effects import apply_smooth_spectral_freeze, SpectralFreezeParameters
+# Removed unused import: from scipy.signal.windows import hann
 from dataclasses import dataclass
 
 @dataclass
@@ -367,45 +368,26 @@ class SacredMachineryEngine:
         # Ensure reverbed audio is trimmed/padded back to original length before spectral freeze mix
         # Note: apply_high_quality_reverb might return longer audio due to tail/pre-delay.
         # For mixing with spectral freeze, we need consistent length.
+        # Ensure the reverbed audio matches the original length before mixing or further processing.
+        # Reverb might add tail or pre-delay, changing the length.
         original_length = len(audio)
         if len(reverbed) > original_length:
             reverbed = reverbed[:original_length]
         elif len(reverbed) < original_length:
             reverbed = np.pad(reverbed, (0, original_length - len(reverbed)), mode='constant')
 
-        # Apply spectral freeze effect
-        freeze_amount = self.haunting.spectral_freeze  # Using direct HauntingParameters
-        if freeze_amount > 0:
-            frozen = self._spectral_freeze(audio, freeze_amount)
-            result = reverbed * (1 - freeze_amount) + frozen * freeze_amount
+        # Apply spectral freeze effect if configured
+        if isinstance(self.haunting.spectral_freeze, SpectralFreezeParameters):
+            self.logger.debug("Applying smooth spectral freeze effect...")
+            result = apply_smooth_spectral_freeze(
+                reverbed, self.sample_rate, self.haunting.spectral_freeze
+            )
         else:
-            result = reverbed
+            result = reverbed # No freeze configured
 
-        return np.array(result, dtype=np.float32)
+        # Assuming 'apply_smooth_spectral_freeze' and 'reverbed' return float32 numpy arrays
+        return result
 
-
-    def _spectral_freeze(
-        self,
-        audio: npt.NDArray[np.float32],
-        freeze_amount: float
-    ) -> npt.NDArray[np.float32]:
-        """Apply spectral freeze effect"""
-        # Get spectral representation
-        D = np.fft.rfft(audio)
-        freqs = np.fft.rfftfreq(len(audio))
-
-        # Generate frozen spectrum by smoothing
-        window_size = int(len(freqs) * freeze_amount * 0.1)
-        if window_size > 1:
-            window = hann(window_size, sym=False)
-            frozen_D = signal.convolve(np.abs(D), window/window.sum(), mode='same')
-            frozen_D = frozen_D * np.exp(1j * np.angle(D))
-        else:
-            frozen_D = D
-
-        # Convert back to time domain
-        result = np.fft.irfft(frozen_D)
-        return np.array(result[:len(audio)], dtype=np.float32)
 
     def _generate_pads(self, duration: float) -> npt.NDArray[np.float32]:
         """Generate glacial synthesizer pads"""

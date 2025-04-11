@@ -13,6 +13,7 @@ dependencies = [
     "librosa>=0.9.0",
     "sounddevice>=0.4.4",
     "soundfile>=0.10.3",
+    "pedalboard>=0.7.1", # For reverb and other effects
     
     # MIDI Support
     "mido>=1.2.10",

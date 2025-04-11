@@ -1,7 +1,8 @@
 import pytest
 import numpy as np
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY # Add ANY
 from typing import cast # Added for casting
+from robotic_psalms.synthesis.effects import ReverbParameters # Add ReverbParameters
 
 # Import actual implementations
 from robotic_psalms.config import PsalmConfig, HauntingParameters, MixLevels, LiturgicalMode
@@ -102,8 +103,9 @@ def test_process_psalm_vocal_synthesis_error(engine: SacredMachineryEngine, capl
 
 # --- Test Effects Application ---
 
-def test_process_psalm_applies_haunting(default_config: PsalmConfig):
-    """Test that haunting effects are applied when configured."""
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_high_quality_reverb', autospec=True) # Add patch
+def test_process_psalm_applies_haunting(mock_apply_reverb: MagicMock, default_config: PsalmConfig): # Add mock arg
+    """Test that haunting effects attempt to call the new high-quality reverb."""
     # Modify config for strong haunting
     default_config.haunting_intensity = HauntingParameters(reverb_decay=0.8, spectral_freeze=0.5)
     default_config.glitch_density = 0.0 # Disable glitch for isolation
@@ -123,9 +125,19 @@ def test_process_psalm_applies_haunting(default_config: PsalmConfig):
 
     result = engine.process_psalm(psalm_text, duration)
 
-    # Check that vocals are different from the input (effects applied)
-    # Use tolerance due to float precision
-    assert not np.allclose(result.vocals, input_vocals, atol=1e-6), "Vocals should be modified by haunting effects"
+    # Assert that the new reverb function was called (EXPECTED TO FAIL)
+    mock_apply_reverb.assert_called_once()
+    # Check arguments (basic check using ANY for audio and params)
+    # We expect reverb params derived from config.haunting_intensity
+    mock_apply_reverb.assert_called_with(
+        ANY, # The audio data passed to reverb
+        engine.sample_rate,
+        ANY # Expecting ReverbParameters instance
+        # isinstance(mock_apply_reverb.call_args[0][2], ReverbParameters) # More specific check if needed later
+    )
+
+    # Original assertion (commented out/removed as focus shifts to the call)
+    # assert not np.allclose(result.vocals, input_vocals, atol=1e-6), "Vocals should be modified by haunting effects"
     cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
 
 

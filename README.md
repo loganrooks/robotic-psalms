@@ -111,7 +111,12 @@ robotic_articulation:
   consonant_harshness: 0.3
 
 haunting_intensity:
-  reverb_decay: 8.0
+  reverb: # New high-quality reverb settings
+    decay_time: 4.5       # Reverb tail length in seconds (float, > 0.0)
+    pre_delay: 0.02       # Delay before reverb starts in seconds (float, >= 0.0)
+    diffusion: 0.7        # Controls the density/smoothness of the reverb tail (float, 0.0 to 1.0)
+    damping: 0.8          # High-frequency damping, makes reverb darker (float, 0.0 to 1.0)
+    wet_dry_mix: 0.3      # Mix between original (dry) and reverb (wet) signal (float, 0.0 to 1.0)
   spectral_freeze: 0.4
 
 vocal_timbre:
@@ -168,7 +173,12 @@ robotic-psalms examples/psalm.txt output.wav --config examples/config.yml --visu
 - `celestial_harmonicity`: Balance between pure and complex tones
 - `phoneme_spacing`: Time between vocal sounds
 - `consonant_harshness`: Intensity of consonant sounds
-- `reverb_decay`: Length of reverb tail (seconds)
+- `reverb`: Configuration for the high-quality reverb effect:
+  - `decay_time`: Length of the reverb tail in seconds (e.g., `4.5`).
+  - `pre_delay`: Delay in seconds before the reverb effect starts (e.g., `0.02`).
+  - `diffusion`: Controls the density and smoothness of the reverb tail (0.0 to 1.0). Higher values are smoother.
+  - `damping`: Controls how quickly high frequencies fade in the reverb tail (0.0 to 1.0). Higher values mean less damping (brighter reverb).
+  - `wet_dry_mix`: The balance between the original (dry) signal and the reverb (wet) signal (0.0 for full dry, 1.0 for full wet).
 - `spectral_freeze`: Amount of spectral time-stretching
 
 ### Voice Timbre

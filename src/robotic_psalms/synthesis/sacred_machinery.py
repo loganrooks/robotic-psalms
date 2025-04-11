@@ -7,6 +7,7 @@ import numpy.typing as npt
 from scipy import signal
 from ..config import PsalmConfig, HauntingParameters, LiturgicalMode
 from .vox_dei import VoxDeiSynthesizer, VoxDeiSynthesisError
+from .effects import apply_high_quality_reverb, ReverbParameters
 from scipy.signal.windows import hann
 from dataclasses import dataclass
 
@@ -55,7 +56,16 @@ class SacredMachineryEngine:
         }
 
     def process_psalm(self, text: str, duration: float) -> SynthesisResult:
-        """Process a complete psalm"""
+        """
+        Process a complete psalm text, generating all audio components and applying effects.
+
+        Args:
+            text: The Latin psalm text.
+            duration: The target duration of the output audio in seconds.
+
+        Returns:
+            A SynthesisResult object containing individual stems and the combined mix.
+        """
         # Generate base components
         try:
             # Synthesize and get actual sample rate
@@ -338,11 +348,23 @@ class SacredMachineryEngine:
         self,
         audio: npt.NDArray[np.float32]
     ) -> npt.NDArray[np.float32]:
-        """Apply haunting effects using reverb and spectral freeze"""
-        # Apply reverb based on decay time
-        reverb_time = self.haunting.reverb_decay  # Using direct HauntingParameters
-        impulse_response = self._generate_reverb_ir(reverb_time)
-        reverbed = signal.fftconvolve(audio, impulse_response)[:len(audio)]
+        """
+        Apply haunting effects using high-quality reverb and spectral freeze.
+
+        Uses `apply_high_quality_reverb` with parameters from `self.haunting.reverb`.
+        """
+        # Apply high-quality reverb
+        reverb_params = ReverbParameters(**self.haunting.reverb.model_dump())
+        reverbed = apply_high_quality_reverb(audio, self.sample_rate, reverb_params)
+
+        # Ensure reverbed audio is trimmed/padded back to original length before spectral freeze mix
+        # Note: apply_high_quality_reverb might return longer audio due to tail/pre-delay.
+        # For mixing with spectral freeze, we need consistent length.
+        original_length = len(audio)
+        if len(reverbed) > original_length:
+            reverbed = reverbed[:original_length]
+        elif len(reverbed) < original_length:
+            reverbed = np.pad(reverbed, (0, original_length - len(reverbed)), mode='constant')
 
         # Apply spectral freeze effect
         freeze_amount = self.haunting.spectral_freeze  # Using direct HauntingParameters
@@ -354,23 +376,6 @@ class SacredMachineryEngine:
 
         return np.array(result, dtype=np.float32)
 
-    def _generate_reverb_ir(self, decay_time: float) -> npt.NDArray[np.float32]:
-        """Generate reverb impulse response"""
-        ir_length = int(decay_time * self.sample_rate)
-        t = np.arange(ir_length) / self.sample_rate
-
-        # Generate exponential decay
-        decay = np.exp(-t * (6.0 / decay_time))
-
-        # Add some early reflections
-        reflections = np.zeros_like(decay)
-        for i, offset in enumerate([0.01, 0.02, 0.03, 0.05]):
-            idx = int(offset * self.sample_rate)
-            if idx < len(reflections):
-                reflections[idx] = 0.5 / (i + 1)
-
-        ir = decay * (reflections + np.random.uniform(0, 0.1, len(decay)))
-        return np.array(ir, dtype=np.float32)
 
     def _spectral_freeze(
         self,

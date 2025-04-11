@@ -29,13 +29,43 @@ class RoboticArticulation(BaseModel):
         description="Intensity of consonant sounds"
     )
 
+class ReverbConfig(BaseModel):
+    """Configuration for the high-quality reverb effect."""
+    decay_time: float = Field(
+        default=4.5,
+        gt=0.0,
+        description="Reverb tail length (decay time) in seconds."
+    )
+    pre_delay: float = Field(
+        default=0.02,
+        ge=0.0,
+        description="Delay before the reverb effect starts, in seconds."
+    )
+    diffusion: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Controls the density/smoothness of the reverb tail (0.0 to 1.0). Higher values are smoother."
+    )
+    damping: float = Field(
+        default=0.8,
+        ge=0.0,
+        le=1.0,
+        description="High-frequency damping factor (0.0 to 1.0). Controls how quickly high frequencies fade in the reverb. Lower values mean more damping (darker reverb)."
+    )
+    wet_dry_mix: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Mix between the original (dry) and reverb (wet) signal (0.0 = dry, 1.0 = wet)."
+    )
+
+
 class HauntingParameters(BaseModel):
-    """Parameters controlling ethereal qualities"""
-    reverb_decay: float = Field(
-        default=5.0,
-        ge=0.5,
-        le=30.0,
-        description="Reverb decay time (seconds)"
+    """Parameters controlling ethereal qualities, including reverb and spectral freeze."""
+    reverb: ReverbConfig = Field(
+        default_factory=ReverbConfig,
+        description="Configuration for the high-quality reverb effect."
     )
     spectral_freeze: float = Field(
         default=0.2,

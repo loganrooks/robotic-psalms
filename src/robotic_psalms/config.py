@@ -149,7 +149,7 @@ class VoiceRange(BaseModel):
         default=1.0,
         ge=0.5,
         le=2.0,
-        description="Formant shift factor for voice character"
+        description="Formant shift factor for voice character. Uses pyworld for robust shifting, preserving pitch better than simpler methods. Values > 1.0 raise formants (brighter/smaller perceived source), < 1.0 lowers them (darker/larger)."
     )
 
 class PsalmConfig(BaseModel):

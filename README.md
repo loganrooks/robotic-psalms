@@ -123,6 +123,7 @@ vocal_timbre:
   choirboy: 0.4
   android: 0.4
   machinery: 0.2
+  formant_shift_factor: 1.2 # Shift formants up slightly (range 0.5-2.0)
 ```
 
 ### Input Format
@@ -180,6 +181,7 @@ robotic-psalms examples/psalm.txt output.wav --config examples/config.yml --visu
   - `damping`: Controls how quickly high frequencies fade in the reverb tail (0.0 to 1.0). Higher values mean less damping (brighter reverb).
   - `wet_dry_mix`: The balance between the original (dry) signal and the reverb (wet) signal (0.0 for full dry, 1.0 for full wet).
 - `spectral_freeze`: Amount of spectral time-stretching
+- `formant_shift_factor`: Adjusts vocal formants (0.5-2.0). Values > 1.0 raise formants (brighter/smaller perceived source), < 1.0 lowers them (darker/larger). Uses `pyworld` for robust shifting, preserving pitch better than simpler methods.
 
 ### Voice Timbre
 Blend between three voice characteristics:
@@ -207,13 +209,13 @@ The core functionality, including text processing and audio synthesis using `esp
 
 Future development will focus on enhancing the artistic capabilities and achieving a more sophisticated sonic aesthetic, as outlined in the [Artistic Specification](./artistic_specification.md). Key planned features include:
 
-*   **Improved Vocal Processing:** More robust formant shifting (REQ-ART-V01), enhanced vocal effects chain focusing on reverb and delay (REQ-ART-V02).
+*   **Improved Vocal Processing:** Initial robust formant shifting using `pyworld` (REQ-ART-V01) is integrated. Future work includes enhancing the vocal effects chain focusing on reverb and delay (REQ-ART-V02).
 *   **Ambient Texture:** More complex pad and drone generation (REQ-ART-A01, REQ-ART-A02).
 *   **Effects Refinement:** High-quality reverb (e.g., FDN or convolution) (REQ-ART-E01), improved spectral freeze (REQ-ART-E02), refined glitch effects (REQ-ART-E03), and saturation (REQ-ART-E04).
 *   **Melodic Control:** Guiding vocal synthesis with melodic input (REQ-ART-MEL-01, REQ-ART-MEL-02, REQ-ART-MEL-03).
 
 **Known Issues:**
-*   Formant shifting can sometimes introduce audible noise artifacts.
+*   The `pyworld`-based formant shifting, while robust, may still introduce subtle artifacts depending on the audio and shift factor.
 
 ## Troubleshooting
 

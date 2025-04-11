@@ -12,7 +12,6 @@ create_context_file.py
 .roomodes
 **system-prompt*
 
-
 # Ignore directories (must end with a slash)
 .git/
 node_modules/

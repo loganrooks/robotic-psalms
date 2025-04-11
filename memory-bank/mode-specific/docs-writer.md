@@ -5,6 +5,10 @@
 ---
 
 
+### Plan Item: Update Formant Shifter Docs (REQ-ART-V01) - [2025-04-11 15:07:10]
+- **Type**: Guide / **Audience**: User/Dev / **Outline**: 1. Update README (Example, Param Guide, Roadmap, Known Issues) 2. Delegate config.py docstring update / **Status**: Done / **Owner**: docs-writer / **Source**: User Task REQ-ART-V01 / **Location**: README.md, src/robotic_psalms/config.py
+
+
 ### Plan Item: Update Core Documentation - [2025-04-08 12:31:26]
 - **Type**: Guide / **Audience**: User/Dev / **Outline**: 1. Update README (Requirements, Install, Troubleshooting, Roadmap) 2. Update architecture.md (Dependencies, Notes) 3. Create docs/index.md / **Status**: Done / **Owner**: docs-writer / **Source**: User Task / **Location**: README.md, src/robotic_psalms/architecture.md, docs/index.md
 

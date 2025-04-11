@@ -6,6 +6,8 @@ from pydantic import ValidationError
 from robotic_psalms.synthesis.effects import (
     apply_high_quality_reverb,
     ReverbParameters, # Assuming a Pydantic model for params
+    apply_robust_formant_shift,
+    FormantShiftParameters, # Assuming a Pydantic model
 )
 
 SAMPLE_RATE = 44100
@@ -34,6 +36,13 @@ def default_reverb_params():
         # Assuming sample_rate is needed if not passed separately
         # sample_rate=SAMPLE_RATE
     )
+
+
+@pytest.fixture
+def default_formant_shift_params():
+    """Default formant shift parameters."""
+    # Placeholder: shift_factor=1.0 means no shift
+    return FormantShiftParameters(shift_factor=1.5) # Example: Shift up
 
 def test_reverb_module_exists():
     """Checks if the placeholder import works (it shouldn't yet)."""
@@ -126,3 +135,98 @@ def test_reverb_handles_invalid_parameters(dry_mono_signal):
             decay_time=2.5, pre_delay=0.02, diffusion=0.7, damping=0.5, wet_dry_mix=1.5
         )
         apply_high_quality_reverb(dry_mono_signal, SAMPLE_RATE, invalid_params)
+
+# --- Formant Shifting Tests (REQ-ART-V01) ---
+
+@pytest.fixture
+def formant_shift_params_no_shift():
+    """Formant shift parameters for no shift."""
+    return FormantShiftParameters(shift_factor=1.0)
+
+def test_formant_shift_module_exists():
+    """Checks if the placeholder formant shift import works."""
+    assert callable(apply_robust_formant_shift)
+    assert 'shift_factor' in FormantShiftParameters.model_fields
+
+def test_formant_shift_applies_effect(dry_mono_signal, default_formant_shift_params):
+    """Test that applying formant shift changes the signal."""
+    shifted_signal = apply_robust_formant_shift(
+        dry_mono_signal, SAMPLE_RATE, default_formant_shift_params
+    )
+    assert shifted_signal.ndim == dry_mono_signal.ndim
+    # Basic check: Output should differ if shift_factor != 1.0
+    assert not np.allclose(shifted_signal, dry_mono_signal), "Formant shift did not alter the signal"
+
+def test_formant_shift_handles_mono(dry_mono_signal, default_formant_shift_params):
+    """Test formant shift processing for mono input."""
+    shifted_signal = apply_robust_formant_shift(
+        dry_mono_signal, SAMPLE_RATE, default_formant_shift_params
+    )
+    assert shifted_signal.ndim == 1
+    # Formant shifting ideally preserves length
+    assert len(shifted_signal) == len(dry_mono_signal)
+
+def test_formant_shift_handles_stereo(dry_stereo_signal, default_formant_shift_params):
+    """Test formant shift processing for stereo input."""
+    shifted_signal = apply_robust_formant_shift(
+        dry_stereo_signal, SAMPLE_RATE, default_formant_shift_params
+    )
+    assert shifted_signal.ndim == 2
+    assert shifted_signal.shape[1] == 2 # Should remain stereo
+    assert shifted_signal.shape[0] == dry_stereo_signal.shape[0]
+
+def test_formant_shift_preserves_pitch(dry_mono_signal, default_formant_shift_params):
+    """Test that formant shifting preserves the fundamental pitch (TDD Anchor)."""
+    input_freq = 440 # Expected fundamental frequency of the fixture
+    shifted_signal = apply_robust_formant_shift(
+        dry_mono_signal, SAMPLE_RATE, default_formant_shift_params
+    )
+
+    # Perform FFT
+    fft_result = np.fft.fft(shifted_signal)
+    fft_freq = np.fft.fftfreq(len(shifted_signal), 1 / SAMPLE_RATE)
+
+    # Find the peak frequency in the positive spectrum
+    positive_mask = fft_freq > 0
+    peak_index = np.argmax(np.abs(fft_result[positive_mask]))
+    detected_freq = fft_freq[positive_mask][peak_index]
+
+    # Allow some tolerance for FFT resolution and potential algorithm artifacts
+    assert np.isclose(detected_freq, input_freq, atol=10), f"Fundamental frequency shifted from {input_freq} Hz to {detected_freq} Hz"
+
+def test_formant_shift_parameters_affect_output(dry_mono_signal, formant_shift_params_no_shift):
+    """Test that changing the shift_factor alters the output."""
+    unshifted_signal = apply_robust_formant_shift(
+        dry_mono_signal, SAMPLE_RATE, formant_shift_params_no_shift
+    )
+    # Verify no change when factor is 1.0
+    assert np.allclose(unshifted_signal, dry_mono_signal), "Shift factor 1.0 altered the signal"
+
+    # Apply a different shift factor
+    params_shifted = FormantShiftParameters(shift_factor=0.8) # Shift down
+    shifted_signal_down = apply_robust_formant_shift(
+        dry_mono_signal, SAMPLE_RATE, params_shifted
+    )
+    assert not np.allclose(unshifted_signal, shifted_signal_down), "Changing shift_factor had no effect"
+
+def test_formant_shift_handles_zero_length(default_formant_shift_params):
+    """Test formant shift with zero-length audio input."""
+    zero_signal = np.array([], dtype=np.float32)
+    shifted_signal = apply_robust_formant_shift(
+        zero_signal, SAMPLE_RATE, default_formant_shift_params
+    )
+    assert isinstance(shifted_signal, np.ndarray)
+    assert len(shifted_signal) == 0, "Output should be zero-length for zero-length input"
+
+def test_formant_shift_handles_invalid_parameters(dry_mono_signal):
+    """Test that invalid parameter values raise errors."""
+    # Example: Zero shift factor (might be invalid depending on algorithm)
+    with pytest.raises((ValidationError, ValueError)): 
+        invalid_params = FormantShiftParameters(shift_factor=0.0)
+        apply_robust_formant_shift(dry_mono_signal, SAMPLE_RATE, invalid_params)
+
+    # Example: Negative shift factor (likely invalid)
+    with pytest.raises((ValidationError, ValueError)):
+        invalid_params = FormantShiftParameters(shift_factor=-1.5)
+        apply_robust_formant_shift(dry_mono_signal, SAMPLE_RATE, invalid_params)
+

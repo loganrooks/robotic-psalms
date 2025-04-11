@@ -52,6 +52,25 @@
 #### Edge Cases Covered:
 - None yet.
 
+
+
+### Test Plan: Robust Formant Shifting (REQ-ART-V01) - 2025-04-11 00:15:56
+#### Unit Tests:
+- Test Case: Formant shift module/function/class exists / Expected: Import succeeds / Status: Failing
+- Test Case: Apply formant shift to mono signal / Expected: Output shape matches input, content differs / Status: Failing
+- Test Case: Apply formant shift to stereo signal / Expected: Output shape matches input (stereo), content differs / Status: Failing
+- Test Case: Changing shift_factor affects output / Expected: Output differs from default (factor=1.0) / Status: Failing
+- Test Case: shift_factor=1.0 results in no change / Expected: Output is close to input / Status: Failing
+- Test Case: Preserve fundamental pitch / Expected: Detected pitch matches input pitch (within tolerance) / Status: Failing
+- Test Case: Handle zero-length input / Expected: Output is zero-length / Status: Failing
+- Test Case: Handle invalid shift_factor (zero) / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid shift_factor (negative) / Expected: Raises ValidationError or ValueError / Status: Failing
+#### Integration Tests:
+- None yet (Focus is unit tests for the effect itself)
+#### Edge Cases Covered:
+- Zero-length input
+- Invalid parameter values (shift_factor)
+- No-op parameter value (shift_factor=1.0)
 ## Test Cases
 <!-- List specific test cases (unit, integration) -->
 
@@ -134,6 +153,13 @@
 ### Fixture: default_reverb_params - 2025-04-08 13:03:24
 - **Purpose**: Provides a default set of `ReverbParameters` based on REQ-ART-E01 / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for reverb tests.
 ## Test Execution Results
+
+
+### Fixture: default_formant_shift_params - 2025-04-11 00:15:56
+- **Purpose**: Provides default parameters for formant shifting (shift_factor=1.5) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for formant shift tests.
+
+### Fixture: formant_shift_params_no_shift - 2025-04-11 00:15:56
+- **Purpose**: Provides parameters for no formant shifting (shift_factor=1.0) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Testing no-op case for formant shift.
 <!-- Append test run summaries using the format below -->
 
 ### Test Run: 2025-04-08 10:41:13
@@ -149,6 +175,14 @@
 
 
 
+
+
+### Test Run: Integration Test for `apply_robust_formant_shift` - [2025-04-11 14:01:30]
+- **Trigger**: Manual
+- **Env**: Local
+- **Suite**: `tests/synthesis/test_vox_dei.py -k test_robotic_effects_modify_audio`
+- **Result**: FAIL
+- **Failures**: `test_robotic_effects_modify_audio`: `AttributeError: <module 'robotic_psalms.synthesis.vox_dei' ...> does not have the attribute 'apply_robust_formant_shift'`
 ### TDD Cycle: High-Quality Reverb (REQ-ART-E01) - 2025-04-08 13:03:24
 - **Start**: 2025-04-08 13:01:51
 - **End**: 2025-04-08 13:03:24
@@ -156,3 +190,20 @@
 - **Green**: Implementation approach: Next step is to create the `src/robotic_psalms/synthesis/effects.py` module with minimal placeholder implementations for `ReverbParameters` (Pydantic model) and `apply_high_quality_reverb` function to resolve the `ImportError` and make tests runnable (though likely still failing assertions).
 - **Refactor**: Improvements made: N/A (Red phase only)
 - **Outcomes**: Established test harness for the high-quality reverb effect.
+
+
+### TDD Cycle: Robust Formant Shifting (REQ-ART-V01) - 2025-04-11 00:15:56
+- **Start**: 2025-04-11 00:14:09
+- **End**: 2025-04-11 00:15:56
+- **Red**: Tests created: Wrote failing tests in `tests/synthesis/test_effects.py` for `apply_robust_formant_shift` and `FormantShiftParameters` (target: `src/robotic_psalms/synthesis/effects.py`). Tests cover basic application, parameter control, input types, pitch preservation, and edge cases. Failing due to `ImportError`/`NameError`.
+- **Green**: Implementation approach: Next step is to create the minimal placeholder implementations for `FormantShiftParameters` (Pydantic model) and `apply_robust_formant_shift` function in `src/robotic_psalms/synthesis/effects.py` to resolve the import errors and make tests runnable (though likely still failing assertions).
+- **Refactor**: Improvements made: N/A (Red phase only)
+- **Outcomes**: Established test harness for the robust formant shifting effect.
+
+
+### TDD Cycle: Integration Test for `apply_robust_formant_shift` - [2025-04-11 14:01:50]
+- **Start**: [2025-04-11 14:01:02]
+- **Red**: Modified `tests/synthesis/test_vox_dei.py` (`test_robotic_effects_modify_audio`) to assert call to `apply_robust_formant_shift`. Test fails with `AttributeError`.
+- **Green**: [Pending]
+- **Refactor**: [Pending]
+- **Outcomes**: Confirmed TDD workflow for integration tests requires code changes in the target module (`vox_dei.py`).

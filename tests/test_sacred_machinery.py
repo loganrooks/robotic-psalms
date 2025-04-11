@@ -5,7 +5,7 @@ from typing import cast # Added for casting
 from robotic_psalms.synthesis.effects import ReverbParameters # Add ReverbParameters
 
 # Import actual implementations
-from robotic_psalms.config import PsalmConfig, HauntingParameters, MixLevels, LiturgicalMode
+from robotic_psalms.config import PsalmConfig, HauntingParameters, MixLevels, LiturgicalMode, ReverbConfig
 from robotic_psalms.synthesis.sacred_machinery import SacredMachineryEngine, SynthesisResult
 from robotic_psalms.synthesis.vox_dei import VoxDeiSynthesizer, VoxDeiSynthesisError # Keep for side_effect
 
@@ -43,7 +43,7 @@ def test_process_psalm_success(engine: SacredMachineryEngine):
 
     # Configure the mock method on the instance directly, using cast
     dummy_vocals = np.sin(np.linspace(0, 440 * 2 * np.pi, expected_samples)).astype(np.float32)
-    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = dummy_vocals
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (dummy_vocals, engine.sample_rate)
 
     # Process the psalm
     result = engine.process_psalm(psalm_text, duration)
@@ -107,7 +107,7 @@ def test_process_psalm_vocal_synthesis_error(engine: SacredMachineryEngine, capl
 def test_process_psalm_applies_haunting(mock_apply_reverb: MagicMock, default_config: PsalmConfig): # Add mock arg
     """Test that haunting effects attempt to call the new high-quality reverb."""
     # Modify config for strong haunting
-    default_config.haunting_intensity = HauntingParameters(reverb_decay=0.8, spectral_freeze=0.5)
+    default_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.8), spectral_freeze=0.5)
     default_config.glitch_density = 0.0 # Disable glitch for isolation
 
     # Re-init engine with modified config, patching VoxDei again
@@ -121,12 +121,12 @@ def test_process_psalm_applies_haunting(mock_apply_reverb: MagicMock, default_co
     expected_samples = int(duration * engine.sample_rate)
     # Provide simple input audio via the mock, using cast
     input_vocals = np.ones(expected_samples, dtype=np.float32) * 0.5
-    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = input_vocals
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
 
     result = engine.process_psalm(psalm_text, duration)
 
     # Assert that the new reverb function was called (EXPECTED TO FAIL)
-    mock_apply_reverb.assert_called_once()
+    assert mock_apply_reverb.call_count == 3, f"Expected 3 calls, but got {mock_apply_reverb.call_count}"
     # Check arguments (basic check using ANY for audio and params)
     # We expect reverb params derived from config.haunting_intensity
     mock_apply_reverb.assert_called_with(
@@ -146,7 +146,7 @@ def test_process_psalm_applies_glitch(default_config: PsalmConfig):
     # Modify config for glitch
     default_config.glitch_density = 0.8 # High density
     # Minimize haunting effects by setting to minimum allowed values
-    default_config.haunting_intensity = HauntingParameters(reverb_decay=0.5, spectral_freeze=0.0)
+    default_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.5), spectral_freeze=0.0)
 
     # Re-init engine with modified config
     with patch('robotic_psalms.synthesis.sacred_machinery.VoxDeiSynthesizer', autospec=True) as mock_vox_init:
@@ -159,7 +159,7 @@ def test_process_psalm_applies_glitch(default_config: PsalmConfig):
     expected_samples = int(duration * engine.sample_rate)
     input_vocals = np.sin(np.linspace(0, 440 * 2 * np.pi, expected_samples)).astype(np.float32)
     # Use cast
-    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = input_vocals
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
 
     result = engine.process_psalm(psalm_text, duration)
 
@@ -179,7 +179,7 @@ def test_process_psalm_fit_to_length(engine: SacredMachineryEngine):
 
     # Make mock synth return audio of different length, use cast
     wrong_length_samples = expected_samples // 2
-    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = np.zeros(wrong_length_samples, dtype=np.float32)
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (np.zeros(wrong_length_samples, dtype=np.float32), engine.sample_rate)
 
     # Mock generation methods to also return different lengths
     # Use patch.object on the specific engine instance
@@ -213,7 +213,7 @@ def test_process_psalm_mix_levels(default_config: PsalmConfig):
 
     # Return constant value from synth and generators to easily check mixing, use cast
     mock_input_val = 0.5
-    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = np.ones(expected_samples, dtype=np.float32) * mock_input_val
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (np.ones(expected_samples, dtype=np.float32) * mock_input_val, engine.sample_rate)
 
     # Mock generation and effect methods to isolate mixing
     with patch.object(engine, '_generate_pads', return_value=np.ones(expected_samples, dtype=np.float32) * mock_input_val, autospec=True), \
@@ -245,7 +245,7 @@ def test_generate_methods_produce_output(engine: SacredMachineryEngine):
     psalm_text = "Generation test"
     duration = 2.0
     # Use cast
-    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = np.zeros(int(duration * engine.sample_rate), dtype=np.float32)
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (np.zeros(int(duration * engine.sample_rate), dtype=np.float32), engine.sample_rate)
 
     result = engine.process_psalm(psalm_text, duration)
 

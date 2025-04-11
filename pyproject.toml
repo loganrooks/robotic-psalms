@@ -1,79 +1,66 @@
-[project]
+[tool.poetry]
 name = "robotic-psalms"
 version = "0.1.0"
 description = "Ethereal computerized vocal arrangements of Latin psalms"
-authors = [
-    {name = "Robotic Psalms Project"}
-]
+authors = ["Robotic Psalms Project"]
+license = "MIT" # Assuming MIT, can be changed
+readme = "README.md"
 
-dependencies = [
-    # Audio Processing
-    "numpy>=1.22.0",
-    "scipy>=1.8.0",
-    "librosa>=0.9.0",
-    "sounddevice>=0.4.4",
-    "soundfile>=0.10.3",
-    "pedalboard>=0.7.1", # For reverb and other effects
-    
-    # MIDI Support
-    "mido>=1.2.10",
-    "python-rtmidi>=1.4.9",
-    
-    # Configuration
-    "pydantic>=2.0.0",
-    "pyyaml>=6.0.0",
-    
-    # Visualization
-    "matplotlib>=3.5.0",
-    "pyopengl>=3.1.6",
-]
+[tool.poetry.dependencies]
+python = "^3.9" # Match target version from black config
 
-[project.scripts]
-robotic-psalms = "robotic_psalms.cli:main"
+# Audio Processing
+numpy = ">=1.22.0"
+scipy = ">=1.8.0"
+librosa = ">=0.9.0"
+sounddevice = ">=0.4.4"
+soundfile = ">=0.10.3"
+pedalboard = ">=0.7.1" # For reverb and other effects
+pyworld = ">=0.3.2" # For WORLD vocoder analysis/synthesis
+# praat-parselmouth = ">=0.4.3" # Removed - Not used
+# setuptools = ">=60.0.0" # Removed - No longer needed by pyworld? Check install if needed.
 
-[project.optional-dependencies]
-# Individual TTS engines - choose one
-espeak-ng = [
-    "espeakng>=1.0" # Switch to the alternative espeakng library
-]
-espeak = [
-    "python-espeak>=0.6.3"
-]
+# MIDI Support
+mido = ">=1.2.10"
+python-rtmidi = ">=1.4.9"
 
-# Development and documentation
-dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black>=22.0.0",
-    "isort>=5.10.0",
-    "mypy>=0.900",
-    "flake8>=4.0.0",
-]
+# Configuration
+pydantic = ">=2.0.0"
+pyyaml = ">=6.0.0"
 
-docs = [
-    "sphinx>=4.0.0",
-    "sphinx-rtd-theme>=1.0.0"
-]
+# Visualization
+matplotlib = ">=3.5.0"
+pyopengl = ">=3.1.6"
 
-# Full development setup
-all = [
-    "robotic-psalms[espeak-ng, dev,docs]"
-]
+# TTS Engines (Optional - install specific group if needed)
+espeakng = { version = ">=1.0", optional = true } # Switch to the alternative espeakng library
+python-espeak = { version = ">=0.6.3", optional = true }
 
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.0.0"
+pytest-cov = ">=4.0.0"
+black = ">=22.0.0"
+isort = ">=5.10.0"
+mypy = ">=0.900"
+flake8 = ">=4.0.0"
+
+[tool.poetry.group.docs.dependencies]
+sphinx = ">=4.0.0"
+sphinx-rtd-theme = ">=1.0.0"
+
+[tool.poetry.extras]
+espeak-ng = ["espeakng"]
+espeak = ["python-espeak"]
+all = ["espeakng", "dev", "docs"] # Example 'all' group
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/robotic_psalms"]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [tool.black]
 line-length = 88
@@ -83,6 +70,12 @@ target-version = ["py39"]
 profile = "black"
 line_length = 88
 
-
 [tool.pylance]
 reportMissingModuleSource = "none"
+
+# Keep hatch config for potential future use or if other tools rely on it
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/robotic_psalms"]

@@ -24,3 +24,12 @@
 - **Metrics After**: N/A
 - **Related Debt**: N/A
 - **Related Issue**: N/A
+
+### Optimization: [2025-04-11 15:04:00] - Refactor Formant Shifter Integration Code & Tests (REQ-ART-V01)
+- **Target**: `src/robotic_psalms/synthesis/vox_dei.py`, `tests/synthesis/test_vox_dei.py`
+- **Type**: Readability/Maintainability
+- **Desc**: Refactored `vox_dei.py`: Moved `soundfile`/`pathlib` imports into debug blocks, removed unused `typing.Protocol`, added `_MIN_SOSFILTFILT_LEN` constant for filter checks. Refactored `test_vox_dei.py`: Renamed `input_audio` to `mock_synth_output_audio` in `test_robotic_effects_modify_audio` for clarity.
+- **Metrics Before**: N/A
+- **Metrics After**: N/A
+- **Related Debt**: N/A
+- **Related Issue**: N/A

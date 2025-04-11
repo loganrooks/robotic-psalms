@@ -2,7 +2,12 @@ import numpy as np
 from pydantic import BaseModel, Field, ConfigDict
 import pedalboard
 
+import librosa
 # Define validation ranges based on common sense and test cases
+import parselmouth # Keep for potential future use, though not for this task
+import pyworld as pw # Use pw alias
+from scipy.interpolate import interp1d # Keep for warping
+
 # Pedalboard's Reverb defaults: room_size=0.5, damping=0.5, wet_level=0.33, dry_level=0.4, width=1.0, freeze_mode=0.0
 # We'll map our params where possible. Pedalboard doesn't have direct decay_time, pre_delay, diffusion.
 # We'll use room_size for decay_time (larger room = longer decay), wet_level/dry_level for wet_dry_mix, and damping.
@@ -101,3 +106,137 @@ def apply_high_quality_reverb(audio: np.ndarray, sample_rate: int, params: Rever
     # Return in original dtype if possible, though effects usually work best in float
     # For now, return float32 as pedalboard outputs
     return wet_signal
+
+
+# --- Formant Shifting --- 
+
+class FormantShiftParameters(BaseModel):
+    """Parameters for the robust formant shifting effect."""
+    shift_factor: float = Field(..., gt=0.0, description="Factor by which to shift formants. >1 shifts up, <1 shifts down.")
+
+    model_config = ConfigDict(extra='forbid')
+
+def apply_robust_formant_shift(audio: np.ndarray, sample_rate: int, params: FormantShiftParameters) -> np.ndarray:
+    """
+    Applies formant shifting while preserving pitch using the WORLD vocoder.
+
+    Analyzes the audio into F0, spectral envelope (SP), and aperiodicity (AP).
+    Warps the spectral envelope's frequency axis according to the shift_factor.
+    Resynthesizes the audio using the original F0, original AP, and the warped SP.
+
+    Args:
+        audio: Input audio signal as a NumPy array (mono or stereo).
+        sample_rate: Sample rate of the audio signal.
+        params: An instance of FormantShiftParameters containing effect settings.
+
+    Returns:
+        The processed audio signal with formants shifted.
+    """
+    if audio.size == 0:
+        return np.array([], dtype=audio.dtype)
+
+    # If shift_factor is 1.0, no change is needed.
+    if np.isclose(params.shift_factor, 1.0):
+        return audio.copy()
+
+    original_dtype = audio.dtype
+    # pyworld expects float64
+    audio_float64 = audio.astype(np.float64)
+
+    # Handle stereo by processing channels independently
+    if audio_float64.ndim == 2:
+        shifted_channels = []
+        for i in range(audio_float64.shape[1]):
+            channel_audio = np.ascontiguousarray(audio_float64[:, i]) # Ensure contiguous
+            shifted_channel = _apply_formant_shift_mono(channel_audio, sample_rate, params.shift_factor)
+            shifted_channels.append(shifted_channel)
+        # Stack channels back together
+        shifted_audio = np.stack(shifted_channels, axis=-1)
+    elif audio_float64.ndim == 1:
+        audio_float64 = np.ascontiguousarray(audio_float64) # Ensure contiguous
+        shifted_audio = _apply_formant_shift_mono(audio_float64, sample_rate, params.shift_factor)
+    else:
+        raise ValueError("Input audio must be 1D (mono) or 2D (stereo)")
+
+    # Convert back to original dtype if needed, though float is often preferred for effects
+    # Let's return float64 for now, consistent with pyworld output
+    # return shifted_audio.astype(original_dtype)
+    return shifted_audio
+
+
+def _apply_formant_shift_mono(x: np.ndarray, fs: int, shift_factor: float) -> np.ndarray:
+    """Helper function to apply formant shift to a mono float64 signal."""
+    # Ensure input is float64 and contiguous (redundant check, but safe)
+    x = np.ascontiguousarray(x, dtype=np.float64)
+
+    # --- WORLD Analysis ---
+    # Use default DIO/Harvest parameters for F0 estimation
+    f0, t = pw.dio(x, fs)
+    # Refine F0 using Stonemask
+    f0 = pw.stonemask(x, f0, t, fs)
+    # Estimate spectral envelope using CheapTrick
+    sp = pw.cheaptrick(x, f0, t, fs)
+    # Estimate aperiodicity using D4C
+    ap = pw.d4c(x, f0, t, fs)
+
+    # --- Warp Spectral Envelope ---
+    sp_warped = _warp_spectral_envelope(sp, fs, shift_factor)
+
+    # --- WORLD Synthesis ---
+    # Ensure f0 is C-contiguous double array for synthesis
+    f0_cont = np.ascontiguousarray(f0, dtype=np.float64)
+    # Ensure sp_warped and ap are also contiguous float64 (should be from warping/analysis)
+    sp_warped_cont = np.ascontiguousarray(sp_warped, dtype=np.float64)
+    ap_cont = np.ascontiguousarray(ap, dtype=np.float64)
+
+    # Synthesize using original F0, warped SP, original AP
+    y = pw.synthesize(f0_cont, sp_warped_cont, ap_cont, fs)
+
+    # Ensure output length matches input length (synthesis might slightly alter it)
+    if len(y) > len(x):
+        y = y[:len(x)]
+    elif len(y) < len(x):
+        padding = np.zeros(len(x) - len(y), dtype=np.float64)
+        y = np.concatenate((y, padding))
+
+    return y.astype(np.float64) # Return float64
+
+
+# Helper function for spectral warping based on research report
+def _warp_spectral_envelope(sp: np.ndarray, fs: int, formant_shift_ratio: float) -> np.ndarray:
+    """
+    Warps the spectral envelope frequency axis using interpolation.
+
+    Args:
+        sp: Spectral envelope from pyworld (frames x frequency_bins), float64.
+        fs: Sample rate.
+        formant_shift_ratio: Factor to shift formants (>1 up, <1 down).
+
+    Returns:
+        Warped spectral envelope, float64.
+    """
+    num_frames, num_bins = sp.shape
+    # CheapTrick uses fft_size / 2 + 1 bins. Calculate fft_size from num_bins.
+    fft_size = (num_bins - 1) * 2
+    original_freqs = np.linspace(0, fs / 2, num_bins)
+    # Frequencies from which to sample the *original* envelope
+    warped_freqs = original_freqs / formant_shift_ratio
+
+    sp_warped = np.zeros_like(sp)
+
+    for i in range(num_frames):
+        # Create interpolation function based on original envelope values at warped frequencies
+        interp_func = interp1d(
+            warped_freqs, sp[i], kind='linear', bounds_error=False,
+            # Extrapolate using edge values of the original envelope
+            fill_value=(sp[i, 0], sp[i, -1])
+        )
+        # Evaluate the interpolation function at the original frequencies to get the warped envelope
+        sp_warped[i] = interp_func(original_freqs)
+
+    # Ensure non-negative values (numerical precision might cause small negatives)
+    # Use a small positive floor based on pyworld examples/recommendations
+    sp_warped[sp_warped < 1e-16] = 1e-16
+
+    # Ensure output is float64 for pyworld synthesis
+    return sp_warped.astype(np.float64)

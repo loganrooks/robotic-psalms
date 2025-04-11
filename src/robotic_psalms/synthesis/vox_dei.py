@@ -1,17 +1,21 @@
 import logging
-from typing import Optional, Protocol, cast
+from typing import Optional, cast # Removed Protocol
 
 import numpy as np
 import numpy.typing as npt
-import soundfile as sf
-from pathlib import Path
+# soundfile and Path moved into debug blocks later
 # soundfile is used implicitly by EspeakNGWrapper, but not directly here.
 from scipy import signal
 
 from ..config import PsalmConfig, VocalTimbre
 # Corrected imports for TTS engines and base class
 from .tts.base import TTSEngine, ParameterEnum
+from .effects import FormantShiftParameters, apply_robust_formant_shift
 from .tts.engines.espeak import EspeakNGWrapper
+
+
+# Constant for minimum length required by sosfiltfilt in this context
+_MIN_SOSFILTFILT_LEN = 15
 
 
 class VoxDeiSynthesisError(Exception):
@@ -121,6 +125,8 @@ class VoxDeiSynthesizer:
             audio: npt.NDArray[np.float32] = audio_data
             # --- DEBUG: Save raw TTS output ---
             if self.logger.isEnabledFor(logging.DEBUG):
+                import soundfile as sf # Import moved here
+                from pathlib import Path # Import moved here
                 try:
                     raw_output_path = Path("debug_vocals_01_raw_tts.wav") # Numbered filename
                     sf.write(raw_output_path, audio, synth_sample_rate)
@@ -137,6 +143,8 @@ class VoxDeiSynthesizer:
             audio = self._apply_formant_shift(audio)
             # --- DEBUG: Save audio after formant shift ---
             if self.logger.isEnabledFor(logging.DEBUG):
+                import soundfile as sf # Import moved here
+                from pathlib import Path # Import moved here
                 try:
                     formant_shift_path = Path("debug_vocals_02_after_formant_shift.wav")
                     sf.write(formant_shift_path, audio, synth_sample_rate)
@@ -147,6 +155,8 @@ class VoxDeiSynthesizer:
             audio = self._apply_timbre_blend(audio)
             # --- DEBUG: Save audio after timbre blend ---
             if self.logger.isEnabledFor(logging.DEBUG):
+                import soundfile as sf # Import moved here
+                from pathlib import Path # Import moved here
                 try:
                     timbre_blend_path = Path("debug_vocals_03_after_timbre_blend.wav")
                     sf.write(timbre_blend_path, audio, synth_sample_rate)
@@ -168,82 +178,22 @@ class VoxDeiSynthesizer:
             raise VoxDeiSynthesisError(f"TTS synthesis failed: {str(e)}") from e
 
     def _apply_formant_shift(self, audio: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
-        """Apply formant shifting based on timbre and voice range settings"""
-        timbre: VocalTimbre = self.config.vocal_timbre
+        """Apply robust formant shifting using the dedicated effects function."""
+        if abs(self.formant_shift_factor - 1.0) < 1e-6:
+            # Skip shifting if factor is effectively 1.0
+            return audio
 
-        # Apply base formant shift for voice range
-        shifted_audio = self._formant_shift(audio, self.formant_shift_factor)
-
-        # Calculate additional shifts based on timbre blend
-        # Ensure factors are floats
-        choir_shift_factor = 1.2 * float(timbre.choirboy)
-        android_shift_factor = 0.8 * float(timbre.android)
-        machine_shift_factor = 0.5 * float(timbre.machinery)
-
-        # Layer additional formant shifts only if factor > 0
-        if choir_shift_factor > 1e-6: # Use small epsilon for float comparison
-            shifted_audio += self._formant_shift(audio, choir_shift_factor * self.formant_shift_factor)
-        if android_shift_factor > 1e-6:
-            shifted_audio += self._formant_shift(audio, android_shift_factor * self.formant_shift_factor)
-        if machine_shift_factor > 1e-6:
-            shifted_audio += self._formant_shift(audio, machine_shift_factor * self.formant_shift_factor)
-
-        # Normalize potentially increased amplitude
-        max_amp = np.max(np.abs(shifted_audio))
-        if max_amp > 1.0:
-             shifted_audio /= max_amp
-
-        return shifted_audio.astype(np.float32)
-
-    def _formant_shift(self, audio: npt.NDArray[np.float32], factor: float) -> npt.NDArray[np.float32]:
-        """Apply formant shifting using FFT"""
-        n = len(audio)
-        # Ensure even length for rfft
-        if n % 2 != 0:
-            audio = np.pad(audio, (0, 1), mode='constant')
-            n += 1 # Update length
-
-        # Get frequency spectrum
-        D = np.fft.rfft(audio)
-        # Frequencies for rfft output
-        freqs = np.fft.rfftfreq(n, 1.0 / self.sample_rate)
-
-        # Shift frequency components
-        shifted_freqs = freqs * factor
-        # Ensure shifted_freqs is monotonically increasing for interpolation
-        if factor <= 0:
-             # Handle non-positive factor - maybe return original or raise error
-             self.logger.warning("Formant shift factor must be positive. Returning original audio.")
-             return audio
-
-        # Interpolate magnitudes onto original frequency bins
-        # Use absolute value for magnitude interpolation
-        shifted_magnitudes = np.interp(freqs, shifted_freqs, np.abs(D))
-
-        # Combine interpolated magnitudes with original phases
-        # Ensure phase array matches magnitude array length
-        phases = np.angle(D)
-        if len(phases) < len(shifted_magnitudes):
-             # This case might happen with certain FFT lengths, pad phases
-             phases = np.pad(phases, (0, len(shifted_magnitudes) - len(phases)), mode='constant')
-        elif len(phases) > len(shifted_magnitudes):
-             # Truncate phases if necessary
-             phases = phases[:len(shifted_magnitudes)]
-
-        shifted_D = shifted_magnitudes * np.exp(1j * phases)
-
-        # Inverse transform
-        result = np.fft.irfft(shifted_D, n=n) # Specify original length 'n'
-
-        # Ensure output matches original input length (before potential padding)
-        original_length = len(audio) if n == len(audio) else len(audio) - 1
-        if len(result) > original_length:
-            result = result[:original_length]
-        elif len(result) < original_length:
-            # This shouldn't happen with irfft(n=n) but handle defensively
-            result = np.pad(result, (0, original_length - len(result)), mode='constant')
-
-        return result.astype(np.float32)
+        self.logger.debug(f"Applying robust formant shift with factor: {self.formant_shift_factor}")
+        params = FormantShiftParameters(shift_factor=self.formant_shift_factor)
+        try:
+            # Pass sample_rate explicitly
+            shifted_audio = apply_robust_formant_shift(audio, self.sample_rate, params=params)
+            # Ensure output is float32
+            return shifted_audio.astype(np.float32)
+        except Exception as e:
+            self.logger.error(f"Robust formant shifting failed: {e}", exc_info=True)
+            # Return original audio on error to avoid breaking the chain
+            return audio
 
     def _apply_timbre_blend(
         self,
@@ -279,6 +229,11 @@ class VoxDeiSynthesizer:
         audio: npt.NDArray[np.float32]
     ) -> npt.NDArray[np.float32]:
         """Apply angelic choir characteristics (lowpass + chorus)"""
+        # sosfiltfilt requires input length > padlen (default is often related to filter order, seems to be 15 here)
+        if audio.shape[0] <= _MIN_SOSFILTFILT_LEN:
+            self.logger.warning(f"Audio length ({audio.shape[0]}) too short for choir filter (needs > {_MIN_SOSFILTFILT_LEN}). Skipping.")
+            return audio
+
         # Gentle lowpass filter (adjust cutoff frequency as needed)
         # Cutoff relative to Nyquist frequency (sample_rate / 2)
         cutoff_norm = 8000 / (self.sample_rate / 2)
@@ -310,6 +265,11 @@ class VoxDeiSynthesizer:
         audio: npt.NDArray[np.float32]
     ) -> npt.NDArray[np.float32]:
         """Apply android voice characteristics (bandpass + ring mod)"""
+        # sosfiltfilt requires input length > padlen (default is often related to filter order, seems to be 15 here)
+        if audio.shape[0] <= _MIN_SOSFILTFILT_LEN:
+            self.logger.warning(f"Audio length ({audio.shape[0]}) too short for android filter (needs > {_MIN_SOSFILTFILT_LEN}). Skipping.")
+            return audio
+
         # Bandpass filter (adjust frequencies as needed)
         low_cut_norm = 300 / (self.sample_rate / 2)
         high_cut_norm = 3400 / (self.sample_rate / 2)
@@ -336,6 +296,11 @@ class VoxDeiSynthesizer:
         audio: npt.NDArray[np.float32]
     ) -> npt.NDArray[np.float32]:
         """Apply machinery characteristics (highpass + distortion/resonance)"""
+        # sosfiltfilt requires input length > padlen (default is often related to filter order, seems to be 15 here)
+        if audio.shape[0] <= _MIN_SOSFILTFILT_LEN:
+            self.logger.warning(f"Audio length ({audio.shape[0]}) too short for machinery filter (needs > {_MIN_SOSFILTFILT_LEN}). Skipping.")
+            return audio
+
         # Highpass filter
         cutoff_norm = 1000 / (self.sample_rate / 2) # Higher cutoff for metallic feel
         # Use SOS format for stability

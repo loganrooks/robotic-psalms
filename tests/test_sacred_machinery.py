@@ -3,7 +3,7 @@ import numpy as np
 from unittest.mock import patch, MagicMock, ANY # Add ANY
 import numpy.fft as fft
 from typing import cast # Added for casting
-from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters, ChorusParameters, SpectralFreezeParameters, GlitchParameters # Add GlitchParameters
+from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters, ChorusParameters, SpectralFreezeParameters, GlitchParameters, SaturationParameters # Add GlitchParameters, SaturationParameters
 
 # Import actual implementations
 from robotic_psalms.config import PsalmConfig, HauntingParameters, MixLevels, LiturgicalMode, ReverbConfig, DelayConfig # Consolidated imports
@@ -677,6 +677,78 @@ def test_process_psalm_does_not_apply_spectral_freeze_when_none(mock_apply_freez
 
     # Assert that the spectral freeze function was NOT called
     mock_apply_freeze.assert_not_called()
+
+    # Ensure synth was called
+    cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
+
+
+
+# --- NEW TESTS FOR SATURATION ---
+
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_saturation', autospec=True)
+def test_process_psalm_applies_saturation_when_configured(mock_apply_saturation: MagicMock, default_config: PsalmConfig, engine_factory):
+    """Test that saturation effect is applied when configured in PsalmConfig."""
+    # Modify config to enable saturation
+    test_config = default_config.model_copy(deep=True)
+    test_saturation_params = SaturationParameters(drive=0.6, tone=0.4, mix=0.7)
+    test_config.saturation_effect = test_saturation_params
+    # Disable other potentially interfering effects for isolation
+    test_config.glitch_effect = None
+    test_config.haunting_intensity = HauntingParameters()
+    test_config.delay_effect = None
+    test_config.chorus_params = None
+
+    # Create engine with modified config using the factory
+    engine = engine_factory(test_config)
+
+    psalm_text = "Saturation test"
+    duration = 2.0
+    expected_samples = int(duration * engine.sample_rate)
+    # Provide simple input audio via the mock
+    input_vocals = np.ones(expected_samples, dtype=np.float32) * 0.5
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
+
+    # Configure mock to return a copy to avoid downstream issues
+    mock_apply_saturation.side_effect = lambda audio, sr, params: audio.copy()
+
+    # Process the psalm
+    result = engine.process_psalm(psalm_text, duration)
+
+    # Assert that the saturation function was called (EXPECTED TO FAIL)
+    # Assuming saturation is applied once to the final mix
+    mock_apply_saturation.assert_called_once()
+
+    # Check arguments (basic check using ANY for audio)
+    call_args = mock_apply_saturation.call_args[0]
+    assert isinstance(call_args[0], np.ndarray) # audio data
+    assert call_args[1] == engine.sample_rate # sample rate
+    assert isinstance(call_args[2], SaturationParameters) # SaturationParameters instance
+    # Verify parameters passed correctly from config
+    assert call_args[2].drive == test_saturation_params.drive
+    assert call_args[2].tone == test_saturation_params.tone
+    assert call_args[2].mix == test_saturation_params.mix
+
+    # Ensure synth was called
+    cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
+
+
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_saturation', autospec=True)
+def test_process_psalm_does_not_apply_saturation_when_none(mock_apply_saturation: MagicMock, engine: SacredMachineryEngine):
+    """Test that saturation effect is NOT applied when not configured (default)."""
+    # Engine fixture uses default config where saturation_effect is None
+
+    psalm_text = "No saturation test"
+    duration = 2.0
+    expected_samples = int(duration * engine.sample_rate)
+    # Provide simple input audio via the mock
+    input_vocals = np.ones(expected_samples, dtype=np.float32) * 0.5
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
+
+    # Process the psalm
+    result = engine.process_psalm(psalm_text, duration)
+
+    # Assert that the saturation function was NOT called
+    mock_apply_saturation.assert_not_called()
 
     # Ensure synth was called
     cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)

@@ -157,6 +157,10 @@ vocal_timbre:
       feedback: 0.0         # Feedback amount for chorus voices (float, 0.0 to 1.0)
       wet_dry_mix: 0.5      # Mix between original (dry) and chorus (wet) signal (float, 0.0 to 1.0)
       # num_voices: 3       # Number of chorus voices (integer, >= 2) - Currently ignored by implementation
+    saturation_effect: # Optional saturation/distortion effect
+      drive: 0.5          # Amount of distortion (float, 0.0 to 1.0)
+      tone: 0.5           # Tone control (0.0=dark, 1.0=bright)
+      mix: 0.3            # Wet/dry mix (0.0=dry, 1.0=wet)
 ```
 
 ### Input Format
@@ -248,6 +252,10 @@ robotic-psalms examples/psalm.txt output.wav --config examples/config.yml --visu
   - `feedback`: The amount of the chorus signal fed back into the effect (0.0 to 1.0). Can create a more resonant or flanging sound at higher values.
   - `wet_dry_mix`: The balance between the original (dry) signal and the chorus (wet) signal (0.0 for full dry, 1.0 for full wet).
   - `num_voices`: *Currently ignored by the implementation.* Intended to control the number of chorus voices.
+- `saturation_effect`: (Optional) Configuration for a saturation/distortion effect applied to the final output. If this section is omitted or `mix` is set to 0, the effect is disabled.
+  - `drive`: The amount of distortion applied (0.0 to 1.0). Higher values increase saturation.
+  - `tone`: Controls the brightness of the distortion (0.0 for dark, 1.0 for bright).
+  - `mix`: The balance between the original (dry) signal and the saturated (wet) signal (0.0 for full dry, 1.0 for full wet).
 
 ### Voice Timbre
 Blend between three voice characteristics:

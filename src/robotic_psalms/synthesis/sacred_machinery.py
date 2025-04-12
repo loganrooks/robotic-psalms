@@ -10,7 +10,12 @@ from .vox_dei import VoxDeiSynthesizer, VoxDeiSynthesisError
 from .effects import apply_high_quality_reverb, ReverbParameters
 from .effects import apply_complex_delay, DelayParameters
 from .effects import apply_chorus, ChorusParameters
-from .effects import apply_smooth_spectral_freeze, SpectralFreezeParameters, apply_refined_glitch, GlitchParameters
+from .effects import (apply_high_quality_reverb, ReverbParameters,
+                    apply_complex_delay, DelayParameters,
+                    apply_chorus, ChorusParameters,
+                    apply_smooth_spectral_freeze, SpectralFreezeParameters,
+                    apply_refined_glitch, GlitchParameters,
+                    apply_saturation, SaturationParameters)
 # Removed unused import: from scipy.signal.windows import hann
 from dataclasses import dataclass
 
@@ -166,6 +171,9 @@ class SacredMachineryEngine:
             except Exception as write_err:
                 self.logger.error(f"Failed to save vocals after normalization: {write_err}")
         # --- END DEBUG ---
+
+        # Apply saturation effect if configured
+        combined = self._apply_configured_saturation(combined)
 
         # Apply complex delay effect if configured
         # Apply chorus effect if configured
@@ -457,6 +465,24 @@ class SacredMachineryEngine:
         if peak > 1.0:
             return audio / peak
         return audio
+
+    def _apply_configured_saturation(
+        self,
+        audio: npt.NDArray[np.float32]
+    ) -> npt.NDArray[np.float32]:
+        """Applies the saturation effect if configured in self.config."""
+        if self.config.saturation_effect is not None and self.config.saturation_effect.mix > 0:
+            self.logger.debug("Applying saturation effect...")
+            try:
+                saturation_params = SaturationParameters(**self.config.saturation_effect.model_dump())
+                processed_audio = apply_saturation(audio, self.sample_rate, saturation_params)
+                # Ensure audio is float32 after effect
+                return np.array(processed_audio, dtype=np.float32)
+            except Exception as saturation_err:
+                self.logger.error(f"Failed to apply saturation effect: {saturation_err}")
+                return audio # Return original audio on error
+        else:
+            return audio # Return original if not configured or mix is zero
 
 
 

@@ -93,3 +93,26 @@
 - **Metrics After**: N/A (Test results: 61 passed, 8 xfailed)
 - **Related Debt**: N/A
 - **Related Issue**: REQ-ART-E03
+
+
+
+### Optimization: [2025-04-11 21:53:00] - Refactor Saturation Implementation & Tests (REQ-ART-E04)
+- **Target**: `src/robotic_psalms/synthesis/effects.py`, `tests/synthesis/test_effects.py`
+- **Type**: Readability/Maintainability/Clarity
+- **Desc**: 
+    - `effects.py`: Updated `SaturationParameters.drive` description. Added constants `TONE_MIN_FREQ`, `TONE_MAX_FREQ`. Added comment and clipping (max 60dB) for `drive_db` calculation in `apply_saturation`. Added comments clarifying shape/length normalization logic.
+    - `test_effects.py`: Added comments to `test_saturation_adds_harmonics` clarifying FFT threshold and drive value. Used more distinct parameter values in `test_saturation_parameters_affect_output` for clearer differentiation.
+- **Metrics Before**: N/A (Focus on clarity)
+- **Metrics After**: N/A (Test results: 126 passed, 8 xfailed - consistent with expected state after adding other features)
+- **Related Debt**: N/A
+- **Related Issue**: REQ-ART-E04 (Refactor Phase)
+
+
+### Optimization: [2025-04-11 22:03:00] - Refactor Saturation Integration Code (REQ-ART-E04)
+- **Target**: `src/robotic_psalms/synthesis/sacred_machinery.py`
+- **Type**: Modularity/Readability
+- **Desc**: Removed duplicate import line. Extracted saturation application logic from `process_psalm` into a new private helper method `_apply_configured_saturation` for consistency with other effects (chorus, delay). No changes were needed for `tests/test_sacred_machinery.py`. Confirmed all 28 tests in the file pass after refactoring.
+- **Metrics Before**: N/A
+- **Metrics After**: N/A (Test results: 28 passed)
+- **Related Debt**: N/A
+- **Related Issue**: REQ-ART-E04 (Integration Refactor Phase)

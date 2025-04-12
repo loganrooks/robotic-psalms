@@ -65,6 +65,30 @@
 ## Progress
 *Milestones, completed tasks, overall status.*
 
+#### [2025-04-11 22:05:58] - Task: Update Documentation for Saturation Effect Integration (REQ-ART-E04 - Documentation)
+- **Status:** Completed.
+- **Deliverables:** Updated `README.md` example configuration and Parameter Guide for `saturation_effect`. Verified docstrings in `src/robotic_psalms/config.py` and `src/robotic_psalms/synthesis/effects.py` are adequate.
+---
+
+
+#### [2025-04-11 21:59:43] - Task: Integrate Saturation Effect into Sacred Machinery (REQ-ART-E04 - Integration TDD Green Phase)
+- **Status:** Completed.
+- **Deliverables:** Modified `src/robotic_psalms/synthesis/sacred_machinery.py` to import and conditionally call `apply_saturation` based on `PsalmConfig.saturation_effect`. All tests in `tests/test_sacred_machinery.py` pass (28/28).
+---
+
+
+#### [2025-04-11 21:57:25] - Task: Update Integration Tests for Saturation Effect (REQ-ART-E04 - Integration TDD Red Phase)
+- **Status:** Completed (Red Phase).
+- **Deliverables:** Added failing integration tests (`test_process_psalm_applies_saturation_when_configured`, `test_process_psalm_does_not_apply_saturation_when_none`) to `tests/test_sacred_machinery.py`. Tests fail with `AttributeError` during patching, confirming `apply_saturation` is not yet integrated into `SacredMachineryEngine`.
+---
+
+
+#### [2025-04-11 21:39:55] - Task: Write Failing Tests for Saturation/Distortion (REQ-ART-E04 - Red Phase)
+- **Status:** Completed (Red Phase).
+- **Deliverables:** Added failing unit tests for `apply_saturation` and `SaturationParameters` to `tests/synthesis/test_effects.py`. Tests define the required interface and behavior, currently failing due to missing implementation (ImportError/NameError).
+---
+
+
 #### [2025-04-11 21:33:38] - Task: Update Documentation for Refined Glitch Integration (REQ-ART-E03 - Documentation)
 - **Status:** Completed.
 - **Deliverables:** Updated `README.md` example configuration and Parameter Guide for `glitch_effect`, removing `glitch_density`. Verified docstrings in `src/robotic_psalms/config.py`. Delegated and confirmed update of docstrings for `GlitchParameters` in `src/robotic_psalms/synthesis/effects.py` via `code` mode.
@@ -231,4 +255,10 @@
 #### [2025-04-11 21:34:24] - Feature: Refined Glitch Effect (REQ-ART-E03)
 - **Status:** Completed.
 - **Deliverables:** Implemented `apply_refined_glitch` function with multiple glitch types ('repeat', 'stutter', 'tape_stop', 'bitcrush') and `GlitchParameters` model in `src/robotic_psalms/synthesis/effects.py`. Integrated into `SacredMachineryEngine`, replacing `glitch_density` with `glitch_effect` config. Relevant tests created/updated and passing. Documentation updated in `README.md`.
+---
+
+
+#### [2025-04-11 22:06:38] - Feature: Saturation Effect (REQ-ART-E04)
+- **Status:** Completed.
+- **Deliverables:** Implemented `apply_saturation` function and `SaturationParameters`/`SaturationConfig` models using `pedalboard.Distortion` and `pedalboard.LowpassFilter` in `src/robotic_psalms/synthesis/effects.py` and `src/robotic_psalms/config.py`. Integrated conditionally into `SacredMachineryEngine`. Core tests passing, documentation updated.
 ---

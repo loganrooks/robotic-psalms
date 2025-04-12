@@ -22,6 +22,8 @@ from robotic_psalms.synthesis.effects import (
     SpectralFreezeParameters, # Placeholder
     apply_refined_glitch, # Placeholder
     GlitchParameters, # Placeholder
+    apply_saturation, # Placeholder
+    SaturationParameters, # Placeholder
 )
 from pedalboard._pedalboard import Pedalboard # Import as suggested by Pylance
 
@@ -149,10 +151,21 @@ def default_glitch_params():
         intensity=0.5,
         chunk_size_ms=50.0,
         repeat_count=3,
-        tape_stop_speed=1.0, # Irrelevant for 'repeat'
+        tape_stop_speed=0.99, # Irrelevant for 'repeat', but must be < 1.0 for validation
         bitcrush_depth=8,    # Irrelevant for 'repeat'
         bitcrush_rate_factor=0.5 # Irrelevant for 'repeat'
     )
+
+@pytest.fixture
+def default_saturation_params():
+    """Default saturation parameters."""
+    return SaturationParameters(
+        drive=0.5,
+        tone=0.5,
+        mix=0.5,
+        # saturation_type='tanh' # Optional: if implementing types
+    )
+
 # --- Reverb Tests ---
 def test_reverb_module_exists():
     assert callable(apply_high_quality_reverb)
@@ -949,10 +962,10 @@ def test_refined_glitch_zero_length_input(default_glitch_params):
 
 def test_refined_glitch_invalid_parameters(dry_mono_signal):
     """Test refined glitch with invalid parameter values."""
-    with pytest.raises((ValidationError, ValueError)):
-        # Invalid glitch_type
-        invalid_params = GlitchParameters(glitch_type='invalid_type', intensity=0.5, chunk_size_ms=50.0, repeat_count=3, tape_stop_speed=1.0, bitcrush_depth=8, bitcrush_rate_factor=0.5)
-        apply_refined_glitch(dry_mono_signal, SAMPLE_RATE, invalid_params)
+    with pytest.raises(ValidationError): # Pydantic raises ValidationError for Literal mismatches
+        # Invalid glitch_type (should fail during instantiation)
+        GlitchParameters(glitch_type='invalid_type', intensity=0.5, chunk_size_ms=50.0, repeat_count=3, tape_stop_speed=0.99, bitcrush_depth=8, bitcrush_rate_factor=0.5)
+        # No need to call apply_refined_glitch here, validation happens on init
 
     with pytest.raises((ValidationError, ValueError)):
         # Intensity out of range
@@ -983,4 +996,123 @@ def test_refined_glitch_invalid_parameters(dry_mono_signal):
         # bitcrush_rate_factor out of range
         invalid_params = GlitchParameters(glitch_type='bitcrush', intensity=0.5, chunk_size_ms=50.0, repeat_count=3, tape_stop_speed=1.0, bitcrush_depth=8, bitcrush_rate_factor=1.1)
         apply_refined_glitch(dry_mono_signal, SAMPLE_RATE, invalid_params)
+
+
+# --- Saturation/Distortion Tests (REQ-ART-E04) ---
+
+def test_saturation_module_exists():
+    """Checks if the saturation imports work."""
+    assert callable(apply_saturation)
+    assert 'drive' in SaturationParameters.model_fields
+    assert 'tone' in SaturationParameters.model_fields
+    assert 'mix' in SaturationParameters.model_fields
+    # assert 'saturation_type' in SaturationParameters.model_fields # Optional
+
+def test_apply_saturation_mono(dry_mono_signal, default_saturation_params):
+    """Test applying saturation to a mono signal."""
+    saturated_signal = apply_saturation(
+        dry_mono_signal, SAMPLE_RATE, default_saturation_params
+    )
+    assert saturated_signal.ndim == dry_mono_signal.ndim
+    assert len(saturated_signal) == len(dry_mono_signal)
+    assert not np.allclose(saturated_signal, dry_mono_signal), "Saturation did not alter mono signal"
+
+def test_apply_saturation_stereo(dry_stereo_signal, default_saturation_params):
+    """Test applying saturation to a stereo signal."""
+    saturated_signal = apply_saturation(
+        dry_stereo_signal, SAMPLE_RATE, default_saturation_params
+    )
+    assert saturated_signal.ndim == dry_stereo_signal.ndim
+    assert saturated_signal.shape[1] == 2
+    assert saturated_signal.shape[0] == dry_stereo_signal.shape[0]
+    assert not np.allclose(saturated_signal, dry_stereo_signal), "Saturation did not alter stereo signal"
+
+def test_saturation_adds_harmonics(dry_mono_signal, default_saturation_params):
+    """Conceptual test: Saturation should add harmonic content."""
+    input_fft = np.fft.fft(dry_mono_signal)
+    input_freq = np.fft.fftfreq(len(dry_mono_signal), 1 / SAMPLE_RATE)
+    # Find prominent peaks (arbitrary threshold: > 10% of max amplitude)
+    input_peaks = np.where(np.abs(input_fft) > np.max(np.abs(input_fft)) * 0.1)[0]
+
+    # Increase drive for this test to ensure harmonics are generated
+    # Use a high drive value (arbitrarily chosen) to ensure harmonics are generated
+    params_high_drive = default_saturation_params.model_copy(update={'drive': 20.0})
+
+    saturated_signal = apply_saturation(
+        dry_mono_signal, SAMPLE_RATE, params_high_drive
+    )
+    output_fft = np.fft.fft(saturated_signal)
+    # Find prominent peaks in output (using the same arbitrary threshold)
+    output_peaks = np.where(np.abs(output_fft) > np.max(np.abs(output_fft)) * 0.1)[0]
+
+    # Check if the number of significant peaks increased or changed substantially
+    # Basic check: Assert that either the number of peaks increased OR the peak indices changed.
+    # This implies new frequency content was added or existing content shifted significantly.
+    assert len(output_peaks) > len(input_peaks) or not np.allclose(input_peaks, output_peaks), \
+        "Saturation did not appear to add/change significant harmonic content (peak count/location check)"
+
+def test_saturation_parameters_affect_output(dry_mono_signal, default_saturation_params):
+    """Test that changing saturation parameters alters the output."""
+    saturated_default = apply_saturation(dry_mono_signal, SAMPLE_RATE, default_saturation_params)
+
+    # Change drive
+    # Use a more distinct drive value compared to the default (0.5)
+    params_high_drive = default_saturation_params.model_copy(update={'drive': 5.0})
+    saturated_high_drive = apply_saturation(dry_mono_signal, SAMPLE_RATE, params_high_drive)
+    assert not np.allclose(saturated_default, saturated_high_drive), "Changing drive had no effect"
+
+    # Change tone (conceptual - assumes tone affects frequency content)
+    # Use a more distinct tone value compared to the default (0.5)
+    params_dark_tone = default_saturation_params.model_copy(update={'tone': 0.1})
+    saturated_dark_tone = apply_saturation(dry_mono_signal, SAMPLE_RATE, params_dark_tone)
+    assert not np.allclose(saturated_default, saturated_dark_tone), "Changing tone had no effect"
+
+    # Change mix
+    # Use a more distinct mix value compared to the default (0.5)
+    params_high_mix = default_saturation_params.model_copy(update={'mix': 0.9})
+    saturated_high_mix = apply_saturation(dry_mono_signal, SAMPLE_RATE, params_high_mix)
+    assert not np.allclose(saturated_default, saturated_high_mix), "Changing mix had no effect"
+
+    # Use a more distinct low mix value compared to the default (0.5)
+    params_low_mix = default_saturation_params.model_copy(update={'mix': 0.1})
+    saturated_low_mix = apply_saturation(dry_mono_signal, SAMPLE_RATE, params_low_mix)
+    assert not np.allclose(saturated_default, saturated_low_mix), "Changing mix (low) had no effect"
+    assert not np.allclose(saturated_high_mix, saturated_low_mix), "Changing mix (high vs low) had no effect"
+
+    # Optional: Test saturation_type if implemented
+    # params_alt_type = default_saturation_params.model_copy(update={'saturation_type': 'soft_clip'})
+    # saturated_alt_type = apply_saturation(dry_mono_signal, SAMPLE_RATE, params_alt_type)
+    # assert not np.allclose(saturated_default, saturated_alt_type), "Changing saturation_type had no effect"
+
+def test_saturation_zero_length_input(default_saturation_params):
+    """Test saturation with zero-length audio input."""
+    zero_signal = np.array([], dtype=np.float32)
+    saturated_signal = apply_saturation(
+        zero_signal, SAMPLE_RATE, default_saturation_params
+    )
+    assert isinstance(saturated_signal, np.ndarray)
+    assert len(saturated_signal) == 0
+
+def test_saturation_invalid_parameters(dry_mono_signal):
+    """Test saturation with invalid parameter values."""
+    with pytest.raises((ValidationError, ValueError)):
+        # Drive out of range (assuming 0.0 to 1.0+)
+        invalid_params = SaturationParameters(drive=-0.1, tone=0.5, mix=0.5)
+        apply_saturation(dry_mono_signal, SAMPLE_RATE, invalid_params)
+
+    with pytest.raises((ValidationError, ValueError)):
+        # Tone out of range (assuming 0.0 to 1.0)
+        invalid_params = SaturationParameters(drive=0.5, tone=1.5, mix=0.5)
+        apply_saturation(dry_mono_signal, SAMPLE_RATE, invalid_params)
+
+    with pytest.raises((ValidationError, ValueError)):
+        # Mix out of range (0.0 to 1.0)
+        invalid_params = SaturationParameters(drive=0.5, tone=0.5, mix=-0.5)
+        apply_saturation(dry_mono_signal, SAMPLE_RATE, invalid_params)
+
+    # Optional: Test invalid saturation_type
+    # with pytest.raises((ValidationError, ValueError)):
+    #     invalid_params = SaturationParameters(drive=0.5, tone=0.5, mix=0.5, saturation_type='invalid')
+    #     apply_saturation(dry_mono_signal, SAMPLE_RATE, invalid_params)
+
 

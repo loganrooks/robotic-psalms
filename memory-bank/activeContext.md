@@ -3,6 +3,71 @@
 *This file tracks the immediate focus, ongoing tasks, and unresolved questions for the current session.*
 
 ---
+### [2025-04-11 22:05:45] - Task: Update Documentation for Saturation Effect Integration (REQ-ART-E04 - Documentation)
+- **Focus:** Update `README.md` and check docstrings in `config.py`/`effects.py` for the new `saturation_effect` (`SaturationParameters`) configuration.
+- **Actions:**
+    - Read `README.md`.
+    - Inserted `saturation_effect` example config and parameter descriptions into `README.md`.
+    - Read `src/robotic_psalms/config.py`. Confirmed docstring for `PsalmConfig.saturation_effect` is adequate.
+    - Read `src/robotic_psalms/synthesis/effects.py`. Confirmed docstrings for `SaturationParameters` and its fields (`drive`, `tone`, `mix`) are adequate.
+- **Status:** Completed. Documentation updated.
+
+---
+
+
+### [2025-04-11 21:59:31] - Task: Integrate Saturation Effect into Sacred Machinery (REQ-ART-E04 - Integration TDD Green Phase)
+- **Focus:** Modify `src/robotic_psalms/synthesis/sacred_machinery.py` to integrate the `apply_saturation` effect conditionally based on `PsalmConfig.saturation_effect`.
+- **Actions:**
+    - Imported `apply_saturation` and `SaturationParameters` from `.effects`.
+    - Added conditional logic to `process_psalm` to call `apply_saturation` on the `combined` audio signal before chorus and delay, if configured.
+    - Ran specific saturation tests (`pytest tests/test_sacred_machinery.py -k saturation`) - Passed (2/2).
+    - Ran all tests in `tests/test_sacred_machinery.py` (`pytest tests/test_sacred_machinery.py`) - Passed (28/28).
+- **Status:** Completed (Green Phase). Saturation effect integrated successfully. All relevant tests pass.
+
+---
+
+
+### [2025-04-11 21:57:10] - Task: Update Integration Tests for Saturation Effect (REQ-ART-E04 - Integration TDD Red Phase)
+- **Focus:** Add failing integration tests to `tests/test_sacred_machinery.py` to drive the integration of `apply_saturation` based on `PsalmConfig.saturation_effect`.
+- **Actions:**
+    - Read `tests/test_sacred_machinery.py`.
+    - Added `test_process_psalm_applies_saturation_when_configured` (mocks `apply_saturation`, asserts call when configured).
+    - Added `test_process_psalm_does_not_apply_saturation_when_none` (mocks `apply_saturation`, asserts no call when not configured).
+    - Added `SaturationParameters` import to the test file.
+    - Ran `pytest tests/test_sacred_machinery.py -k saturation`.
+- **Status:** Red phase complete. Both tests failed with `AttributeError: ... does not have the attribute 'apply_saturation'` during `@patch` setup, confirming the integration point is missing in `sacred_machinery.py`. Ready for Green phase (importing and calling `apply_saturation` in `sacred_machinery.py`).
+
+---
+
+
+### [2025-04-11 21:54:46] - Task: Add Configuration for Saturation Effect (REQ-ART-E04 Config)
+- **Focus:** Modify `src/robotic_psalms/config.py` to include configuration for the `apply_saturation` effect.
+- **Actions:**
+    - Added `SaturationParameters` import from `.synthesis.effects`.
+    - Added `saturation_effect: Optional[SaturationParameters] = Field(...)` to `PsalmConfig`.
+- **Status:** Completed. `config.py` updated successfully. Unrelated Pylance errors detected in `sacred_machinery.py` and `effects.py` after the change, likely due to NumPy type hinting issues.
+
+---
+
+
+
+### [2025-04-11 21:39:55] - Task: Write Failing Tests for Saturation/Distortion (REQ-ART-E04 - Red Phase)
+
+### [2025-04-11 22:06:16] - Task: Implement Saturation Effect (REQ-ART-E04)
+- **Focus:** Completed full TDD cycle (implementation, integration, refactoring, documentation) for the saturation/distortion effect using `pedalboard`. Integrated conditionally into `SacredMachineryEngine`.
+- **Status:** Completed. All tests passing (excluding known xfails). Documentation updated.
+- **Focus:** Create failing unit tests in `tests/synthesis/test_effects.py` for a new saturation/distortion effect (`apply_saturation`, `SaturationParameters`).
+- **Actions:**
+    - Read `tests/synthesis/test_effects.py`.
+    - Added placeholder imports for `apply_saturation` and `SaturationParameters`.
+    - Added `default_saturation_params` fixture.
+    - Added tests covering existence, basic application (mono/stereo), harmonic addition (conceptual FFT check), parameter control (drive, tone, mix), and edge cases (zero-length, invalid params).
+    - Corrected unrelated Pylance error in `test_refined_glitch_invalid_parameters` by adjusting how invalid `glitch_type` is tested (expect `ValidationError` on instantiation).
+- **Status:** Red phase complete. Tests added to `tests/synthesis/test_effects.py`. Tests are failing as expected due to `ImportError`/`NameError` (Pylance: "unknown import symbol"), confirming the implementation is missing. Ignored persistent Pylance error in `test_refined_glitch_invalid_parameters` as it doesn't affect runtime test behavior. Ready for Green phase (minimal implementation in `effects.py`).
+
+---
+
+
 ### [2025-04-11 21:33:25] - Task: Update Documentation for Refined Glitch Integration (REQ-ART-E03 - Documentation)
 - **Focus:** Update `README.md` and check docstrings in `config.py`/`effects.py` for the new `glitch_effect` (`GlitchParameters`) configuration, removing references to old `glitch_density`.
 - **Actions:**

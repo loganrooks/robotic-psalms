@@ -10,7 +10,7 @@ import librosa # Added for spectral freeze
 from typing import Literal
 from typing import Literal, cast
 import random # For glitch probability
-
+from pedalboard import Distortion, LowpassFilter # Added for saturation
 # Removed module-level seed
 
 # Pedalboard's Reverb defaults: room_size=0.5, damping=0.5, wet_level=0.33, dry_level=0.4, width=1.0, freeze_mode=0.0
@@ -117,6 +117,16 @@ class GlitchParameters(BaseModel):
     tape_stop_speed: float = Field(..., gt=0.0, lt=1.0, description="Final speed factor for the 'tape_stop' effect (e.g., 0.5 for half speed). Speed ramps down towards this value. Must be > 0.0 and < 1.0.") # Updated validation to lt=1.0
     bitcrush_depth: int = Field(..., ge=1, le=16, description="Target bit depth for the 'bitcrush' effect (1 to 16).")
     bitcrush_rate_factor: float = Field(..., ge=0.0, le=1.0, description="Sample rate reduction factor for 'bitcrush'. Maps inversely to step size for sample holding (0.0=max reduction/large step, 1.0=no reduction/step=1).")
+    model_config = ConfigDict(extra='forbid')
+
+
+
+class SaturationParameters(BaseModel):
+    """Parameters for the saturation/distortion effect."""
+    drive: float = Field(..., ge=0.0, description="Amount of drive/gain applied before saturation. Higher values increase distortion.")
+    tone: float = Field(..., ge=0.0, le=1.0, description="Tone control (0.0=dark, 1.0=bright). Maps to a lowpass filter cutoff frequency.")
+    mix: float = Field(..., ge=0.0, le=1.0, description="Wet/dry mix (0.0=dry, 1.0=wet).")
+
     model_config = ConfigDict(extra='forbid')
 
 # --- Effect Functions ---
@@ -897,3 +907,92 @@ def apply_refined_glitch(audio: np.ndarray, sample_rate: int, params: GlitchPara
 
     return audio_out
 # Removed duplicate minimal implementation
+
+
+def apply_saturation(audio: np.ndarray, sample_rate: int, params: SaturationParameters) -> np.ndarray:
+    """
+    Applies a saturation/distortion effect using pedalboard.Distortion and a tone filter.
+
+    Args:
+        audio: Input audio signal as a NumPy array (mono or stereo).
+        sample_rate: Sample rate of the audio signal.
+        params: An instance of SaturationParameters containing effect settings.
+
+    Returns:
+        The processed audio signal with saturation applied (float32).
+    """
+    if audio.size == 0:
+        return np.array([], dtype=np.float32)
+
+    audio_float32 = audio.astype(np.float32)
+    dry_signal = audio_float32.copy() # Keep original for mixing
+
+    # 1. Apply Drive (Distortion)
+    # Map drive (0.0+) linearly to drive_db. The scaling factor (10.0) is arbitrary and might need tuning.
+    # Clip the result to a practical maximum (e.g., 60dB) to avoid extreme distortion.
+    MAX_DRIVE_DB = 60.0
+    drive_db = np.clip(params.drive * 10.0, 0.0, MAX_DRIVE_DB)
+    distortion_effect = Distortion(drive_db=drive_db)
+    board_dist = Pedalboard([distortion_effect])
+    wet_signal = board_dist(audio_float32, sample_rate=sample_rate)
+
+    # 2. Apply Tone (Lowpass Filter)
+    TONE_MIN_FREQ = 200.0
+    TONE_MAX_FREQ = 10000.0
+    # Ensure tone is clipped 0-1
+    tone_clipped = np.clip(params.tone, 0.0, 1.0)
+    # Logarithmic mapping for tone control (0=dark -> min_freq, 1=bright -> max_freq)
+    cutoff_hz = TONE_MIN_FREQ * (TONE_MAX_FREQ / TONE_MIN_FREQ)**tone_clipped
+    nyquist = sample_rate / 2.0
+    # Clip cutoff frequency to be within valid range [min_freq, nyquist * 0.99]
+    cutoff_hz = np.clip(cutoff_hz, TONE_MIN_FREQ, nyquist * 0.99)
+
+    # Only apply filter if tone is not max (1.0), otherwise keep full spectrum
+    if tone_clipped < 1.0:
+        tone_filter = LowpassFilter(cutoff_frequency_hz=cutoff_hz)
+        board_tone = Pedalboard([tone_filter])
+        # Apply filter to the distorted signal
+        wet_signal = board_tone(wet_signal, sample_rate=sample_rate)
+
+    # 3. Apply Mix
+    mix_clipped = np.clip(params.mix, 0.0, 1.0)
+
+    # Ensure shapes match for broadcasting before mixing.
+    # Pedalboard effects can sometimes change channel count (e.g., mono input -> stereo output).
+    if dry_signal.ndim != wet_signal.ndim or dry_signal.shape[1:] != wet_signal.shape[1:]:
+         # Handle potential mono->stereo conversion by pedalboard
+         if dry_signal.ndim == 1 and wet_signal.ndim == 2 and wet_signal.shape[1] > 1:
+             # Tile dry signal to match wet signal channels
+             dry_signal = np.tile(dry_signal[:, np.newaxis], (1, wet_signal.shape[1]))
+         elif dry_signal.ndim == 2 and wet_signal.ndim == 1 and dry_signal.shape[1] == 1:
+             wet_signal = wet_signal.reshape(-1, 1)
+         # If shapes still don't match after attempting common fixes, log warning and return dry
+         if dry_signal.shape[1:] != wet_signal.shape[1:]:
+              print(f"Warning: Shape mismatch between dry ({dry_signal.shape}) and wet ({wet_signal.shape}) signals after saturation/tone. Returning dry signal.")
+              # Ensure length matches original before returning
+              if dry_signal.shape[0] != audio.shape[0]:
+                   dry_signal = np.resize(dry_signal, audio.shape) # Resize to original shape
+              return dry_signal.astype(np.float32)
+
+    # Ensure lengths match before mixing (pedalboard effects generally preserve length, but be safe).
+    min_len = min(dry_signal.shape[0], wet_signal.shape[0])
+    dry_signal = dry_signal[:min_len, ...]
+    wet_signal = wet_signal[:min_len, ...]
+
+    output_signal = (dry_signal * (1.0 - mix_clipped)) + (wet_signal * mix_clipped)
+
+    # Ensure final output length matches original input length.
+    # This handles cases where intermediate processing might have slightly altered length.
+    if output_signal.shape[0] != audio.shape[0]:
+        target_len = audio.shape[0]
+        current_len = output_signal.shape[0]
+        if current_len > target_len:
+            output_signal = output_signal[:target_len, ...]
+        else:
+            padding_shape = (target_len - current_len,) + output_signal.shape[1:]
+            padding = np.zeros(padding_shape, dtype=output_signal.dtype)
+            output_signal = np.concatenate((output_signal, padding), axis=0)
+
+
+    return output_signal.astype(np.float32)
+

@@ -195,6 +195,38 @@
 - Blend amount extremes (0.0, 1.0)
 <!-- List specific test cases (unit, integration) -->
 
+
+### Test Plan: Saturation/Distortion (REQ-ART-E04) - [2025-04-11 21:40:50]
+#### Unit Tests:
+- Test Case: Saturation module/function/class exists / Expected: Import succeeds / Status: Failing
+- Test Case: Apply saturation to mono signal / Expected: Output shape matches input, content differs / Status: Failing
+- Test Case: Apply saturation to stereo signal / Expected: Output shape matches input (stereo), content differs / Status: Failing
+- Test Case: Saturation adds harmonics (conceptual FFT check) / Expected: Output FFT shows more/different peaks / Status: Failing
+- Test Case: Changing drive affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing tone affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing mix affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Handle zero-length input / Expected: Output is zero-length / Status: Failing
+- Test Case: Handle invalid drive / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid tone / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid mix / Expected: Raises ValidationError or ValueError / Status: Failing
+#### Integration Tests:
+- None yet (Focus is unit tests for the effect)
+#### Edge Cases Covered:
+- Zero-length input
+- Invalid parameter values (drive, tone, mix)
+
+
+
+### Test Plan: Saturation Integration (REQ-ART-E04) - [2025-04-11 21:57:32]
+#### Unit Tests:
+- N/A (Unit tests are in `test_effects.py`)
+#### Integration Tests:
+- Test Case: `apply_saturation` is called when `PsalmConfig.saturation_effect` is set / Expected: Mock `apply_saturation` called / Status: Written (Failing - Red)
+- Test Case: `apply_saturation` is NOT called when `PsalmConfig.saturation_effect` is None / Expected: Mock `apply_saturation` not called / Status: Written (Failing - Red)
+#### Edge Cases Covered:
+- Configuration enabled vs. disabled.
+
+
 ## Refactoring Targets (Post-Pass)
 <!-- Identify areas for refactoring after tests pass -->
 
@@ -311,6 +343,11 @@
 
 ### Fixture: default_spectral_freeze_params - [2025-04-11 18:11:30]
 - **Purpose**: Provides default parameters for smooth spectral freeze (REQ-ART-E02) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for spectral freeze tests.
+
+
+
+### Fixture: default_saturation_params - [2025-04-11 21:40:50]
+- **Purpose**: Provides default parameters for saturation/distortion (REQ-ART-E04) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for saturation tests.
 
 ### Test Run: 2025-04-08 10:41:13
 - **Trigger**: Manual / **Env**: Local / **Suite**: tests/synthesis/
@@ -457,6 +494,25 @@
 
 
 
+### TDD Cycle: Saturation/Distortion (REQ-ART-E04 - Red Phase) - [2025-04-11 21:40:50]
+- **Start**: [2025-04-11 21:38:44]
+- **End**: [2025-04-11 21:40:50]
+- **Red**: Tests created: Wrote failing tests in `tests/synthesis/test_effects.py` for `apply_saturation` and `SaturationParameters`. Tests cover existence, basic application, harmonic addition, parameter control (drive, tone, mix), and edge cases. Failing due to `ImportError`/`NameError` (Pylance: "unknown import symbol").
+- **Green**: Implementation approach: Next step is to create minimal placeholder implementations for the function and Pydantic model in `src/robotic_psalms/synthesis/effects.py`.
+- **Refactor**: Improvements made: N/A (Red phase only)
+- **Outcomes**: Established test harness for the saturation/distortion effect.
+
+
+
+### TDD Cycle: Integration Test for `apply_saturation` - [2025-04-11 21:57:32]
+- **Start**: [2025-04-11 21:56:14]
+- **Red**: Added `test_process_psalm_applies_saturation_when_configured` and `test_process_psalm_does_not_apply_saturation_when_none` to `tests/test_sacred_machinery.py`. Tests fail with `AttributeError` during `@patch` setup for `apply_saturation` in `sacred_machinery` module.
+- **Green**: [Pending]
+- **Refactor**: [Pending]
+- **Outcomes**: Confirmed Red phase for integration test. Ready for Green phase (modifying `sacred_machinery.py`).
+
+
+
 ### Test Run: Complex Pad Generation (REQ-ART-A01 - Initial Complexity) - [2025-04-11 18:03:36]
 - **Trigger**: Manual / **Env**: Local / **Suite**: `tests/test_sacred_machinery.py -k generate_pads`
 - **Result**: PASS / **Summary**: 6 Passed / 12 Deselected / 0 Failed
@@ -476,3 +532,23 @@
 - **Suite**: `tests/synthesis/test_effects.py -k spectral_freeze`
 - **Result**: FAIL (Anticipated)
 - **Failures**: `test_spectral_freeze_module_exists`: `ImportError: cannot import name 'apply_smooth_spectral_freeze' from 'robotic_psalms.synthesis.effects'`, `ImportError: cannot import name 'SpectralFreezeParameters' ...`, etc. (or similar NameErrors/Pylance errors during test collection).
+
+
+### Test Run: Saturation/Distortion (REQ-ART-E04 - Red Phase) - [2025-04-11 21:40:50]
+- **Trigger**: Manual (Anticipated)
+- **Env**: Local
+- **Suite**: `tests/synthesis/test_effects.py -k saturation`
+- **Result**: FAIL (Anticipated)
+- **Failures**: `test_saturation_module_exists`: `ImportError: cannot import name 'apply_saturation' from 'robotic_psalms.synthesis.effects'`, `ImportError: cannot import name 'SaturationParameters' ...`, etc. (or similar NameErrors/Pylance errors during test collection).
+
+
+
+### Test Run: Integration Test for `apply_saturation` - [2025-04-11 21:57:10]
+- **Trigger**: Manual
+- **Env**: Local
+- **Suite**: `tests/test_sacred_machinery.py -k saturation`
+- **Result**: FAIL
+- **Summary**: 0 Passed / 2 Failed / 26 Deselected
+- **Report Link**: N/A
+- **Failures**: `test_process_psalm_applies_saturation_when_configured`: `AttributeError: ... does not have the attribute 'apply_saturation'`, `test_process_psalm_does_not_apply_saturation_when_none`: `AttributeError: ... does not have the attribute 'apply_saturation'`
+

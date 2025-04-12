@@ -6,6 +6,13 @@
 
 
 
+### Implementation: Integrate Saturation Effect (REQ-ART-E04 - Integration Green Phase) - 2025-04-11 21:59:52
+- **Approach**: Integrated `apply_saturation` from `.effects` into `SacredMachineryEngine.process_psalm`. Added conditional logic to apply the effect to the `combined` audio signal before chorus and delay, only if `config.saturation_effect` is configured and `mix > 0`. The `SaturationParameters` model is instantiated from the configuration before calling the effect function.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/sacred_machinery.py` (Modified).
+- **Notes**: This completes the integration step for the saturation effect. All tests in `tests/test_sacred_machinery.py` pass (28/28).
+
+
+
 ### Implementation: Update GlitchParameters Docstrings/Validation (Docs-Writer Feedback) - 2025-04-11 21:33:04
 - **Approach**: Applied diff provided by `docs-writer` mode to update docstrings and validation for `GlitchParameters` fields.
 - **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Modified `GlitchParameters` model).
@@ -211,3 +218,10 @@
 - **Approach**: Implemented the minimal `GlitchParameters` Pydantic model with fields (`glitch_type`, `intensity`, `chunk_size_ms`, `repeat_count`, `tape_stop_speed`, `bitcrush_depth`, `bitcrush_rate_factor`) and basic validation (`ge`, `le`, `gt`, `Literal`). Added `from typing import Literal` import. Implemented the `apply_refined_glitch(audio: np.ndarray, sample_rate: int, params: GlitchParameters) -> np.ndarray` function signature with a minimal body (`return audio.astype(np.float32).copy()`) to resolve import errors.
 - **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Added import, model, and function).
 - **Notes**: This minimal implementation is intended to resolve the `ImportError`/`NameError` reported by the `tdd` mode for `tests/synthesis/test_effects.py`. Tests related to this effect should now collect and run, likely failing on assertions because the function does not yet modify the audio.
+
+
+### Implementation: Minimal Saturation Effect (REQ-ART-E04 - Green Phase Start) - 2025-04-11 21:42:37
+- **Approach**: Implemented the minimal `SaturationParameters` Pydantic model with fields (`drive`, `tone`, `mix`) and basic validation (`ge`, `le`). Implemented the `apply_saturation(audio: np.ndarray, sample_rate: int, params: SaturationParameters) -> np.ndarray` function signature with a minimal body (`return audio.astype(np.float32).copy()`) to resolve import errors.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Added model and function).
+- **Notes**: This minimal implementation resolves the `ImportError`/`NameError` reported by the `tdd` mode for `tests/synthesis/test_effects.py` related to saturation. Tests should now collect and run, failing on assertions. Unrelated Pylance error noted in `test_effects.py` regarding `GlitchParameters` instantiation.
+

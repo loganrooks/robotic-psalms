@@ -103,7 +103,14 @@ Create a YAML configuration file to customize the synthesis:
 mode: "dorian"  # Liturgical mode
 tempo_scale: 0.8  # Slower tempo
 
-glitch_density: 0.4
+  glitch_effect: # Optional refined glitch effect configuration
+    glitch_type: "stutter" # Type: "repeat", "stutter", "tape_stop", "bitcrush"
+    intensity: 0.6         # Probability of applying glitch per chunk (0.0-1.0)
+    chunk_size_ms: 50      # Size of audio chunks to process in ms (int, > 0)
+    repeat_count: 3        # For 'repeat'/'stutter': Number of repetitions (int, >= 2)
+    tape_stop_speed: 0.8   # For 'tape_stop': Speed factor (0.0 < speed < 1.0)
+    bitcrush_depth: 8      # For 'bitcrush': Target bit depth (int, 1-16)
+    bitcrush_rate_factor: 4 # For 'bitcrush': Sample rate reduction factor (int, >= 1)
 celestial_harmonicity: 0.7
 
 robotic_articulation:
@@ -196,7 +203,14 @@ robotic-psalms examples/psalm.txt output.wav --config examples/config.yml --visu
 - `aeolian`: Dark, melancholic
 
 ### Effect Parameters
-- `glitch_density`: Intensity of digital artifacts (0.0-1.0)
+- `glitch_effect`: (Optional) Configuration for the refined glitch effect. If omitted or set to `null`, the effect is disabled.
+  - `glitch_type`: The type of glitch to apply. Options: `"repeat"` (repeats the chunk), `"stutter"` (repeats the chunk multiple times quickly), `"tape_stop"` (simulates a tape machine slowing down), `"bitcrush"` (reduces bit depth and sample rate).
+  - `intensity`: The probability (0.0 to 1.0) that a glitch will be applied to any given audio chunk. Higher values mean more frequent glitches.
+  - `chunk_size_ms`: The duration in milliseconds of the audio chunks processed for potential glitching (e.g., `50`). Must be greater than 0.
+  - `repeat_count`: For `"repeat"` and `"stutter"` types, the number of times the chunk is repeated (e.g., `3`). Must be 2 or greater.
+  - `tape_stop_speed`: For `"tape_stop"` type, the factor by which playback speed decreases (e.g., `0.8`). Must be between 0.0 and 1.0 (exclusive of 0.0).
+  - `bitcrush_depth`: For `"bitcrush"` type, the target bit depth for quantization (e.g., `8`). Must be between 1 and 16.
+  - `bitcrush_rate_factor`: For `"bitcrush"` type, the factor by which the sample rate is reduced (e.g., `4`). Must be 1 or greater.
 - `celestial_harmonicity`: Balance between pure and complex tones
 - `phoneme_spacing`: Time between vocal sounds
 - `consonant_harshness`: Intensity of consonant sounds

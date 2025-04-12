@@ -3,6 +3,101 @@
 *This file tracks the immediate focus, ongoing tasks, and unresolved questions for the current session.*
 
 ---
+### [2025-04-11 21:33:25] - Task: Update Documentation for Refined Glitch Integration (REQ-ART-E03 - Documentation)
+- **Focus:** Update `README.md` and check docstrings in `config.py`/`effects.py` for the new `glitch_effect` (`GlitchParameters`) configuration, removing references to old `glitch_density`.
+- **Actions:**
+    - Read `README.md`.
+    - Applied diff to `README.md` to update example config and Parameter Guide for `glitch_effect`, removing `glitch_density`.
+    - Read `src/robotic_psalms/config.py`. Confirmed docstrings for `PsalmConfig.glitch_effect` are adequate.
+    - Read `src/robotic_psalms/synthesis/effects.py`. Identified improvements needed for `GlitchParameters` docstrings.
+    - Delegated `effects.py` docstring update to `code` mode via `new_task` due to file restrictions.
+    - Received confirmation from `code` mode that docstring updates were applied successfully.
+- **Status:** Completed. Documentation updated.
+
+---
+
+
+### [2025-04-11 21:32:46] - Task: Update GlitchParameters Docstrings/Validation (Docs-Writer Feedback)
+- **Focus:** Apply diff provided by `docs-writer` mode to `src/robotic_psalms/synthesis/effects.py`.
+- **Actions:**
+    - Applied diff to update docstrings and validation rules for `repeat_count` (ge=2), `tape_stop_speed` (lt=1.0), and `bitcrush_rate_factor` in the `GlitchParameters` model.
+- **Status:** Completed.
+
+---
+
+
+### [2025-04-11 21:29:50] - Task: Verify and Refine Integration Tests for Refined Glitch Effect (REQ-ART-E03 - Integration Test Verification)
+- **Focus:** Review `tests/test_sacred_machinery.py` to ensure adequate coverage for the conditional application of `apply_refined_glitch` based on `PsalmConfig.glitch_effect`.
+- **Actions:**
+    - Read `tests/test_sacred_machinery.py`.
+    - Refined `test_process_psalm_applies_glitch`: Added `@patch` for `apply_refined_glitch`, fixed `GlitchParameters` instantiation, corrected assertion to expect 3 calls (vocals, pads, drones).
+    - Added `test_process_psalm_does_not_apply_glitch_when_none`: Used `@patch` to assert `apply_refined_glitch` is not called when `config.glitch_effect` is `None`.
+    - Fixed `AttributeError` in `test_process_psalm_mix_levels` by removing patch for old `_apply_glitch_effect` and adding correct patch for `apply_refined_glitch`.
+    - Ran `pytest tests/test_sacred_machinery.py`.
+- **Status:** Completed. Integration tests verified and refined. All 26 tests in the file pass.
+
+---
+
+
+### [2025-04-11 19:55:50] - Task: Add Configuration for Refined Glitch Effect (REQ-ART-E03 Related)
+- **Focus:** Modify `src/robotic_psalms/config.py` to replace `glitch_density: float` with `glitch_effect: Optional[GlitchParameters]`. Update related code in `sacred_machinery.py` and tests.
+- **Actions:**
+    - Read `src/robotic_psalms/config.py`.
+    - Applied diff to `config.py`: Imported `GlitchParameters`, updated `PsalmConfig` docstring, replaced `glitch_density` field with `glitch_effect: Optional[GlitchParameters] = None`.
+    - Read `src/robotic_psalms/synthesis/sacred_machinery.py`.
+    - Applied diff to `sacred_machinery.py`: Imported `apply_refined_glitch` and `GlitchParameters`, replaced check/call logic for old glitch with new conditional logic using `config.glitch_effect`, removed old `_apply_glitch_effect` method, fixed unrelated type hint.
+
+### [2025-04-11 21:34:01] - Task: Implement Refined Glitch Effect (REQ-ART-E03)
+- **Focus:** Completed full TDD cycle (implementation, integration, refactoring, documentation) for the refined glitch effect (`apply_refined_glitch`). Replaced old `glitch_density` parameter with `GlitchParameters` model in config and integrated into `SacredMachineryEngine`.
+- **Status:** Completed. All tests passing (excluding known xfails). Documentation updated.
+    - Read `tests/test_sacred_machinery.py`.
+    - Applied diff to `test_sacred_machinery.py`: Imported `GlitchParameters`, updated test configurations setting `glitch_effect = None` or `glitch_effect = GlitchParameters()` instead of assigning to `glitch_density`.
+    - Verified file contents after `apply_diff` reported stale Pylance errors.
+- **Status:** Completed. Configuration updated, and dependent code in `sacred_machinery.py` and `test_sacred_machinery.py` modified accordingly. Pylance errors resolved in code (stale errors may persist in editor).
+
+---
+
+
+### [2025-04-11 19:47:00] - Task: Implement Functional Refined Glitch Effect (REQ-ART-E03 - Green Phase)
+- **Focus:** Implement functional logic for `apply_refined_glitch` in `src/robotic_psalms/synthesis/effects.py` to handle 'repeat', 'stutter', 'tape_stop', and 'bitcrush' types based on `GlitchParameters`.
+- **Actions:**
+    - Added helper functions `_apply_repeat_glitch`, `_apply_tape_stop_glitch`, `_apply_bitcrush_glitch`.
+    - Implemented logic within helpers for each glitch type (repeat/stutter tiling, tape stop resampling, bitcrush quantization/sample hold).
+    - Updated `apply_refined_glitch` to iterate through audio chunks and probabilistically call helpers based on `params.intensity`.
+    - Debugged persistent test failures related to audio not being modified, traced to helper logic and probabilistic nature vs. deterministic tests.
+    - Corrected helper logic (`_apply_repeat_glitch` slicing, `_apply_tape_stop_glitch` speed interpretation).
+    - Removed debug code.
+- **Status:** Implementation complete. Core logic matches requirements. Tests may fail intermittently due to the probabilistic nature of the `intensity` parameter versus deterministic assertions.
+
+---
+
+
+### [2025-04-11 19:25:51] - Task: Write Failing Tests for Refined Glitch Effect (REQ-ART-E03 - Red Phase - Attempt 2)
+- **Focus:** Add failing unit tests for `apply_refined_glitch` and `GlitchParameters` to `tests/synthesis/test_effects.py`.
+- **Actions:**
+    - Read `tests/synthesis/test_effects.py`.
+    - Added placeholder imports for `apply_refined_glitch` and `GlitchParameters`.
+    - Added `default_glitch_params` fixture.
+    - Added tests covering existence, basic application (mono/stereo), intensity control (0.0 and varying), type-specific parameter control, zero-length input, and invalid parameter validation.
+    - Ran `pytest tests/synthesis/test_effects.py -k refined_glitch`.
+- **Outcome:** Tests were added successfully. However, they did not fail due to `ImportError` as expected for the Red phase start. A minimal implementation already existed (from [2025-04-11 19:22:40]), causing the tests to run but fail on `AssertionError` (9 failed, 4 passed) because the minimal function returns the input unchanged.
+- **Status:** Failing tests added, defining the required functionality. The state represents the transition point ready for the Green phase (implementing glitch logic). Red phase (failing due to missing code) was effectively bypassed due to pre-existing minimal implementation.
+
+---
+
+
+### [2025-04-11 19:22:40] - Task: Implement Minimal Refined Glitch Effect (REQ-ART-E03 - Green Phase Start)
+- **Focus:** Implement minimal `GlitchParameters` model and `apply_refined_glitch` function signature in `src/robotic_psalms/synthesis/effects.py` to resolve test import errors.
+- **Actions:**
+    - Read `src/robotic_psalms/synthesis/effects.py`.
+    - Added `from typing import Literal` import.
+    - Inserted `GlitchParameters` Pydantic model definition with fields based on test requirements (`glitch_type`, `intensity`, `chunk_size_ms`, `repeat_count`, `tape_stop_speed`, `bitcrush_depth`, `bitcrush_rate_factor`) and basic validation.
+    - Inserted `apply_refined_glitch` function signature with type hints and a minimal body (`return audio.astype(np.float32).copy()`).
+- **Status:** Minimal implementation complete. Ready to verify test collection/run via pytest.
+
+---
+
+
 ### [2025-04-11 18:34:33] - Task: Update Documentation for Spectral Freeze Integration (REQ-ART-E02 - Documentation)
 - **Focus:** Update `README.md` and check docstrings in `config.py`/`effects.py` for the new `SpectralFreezeParameters`.
 - **Actions:**

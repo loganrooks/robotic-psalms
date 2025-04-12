@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Optional
-from .synthesis.effects import ResonantFilterParameters, BandpassFilterParameters, ChorusParameters, SpectralFreezeParameters
+from .synthesis.effects import ResonantFilterParameters, BandpassFilterParameters, ChorusParameters, SpectralFreezeParameters, GlitchParameters
 from pydantic import BaseModel, Field, model_validator # Corrected import
 from dataclasses import dataclass
 
@@ -208,7 +208,7 @@ class VoiceRange(BaseModel):
     )
 
 class PsalmConfig(BaseModel):
-    """Main configuration for psalm processing"""
+    """Main configuration for psalm processing. Includes parameters for composition, voice, and effects (including the optional refined glitch effect)."""
     mode: LiturgicalMode = Field(
         default=LiturgicalMode.DORIAN,
         description="Liturgical mode for composition"
@@ -219,11 +219,9 @@ class PsalmConfig(BaseModel):
         le=2.0,
         description="Tempo scaling factor"
     )
-    glitch_density: float = Field(
-        default=0.3,
-        ge=0.0,
-        le=1.0,
-        description="Density of glitch effects"
+    glitch_effect: Optional[GlitchParameters] = Field(
+        default=None,
+        description="Optional configuration for the refined glitch effect. If None, the effect is disabled. Uses GlitchParameters for fine-grained control."
     )
     celestial_harmonicity: float = Field(
         default=0.5,

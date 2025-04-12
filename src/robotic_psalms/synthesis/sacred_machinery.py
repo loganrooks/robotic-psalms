@@ -10,7 +10,7 @@ from .vox_dei import VoxDeiSynthesizer, VoxDeiSynthesisError
 from .effects import apply_high_quality_reverb, ReverbParameters
 from .effects import apply_complex_delay, DelayParameters
 from .effects import apply_chorus, ChorusParameters
-from .effects import apply_smooth_spectral_freeze, SpectralFreezeParameters
+from .effects import apply_smooth_spectral_freeze, SpectralFreezeParameters, apply_refined_glitch, GlitchParameters
 # Removed unused import: from scipy.signal.windows import hann
 from dataclasses import dataclass
 
@@ -113,11 +113,16 @@ class SacredMachineryEngine:
                 self.logger.error(f"Failed to save vocals after haunting effects: {write_err}")
         # --- END DEBUG ---
 
-        # Apply glitch effects
-        if self.config.glitch_density > 0:
-            vocals = self._apply_glitch_effect(vocals)
-            pads = self._apply_glitch_effect(pads)
-            drones = self._apply_glitch_effect(drones)
+        # Apply refined glitch effect if configured
+        if self.config.glitch_effect is not None:
+            self.logger.debug("Applying refined glitch effect...")
+            try:
+                vocals = apply_refined_glitch(vocals, self.sample_rate, self.config.glitch_effect)
+                pads = apply_refined_glitch(pads, self.sample_rate, self.config.glitch_effect)
+                drones = apply_refined_glitch(drones, self.sample_rate, self.config.glitch_effect)
+            except Exception as glitch_err:
+                self.logger.error(f"Failed to apply refined glitch effect: {glitch_err}")
+                # Continue without glitch if effect fails
             # --- DEBUG: Save vocals after glitch effects (Step 06) ---
             if self.logger.isEnabledFor(logging.DEBUG):
                 try:
@@ -299,58 +304,6 @@ class SacredMachineryEngine:
             return result.astype(np.float32)
 
 
-    def _apply_glitch_effect(
-        self,
-        audio: npt.NDArray[np.float32]
-    ) -> npt.NDArray[np.float32]:
-        """Apply glitch effects based on glitch_density parameter"""
-        density = self.config.glitch_density
-        result = audio.copy()
-
-        # Calculate number of glitch points based on density
-        num_glitches = int(len(audio) * density * 0.01)  # 1% max glitch points
-        if num_glitches == 0:
-            return result
-
-        # Generate random glitch points
-        glitch_points = np.random.randint(0, len(audio), num_glitches)
-
-        for point in glitch_points:
-            # Random glitch length between 100-1000 samples
-            glitch_length = np.random.randint(100, 1000)
-            if point + glitch_length > len(audio):
-                continue
-
-            # Apply random glitch effects
-            effect_type = np.random.choice(['repeat', 'reverse', 'bitcrush', 'dropout'])
-
-            if effect_type == 'repeat':
-                # Repeat a small segment
-                seg_length = glitch_length // 4
-                segment = result[point:point + seg_length]
-                for i in range(4):
-                    if point + (i+1)*seg_length <= len(result):
-                        result[point + i*seg_length:point + (i+1)*seg_length] = segment
-
-            elif effect_type == 'reverse':
-                # Reverse a segment
-                result[point:point + glitch_length] = np.flip(
-                    result[point:point + glitch_length]
-                )
-
-            elif effect_type == 'bitcrush':
-                # Reduce bit depth effect
-                segment = result[point:point + glitch_length]
-                bits = np.random.randint(2, 8)
-                steps = 2**bits
-                segment = np.round(segment * steps) / steps
-                result[point:point + glitch_length] = segment
-
-            else:  # dropout
-                # Random audio dropout
-                result[point:point + glitch_length] = 0
-
-        return result
 
     def _apply_haunting_effects(
         self,
@@ -452,7 +405,7 @@ class SacredMachineryEngine:
             envelope = np.exp(-t * 20)
             hit += sine * envelope
 
-        return hit
+        return hit.astype(np.float32) # Cast to ensure correct return type
 
     def _generate_drones(self, duration: float) -> npt.NDArray[np.float32]:
         """Generate frequency modulated drones"""

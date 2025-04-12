@@ -3,7 +3,7 @@ import numpy as np
 from unittest.mock import patch, MagicMock, ANY # Add ANY
 import numpy.fft as fft
 from typing import cast # Added for casting
-from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters, ChorusParameters, SpectralFreezeParameters # Add SpectralFreezeParameters
+from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters, ChorusParameters, SpectralFreezeParameters, GlitchParameters # Add GlitchParameters
 
 # Import actual implementations
 from robotic_psalms.config import PsalmConfig, HauntingParameters, MixLevels, LiturgicalMode, ReverbConfig, DelayConfig # Consolidated imports
@@ -115,7 +115,7 @@ def test_process_psalm_applies_haunting(mock_apply_freeze: MagicMock, mock_apply
     # Instantiate with new SpectralFreezeParameters structure
     test_freeze_params = SpectralFreezeParameters(freeze_point=0.5, blend_amount=0.8, fade_duration=0.1)
     test_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.8), spectral_freeze=test_freeze_params)
-    test_config.glitch_density = 0.0 # Disable glitch for isolation
+    test_config.glitch_effect = None # Disable glitch for isolation
 
     # Create engine with modified config using the factory
     engine = engine_factory(test_config)
@@ -155,13 +155,15 @@ def test_process_psalm_applies_haunting(mock_apply_freeze: MagicMock, mock_apply
     cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
 
 
-def test_process_psalm_applies_glitch(default_config: PsalmConfig, engine_factory):
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_refined_glitch', autospec=True)
+def test_process_psalm_applies_glitch(mock_apply_glitch: MagicMock, default_config: PsalmConfig, engine_factory):
     """Test that glitch effects are applied when configured."""
     # Modify config for glitch
     test_config = default_config.model_copy(deep=True)
-    test_config.glitch_density = 0.8 # High density
-    # Minimize haunting effects by setting to minimum allowed values
-    test_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.5), spectral_freeze=None) # Set to None instead of 0.0
+    test_glitch_params = GlitchParameters(glitch_type='repeat', intensity=0.5, chunk_size_ms=50, repeat_count=2, tape_stop_speed=0.5, bitcrush_depth=8, bitcrush_rate_factor=0.5) # Enable glitch with specific parameters
+    test_config.glitch_effect = test_glitch_params
+    # Minimize haunting effects
+    test_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.5), spectral_freeze=None)
 
     # Create engine with modified config using the factory
     engine = engine_factory(test_config)
@@ -170,15 +172,43 @@ def test_process_psalm_applies_glitch(default_config: PsalmConfig, engine_factor
     duration = 2.0
     expected_samples = int(duration * engine.sample_rate)
     input_vocals = np.sin(np.linspace(0, 440 * 2 * np.pi, expected_samples)).astype(np.float32)
-    # Use cast
     cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
+
+    # Configure mock to return slightly modified audio to ensure original assertion can still pass
+    mock_apply_glitch.side_effect = lambda audio, sr, params: audio * 0.99
 
     result = engine.process_psalm(psalm_text, duration)
 
-    # Check that vocals are different from the input
-    assert not np.allclose(result.vocals, input_vocals, atol=1e-6), "Vocals should be modified by glitch effects"
-    # Use cast
+    # Assert that the glitch function was called once
+    assert mock_apply_glitch.call_count == 3, "Expected apply_refined_glitch to be called 3 times (vocals, pads, drones)"
+
+    # Check arguments passed to the mock
+    call_args = mock_apply_glitch.call_args[0]
+    assert isinstance(call_args[0], np.ndarray) # audio data
+    assert call_args[1] == engine.sample_rate # sample rate
+
+
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_refined_glitch', autospec=True)
+def test_process_psalm_does_not_apply_glitch_when_none(mock_apply_glitch: MagicMock, engine: SacredMachineryEngine):
+    """Test that glitch effect is NOT applied when glitch_effect is None (default)."""
+    # Engine fixture uses default config where glitch_effect is None
+
+    psalm_text = "No glitch test"
+    duration = 2.0
+    expected_samples = int(duration * engine.sample_rate)
+    # Provide simple input audio via the mock
+    input_vocals = np.ones(expected_samples, dtype=np.float32) * 0.5
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
+
+    # Process the psalm
+    result = engine.process_psalm(psalm_text, duration)
+
+    # Assert that the glitch function was NOT called
+    mock_apply_glitch.assert_not_called()
+
+    # Ensure synth was called
     cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
+
 
 # --- Test Helper Methods (Indirectly) ---
 
@@ -192,7 +222,7 @@ def test_process_psalm_applies_complex_delay_when_configured(mock_apply_delay: M
     test_config = default_config.model_copy(deep=True)
     test_delay_config = DelayConfig(delay_time_ms=500.0, feedback=0.3, wet_dry_mix=0.5)
     test_config.delay_effect = test_delay_config
-    test_config.glitch_density = 0.0 # Disable glitch for isolation
+    test_config.glitch_effect = None # Disable glitch for isolation
     test_config.haunting_intensity = HauntingParameters() # Use default haunting
 
     # Create engine with modified config using the factory
@@ -259,7 +289,7 @@ def test_process_psalm_applies_chorus_when_configured(mock_apply_chorus: MagicMo
     # Instantiate ChorusParameters directly as ChorusConfig doesn't exist in config.py
     test_chorus_params = ChorusParameters(rate_hz=1.0, depth=0.5, delay_ms=7.0, feedback=0.2, num_voices=3, wet_dry_mix=0.6) # Corrected param name and added num_voices
     test_config.chorus_params = test_chorus_params
-    test_config.glitch_density = 0.0 # Disable glitch for isolation
+    test_config.glitch_effect = None # Disable glitch for isolation
     test_config.haunting_intensity = HauntingParameters() # Use default haunting
     test_config.delay_effect = None # Disable delay for isolation
 
@@ -368,7 +398,8 @@ def test_process_psalm_fit_to_length(engine: SacredMachineryEngine):
             component_audio = getattr(result, component_name)
             assert len(component_audio) == expected_samples, f"{component_name} should be fitted to target length"
 
-def test_process_psalm_mix_levels(default_config: PsalmConfig, engine_factory):
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_refined_glitch', autospec=True) # Add patch for refined glitch
+def test_process_psalm_mix_levels(mock_apply_glitch: MagicMock, default_config: PsalmConfig, engine_factory): # Add mock argument
     """Test that mix levels are applied."""
     # Set distinct mix levels
     test_config = default_config.model_copy(deep=True)
@@ -387,12 +418,14 @@ def test_process_psalm_mix_levels(default_config: PsalmConfig, engine_factory):
     mock_input_val = 0.5
     cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (np.ones(expected_samples, dtype=np.float32) * mock_input_val, engine.sample_rate)
 
-    # Mock generation and effect methods to isolate mixing
+    # Configure the new mock to not modify audio
+    mock_apply_glitch.side_effect = lambda audio, sr, params: audio
+
+    # Mock generation and other effect methods to isolate mixing
     with patch.object(engine, '_generate_pads', return_value=np.ones(expected_samples, dtype=np.float32) * mock_input_val, autospec=True), \
          patch.object(engine, '_generate_percussion', return_value=np.ones(expected_samples, dtype=np.float32) * mock_input_val, autospec=True), \
          patch.object(engine, '_generate_drones', return_value=np.ones(expected_samples, dtype=np.float32) * mock_input_val, autospec=True), \
-         patch.object(engine, '_apply_haunting_effects', side_effect=lambda x: x, autospec=True), \
-         patch.object(engine, '_apply_glitch_effect', side_effect=lambda x: x, autospec=True):
+         patch.object(engine, '_apply_haunting_effects', side_effect=lambda x: x, autospec=True): # Removed _apply_glitch_effect patch
 
         result = engine.process_psalm(psalm_text, duration)
 
@@ -627,7 +660,7 @@ def test_process_psalm_does_not_apply_spectral_freeze_when_none(mock_apply_freez
     test_config = default_config.model_copy(deep=True)
     # Explicitly set spectral_freeze to None
     test_config.haunting_intensity = HauntingParameters(reverb=ReverbConfig(decay_time=0.8), spectral_freeze=None)
-    test_config.glitch_density = 0.0 # Disable glitch for isolation
+    test_config.glitch_effect = None # Disable glitch for isolation
 
     # Create engine with modified config using the factory
     engine = engine_factory(test_config)

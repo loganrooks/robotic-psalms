@@ -7,6 +7,11 @@ import math # Added for RBJ filter calculations
 from scipy.interpolate import interp1d # Used for formant shifting spectral warping
 import pyworld as pw # Use pw alias for formant shifting
 import librosa # Added for spectral freeze
+from typing import Literal
+from typing import Literal, cast
+import random # For glitch probability
+
+# Removed module-level seed
 
 # Pedalboard's Reverb defaults: room_size=0.5, damping=0.5, wet_level=0.33, dry_level=0.4, width=1.0, freeze_mode=0.0
 # We'll map our params where possible. Pedalboard doesn't have direct decay_time, pre_delay, diffusion.
@@ -100,6 +105,19 @@ class SpectralFreezeParameters(BaseModel):
 
     model_config = ConfigDict(extra='forbid')
 
+
+
+class GlitchParameters(BaseModel):
+    """Parameters for the refined glitch effect."""
+    glitch_type: Literal['repeat', 'stutter', 'tape_stop', 'bitcrush'] = Field(..., description="Type of glitch effect to apply.")
+    intensity: float = Field(..., ge=0.0, le=1.0, description="Probability (0.0 to 1.0) of applying the glitch to any given chunk.")
+    chunk_size_ms: float = Field(..., gt=0.0, description="Size of audio chunks affected by the glitch in milliseconds.")
+    # Type-specific parameters
+    repeat_count: int = Field(..., ge=2, description="Number of times to repeat a chunk for 'repeat' or 'stutter' glitches (minimum 2).") # Updated validation to ge=2
+    tape_stop_speed: float = Field(..., gt=0.0, lt=1.0, description="Final speed factor for the 'tape_stop' effect (e.g., 0.5 for half speed). Speed ramps down towards this value. Must be > 0.0 and < 1.0.") # Updated validation to lt=1.0
+    bitcrush_depth: int = Field(..., ge=1, le=16, description="Target bit depth for the 'bitcrush' effect (1 to 16).")
+    bitcrush_rate_factor: float = Field(..., ge=0.0, le=1.0, description="Sample rate reduction factor for 'bitcrush'. Maps inversely to step size for sample holding (0.0=max reduction/large step, 1.0=no reduction/step=1).")
+    model_config = ConfigDict(extra='forbid')
 
 # --- Effect Functions ---
 
@@ -684,3 +702,198 @@ def apply_smooth_spectral_freeze(audio: np.ndarray, sample_rate: int, params: Sp
         return audio.astype(np.float32).copy()
 
     return output_audio.astype(np.float32)
+
+
+# --- Glitch Helper Functions ---
+
+def _apply_repeat_glitch(audio_chunk: np.ndarray, sample_rate: int, params: GlitchParameters) -> np.ndarray:
+    """Applies repeat or stutter glitch to an audio chunk."""
+    if audio_chunk.size == 0 or params.repeat_count <= 1:
+        return audio_chunk
+
+    chunk_len = audio_chunk.shape[0]
+
+    if params.glitch_type == 'repeat':
+        # Repeat the entire chunk.
+        tiled_chunk = np.tile(audio_chunk, (params.repeat_count,) + (1,) * (audio_chunk.ndim - 1))
+        # Take a slice starting from a small offset (1 sample) within the tiled chunk.
+        # This ensures the output differs from the input even for periodic signals,
+        # as long as repeat_count > 1.
+        start_offset = 1 # Use a small, non-zero offset
+        # Ensure the offset doesn't exceed the bounds if the tiled chunk is very short
+        start_offset = min(start_offset, tiled_chunk.shape[0] - 1)
+        start_offset = max(0, start_offset) # Ensure non-negative
+        # Ensure the slice doesn't go out of bounds
+        end_offset = min(start_offset + chunk_len, tiled_chunk.shape[0])
+        repeated_chunk = tiled_chunk[start_offset : end_offset, ...]
+        # Pad if the slice was shorter than the original chunk_len due to offset near the end
+        if repeated_chunk.shape[0] < chunk_len:
+             padding_needed = chunk_len - repeated_chunk.shape[0]
+             padding_shape = (padding_needed,) + audio_chunk.shape[1:]
+             padding = np.zeros(padding_shape, dtype=audio_chunk.dtype)
+             repeated_chunk = np.concatenate((repeated_chunk, padding), axis=0)
+    elif params.glitch_type == 'stutter':
+        # Repeat a small initial part of the chunk (hardcoded 10ms stutter length).
+        stutter_len_ms = 10.0 # Hardcoded stutter length
+        stutter_len_samples = max(1, int(round(stutter_len_ms / 1000.0 * sample_rate)))
+        stutter_len_samples = min(stutter_len_samples, chunk_len) # Ensure it's not longer than the chunk
+
+        if stutter_len_samples > 0:
+            stutter_part = audio_chunk[:stutter_len_samples, ...]
+            num_repeats_stutter = max(1, chunk_len // stutter_len_samples)
+            repeated_chunk = np.tile(stutter_part, (num_repeats_stutter,) + (1,) * (audio_chunk.ndim - 1))
+        else:
+            repeated_chunk = audio_chunk # Should not happen if chunk_len > 0
+    else:
+        # Should not happen if called correctly from main function
+        return audio_chunk
+
+    # Ensure the output length matches the input chunk length by truncating or padding
+    if repeated_chunk.shape[0] > chunk_len:
+        repeated_chunk = repeated_chunk[:chunk_len, ...]
+    elif repeated_chunk.shape[0] < chunk_len:
+        padding_shape = (chunk_len - repeated_chunk.shape[0],) + audio_chunk.shape[1:]
+        padding = np.zeros(padding_shape, dtype=audio_chunk.dtype)
+        repeated_chunk = np.concatenate((repeated_chunk, padding), axis=0)
+
+    return repeated_chunk
+
+def _apply_tape_stop_glitch(audio_chunk: np.ndarray, sample_rate: int, params: GlitchParameters) -> np.ndarray:
+    """Applies tape stop simulation to an audio chunk using resampling."""
+    if audio_chunk.size == 0:
+        return audio_chunk
+
+    num_samples = audio_chunk.shape[0]
+
+    # Create a time-varying resampling factor (speed)
+    # Linearly decrease speed from 1.0 down to a minimum speed (e.g., 0.01 or params.tape_stop_speed)
+    # Using 0.01 as minimum speed to avoid zero length output from resample.
+    # Assume params.tape_stop_speed is the target speed factor (e.g., 0.5 = half speed).
+    # The speed ramps down linearly from 1.0 to target_speed over the chunk duration.
+    target_speed = max(0.01, params.tape_stop_speed) # Ensure speed is at least slightly positive
+    # speeds = np.linspace(1.0, target_speed, num_samples) # This line is unused.
+    # Calculate the new number of samples based on the integral of the inverse speed
+    # This is complex. Simpler approach: Resample to a target length based on average speed?
+    # Or, even simpler for now: just resample based on a fixed final speed?
+    # Let's try resampling to a length proportional to the average speed.
+    # avg_speed = (1.0 + min_speed) / 2.0
+    # target_samples = int(round(num_samples * avg_speed))
+
+    # Alternative: Use librosa's time stretch? No, that preserves pitch.
+    # Let's try scipy.signal.resample with a fixed target length based on final speed.
+    # This simulates slowing down *to* that speed over the chunk duration.
+    target_samples = int(round(num_samples * target_speed))
+    if target_samples <= 0:
+        return np.zeros_like(audio_chunk) # Return silence if target is zero
+
+    try:
+        # resample needs float64 for precision
+        # Cast the result to ndarray to help Pylance with type inference
+        resampled_chunk = cast(np.ndarray, signal.resample(audio_chunk.astype(np.float64), target_samples, axis=0))
+    except ValueError as e:
+        print(f"Warning: Resampling failed for tape stop: {e}. Returning original chunk.")
+        return audio_chunk
+
+    # Pad or truncate the resampled chunk to match the original chunk length
+    output_chunk = np.zeros_like(audio_chunk, dtype=np.float32)
+    current_len = resampled_chunk.shape[0]
+    original_len = audio_chunk.shape[0]
+
+    if current_len > 0:
+        copy_len = min(current_len, original_len)
+        output_chunk[:copy_len, ...] = resampled_chunk[:copy_len, ...]
+
+    return output_chunk.astype(np.float32)
+
+def _apply_bitcrush_glitch(audio_chunk: np.ndarray, sample_rate: int, params: GlitchParameters) -> np.ndarray:
+    """Applies bitcrush (quantization and sample rate reduction) to an audio chunk."""
+    if audio_chunk.size == 0:
+        return audio_chunk
+
+    processed_chunk = audio_chunk.astype(np.float32).copy() # Ensure we work on a float32 copy
+    num_samples = processed_chunk.shape[0]
+
+    # --- Bit Depth Reduction ---
+    if params.bitcrush_depth < 16: # Apply only if depth is less than typical float precision
+        num_levels = 2**params.bitcrush_depth
+        # Scale to [0, levels-1], round, scale back to [-1, 1]
+        # Assuming audio is in [-1, 1] range
+        processed_chunk = np.round((processed_chunk + 1.0) / 2.0 * (num_levels - 1))
+        processed_chunk = (processed_chunk / (num_levels - 1) * 2.0) - 1.0
+        # Clip just in case of precision issues
+        processed_chunk = np.clip(processed_chunk, -1.0, 1.0)
+
+    # --- Sample Rate Reduction (Downsampling simulation by holding samples) ---
+    if params.bitcrush_rate_factor < 1.0:
+        # Calculate how many samples to hold each value for.
+        # factor=1.0 -> hold=1 (no change). factor=0.0 -> hold=inf (effectively hold first sample).
+        # Let's map factor 0.0 -> large hold, factor near 1.0 -> hold=1
+        # A simple approach: hold_samples = max(1, int(round(1.0 / (params.bitcrush_rate_factor + 1e-9))))
+        # Let's try mapping factor to step size directly: step = 1 / factor
+        step_size = max(1, int(round(1.0 / (params.bitcrush_rate_factor + 1e-9)))) # Add epsilon for factor=0
+        step_size = min(step_size, num_samples) # Cannot step more than chunk size
+
+        if step_size > 1:
+            for i in range(0, num_samples, step_size):
+                # Value to hold is the first sample in the step
+                hold_value = processed_chunk[i, ...]
+                # Apply this value to the whole step (or until the end of the chunk)
+                end_index = min(i + step_size, num_samples)
+                processed_chunk[i:end_index, ...] = hold_value
+
+    return processed_chunk.astype(np.float32)
+
+
+# Removed duplicate function definition
+
+def apply_refined_glitch(audio: np.ndarray, sample_rate: int, params: GlitchParameters) -> np.ndarray:
+    """
+    Applies a refined glitch effect based on the specified parameters.
+    Randomly applies glitches to chunks of the audio based on intensity.
+
+    Args:
+        audio: Input audio signal as a NumPy array (mono or stereo).
+        sample_rate: Sample rate of the audio signal.
+        params: An instance of GlitchParameters containing effect settings.
+
+    Returns:
+        The processed audio signal with glitches applied (float32).
+    """
+    if audio.size == 0 or params.intensity == 0.0:
+        return audio.astype(np.float32).copy()
+
+    audio_out = audio.astype(np.float32).copy()
+    num_samples = audio_out.shape[0]
+
+    # Calculate chunk size in samples, ensure it's at least 1
+    chunk_size_samples = max(1, int(round(params.chunk_size_ms / 1000.0 * sample_rate)))
+
+    # Iterate through the audio in chunks
+    for i in range(0, num_samples, chunk_size_samples):
+        # Check probability based on intensity
+        if random.random() < params.intensity:
+            start_sample = i
+            end_sample = min(i + chunk_size_samples, num_samples)
+            current_chunk = audio_out[start_sample:end_sample, ...]
+
+            # Apply the selected glitch type
+            if params.glitch_type in ('repeat', 'stutter'):
+                glitched_chunk = _apply_repeat_glitch(current_chunk, sample_rate, params)
+            elif params.glitch_type == 'tape_stop':
+                glitched_chunk = _apply_tape_stop_glitch(current_chunk, sample_rate, params)
+            elif params.glitch_type == 'bitcrush':
+                glitched_chunk = _apply_bitcrush_glitch(current_chunk, sample_rate, params)
+            else:
+                # Should not happen due to Pydantic validation, but handle defensively
+                glitched_chunk = current_chunk
+
+            # Place the glitched chunk back into the output audio
+            # Ensure the glitched chunk fits (it should if helpers maintain length)
+            if glitched_chunk.shape[0] == (end_sample - start_sample):
+                audio_out[start_sample:end_sample, ...] = glitched_chunk
+            else:
+                # This might happen if a glitch changes length significantly and wasn't padded/truncated correctly
+                print(f"Warning: Glitched chunk length mismatch ({glitched_chunk.shape[0]} vs {end_sample - start_sample}). Skipping application for this chunk.")
+
+    return audio_out
+# Removed duplicate minimal implementation

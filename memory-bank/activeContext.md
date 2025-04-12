@@ -82,6 +82,11 @@
 - **Status:** Completed. All tests passing (excluding known xfails). Documentation updated.
 - **Focus:** Update `README.md` and `src/robotic_psalms/synthesis/vox_dei.py` docstrings for the new melodic contour feature (`melody` argument).
 - **Actions:**
+
+### [2025-04-12 06:12:08] - Decision: Defer Syllable Duration Control (REQ-ART-MEL-03)
+- **Focus:** Evaluated requirement REQ-ART-MEL-03 (Syllable/Note Duration Control).
+- **Analysis:** Implementing independent control over syllable duration while aligning with MIDI melody requires complex text-to-phoneme alignment and/or advanced time-stretching of audio segments, significantly increasing complexity and risk of audio artifacts.
+- **Decision:** Defer implementation of REQ-ART-MEL-03 for now. Prioritize robustness and integration of currently implemented features. Revisit if explicitly requested or deemed critical later.
     - Updated `README.md` Parameter Guide section with details on the `melody` argument format and usage (via Python API).
     - Delegated docstring updates for `synthesize_text` and `_apply_melody_contour` in `src/robotic_psalms/synthesis/vox_dei.py` to `code` mode (confirmed completion).
 - **Status:** Completed.

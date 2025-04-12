@@ -370,6 +370,12 @@
 - **Status:** Completed.
 - **Deliverables:** Implemented `parse_midi_melody` utility using `pretty_midi`. Updated `VoxDeiSynthesizer` and `PsalmConfig` to use `midi_path` argument/field. Updated tests and documentation.
 ---
+
+
+#### [2025-04-12 06:12:42] - Feature: MIDI Melody Input (REQ-ART-MEL-02)
+- **Status:** Completed.
+- **Deliverables:** Implemented `parse_midi_melody` utility using `pretty_midi`. Updated `VoxDeiSynthesizer` and `PsalmConfig` to use `midi_path` argument/field. Updated tests and documentation.
+---
 #### [2025-04-12 04:03:56] - Feature: Master Dynamics Processing (REQ-ART-M01)
 - **Status:** Completed & Ready for Commit.
 - **Deliverables:** Implemented `apply_master_dynamics` function and `MasterDynamicsParameters`/`MasterDynamicsConfig` models using `pedalboard.Compressor` and `pedalboard.Limiter` in `src/robotic_psalms/synthesis/effects.py` and `src/robotic_psalms/config.py`. Integrated conditionally as the final step in `SacredMachineryEngine`. Core tests passing, documentation updated.

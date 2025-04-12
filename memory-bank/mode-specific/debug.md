@@ -5,6 +5,24 @@
 ---
 
 
+### Issue: [MELODY-CONTOUR-XFAIL-INVESTIGATION] - Investigate Melody Contour Accuracy XFail (REQ-STAB-04) - [Status: Resolved] - [2025-04-12 17:31:47]
+- **Reported**: 2025-04-12 16:17:24 (Task Start) / **Severity**: Medium (P1 Priority) / **Symptoms**: Task description indicated `test_apply_melody_contour_shifts_pitch` was failing/xfail, potentially violating +/- 10 Hz pitch accuracy requirement.
+- **Investigation**:
+    1. Reviewed `_apply_melody_contour` implementation (`vox_dei.py`). Noted use of `librosa.pyin` for estimation and `librosa.effects.pitch_shift` for application. Identified potential accuracy issues related to estimation, short segments, and shift algorithm. [2025-04-12 17:18:10]
+    2. Reviewed `test_apply_melody_contour_shifts_pitch` (`test_vox_dei.py`). Noted test used sine wave input and verified output pitch using `librosa.pyin` with `rtol=0.1` assertion. [2025-04-12 17:18:18]
+    3. Ran test with `rtol=0.1`: PASSED. Contradicted task premise. [2025-04-12 17:18:31]
+    4. Identified tolerance mismatch: Test used relative (10%), requirement is absolute (+/- 10 Hz). [2025-04-12 17:18:31]
+    5. Modified test assertion to use `atol=10.0`. [2025-04-12 17:18:46]
+    6. Re-ran test with `atol=10.0`: PASSED. [2025-04-12 17:18:58]
+- **Root Cause**: No failure found. The test passes even with the correct absolute tolerance (`atol=10.0`) specified in REQ-STAB-04. The initial premise of a failing/xfail test was likely based on outdated information. [2025-04-12 17:31:47]
+- **Fix Applied**: Updated test assertion in `tests/synthesis/test_vox_dei.py` to use `atol=10.0` instead of `rtol=0.1` to correctly reflect REQ-STAB-04. [2025-04-12 17:18:46]
+- **Verification**: Test passes with `atol=10.0`. [2025-04-12 17:18:58]
+- **Related Issues**: None.
+- **Recommendation**: Close REQ-STAB-04 as verified by the existing test (after tolerance correction). Consider adding tests with more realistic audio input (e.g., actual TTS output) for further robustness checks if desired.
+
+---
+
+
 
 ### Issue: [CLI-SILENT-VOCALS] - Silent vocals in CLI output despite passing tests - [Status: Resolved] - [2025-04-08 11:22:22]
 - **Reported**: 2025-04-08 11:17:07 / **Severity**: High / **Symptoms**: `output.wav` generated via CLI (`robotic-psalms ...`) contains no audible vocals, only other stems. Unit tests for TTS (`test_espeak.py`, `test_vox_dei.py`) pass.
@@ -60,3 +78,18 @@
 - **Verification**: N/A
 - **Related Issues**: None identified.
 - **Recommendation**: Keep `test_complex_delay_feedback_parameter` marked as `xfail`. Consider reporting the issue to the `pedalboard` developers or investigating alternative delay implementations if precise feedback control is critical.
+
+
+### Issue: [DELAY-FEEDBACK-XFAIL-REINVESTIGATION] - Re-investigate `test_complex_delay_feedback_parameter` (REQ-STAB-01) - [Status: Resolved] - [2025-04-12 14:28:35]
+- **Reported**: 2025-04-12 14:26:33 (Task Start) / **Severity**: Medium / **Symptoms**: `test_complex_delay_feedback_parameter` marked `xfail` due to identical output when changing `feedback` parameter in `pedalboard.Delay`.
+- **Investigation**:
+    1. Reviewed test code (`tests/synthesis/test_effects.py` lines 376-384): Confirmed test setup matches previous findings (impulse, 1s delay, 1.0 mix, 0.1 vs 0.9 feedback). [2025-04-12 14:27:22]
+    2. Reviewed implementation (`src/robotic_psalms/synthesis/effects.py` lines 207-245): Confirmed `feedback` parameter is correctly passed to `pedalboard.Delay`. [2025-04-12 14:27:34]
+    3. Reviewed previous debug report (Memory Bank [2025-04-11 15:57:30]): Confirmed previous direct test of `pedalboard.Delay` also failed. [2025-04-12 14:27:10]
+    4. Searched `spotify/pedalboard` GitHub issues for `delay feedback`: No relevant open or recently closed issues found matching this behavior. [2025-04-12 14:28:12]
+    5. Checked `poetry.lock`: Confirmed `pedalboard` version is still `0.9.16`. [2025-04-12 14:28:35]
+- **Root Cause**: Confirmed previous finding: The `feedback` parameter in `pedalboard.Delay` (version 0.9.16) does not produce numerically different outputs under the specific test conditions (`atol=1e-9`), strongly suggesting a library issue or limitation. [2025-04-12 14:28:35]
+- **Fix Applied**: None. Issue lies within the external library.
+- **Verification**: N/A
+- **Related Issues**: [DELAY-FEEDBACK-XFAIL]
+- **Recommendation**: Keep `test_complex_delay_feedback_parameter` marked as `xfail`. Add comment to Memory Bank about potential reporting to `pedalboard` developers.

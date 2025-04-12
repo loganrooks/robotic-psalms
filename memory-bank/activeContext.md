@@ -3,6 +3,111 @@
 *This file tracks the immediate focus, ongoing tasks, and unresolved questions for the current session.*
 
 ---
+### [2025-04-12 18:34:09] - Task: Update Docstrings in Sacred Machinery
+- **Focus:** Update docstrings for `_apply_time_varying_lowpass` and `_generate_pads` in `src/robotic_psalms/synthesis/sacred_machinery.py` based on user-provided diff.
+- **Actions:**
+    - Applied provided diff using `apply_diff` tool.
+- **Status:** Completed. Docstrings updated.
+
+---
+
+
+### [2025-04-12 18:09:58] - Task: Refactor Enhanced Pad Generation Logic (REQ-ART-A01-v2 - Refactor Phase)
+- **Focus:** Review and refactor `_generate_pads` in `src/robotic_psalms/synthesis/sacred_machinery.py` for clarity, efficiency, and maintainability after recent enhancements.
+- **Actions:**
+    - Reviewed current implementation.
+    - Introduced class constants for LFO frequencies, gain, and filter parameters.
+    - Extracted time-varying low-pass filter logic into `_apply_time_varying_lowpass` helper method.
+    - Updated `_generate_pads` to use constants and the helper function.
+    - Used existing `_normalize_audio` helper.
+    - Ran `pytest -k generate_pads`; confirmed all 8 tests pass.
+    - Updated Memory Bank (`refinement-optimization-mode.md`, `activeContext.md`, `progress.md`).
+- **Status:** Completed (Refactor Phase).
+
+---
+
+
+### [2025-04-12 18:06:26] - Task: Enhance Pad Generation Logic (REQ-ART-A01-v2 - Green Phase)
+- **Focus:** Modify `_generate_pads` in `src/robotic_psalms/synthesis/sacred_machinery.py` to pass new complexity tests (spectral centroid variance > 50000, mean spectral flux > 0.5).
+- **Actions:**
+    - Reviewed current implementation (sine+sawtooth mix, amplitude LFO).
+    - Reviewed new failing tests.
+    - Implemented enhancement: Added LFOs for harmonicity mix and filter cutoff. Used a segmented approach for the time-varying low-pass filter (`scipy.signal.sosfilt` per 1024-sample chunk).
+    - Fixed `AttributeError` related to `sosfilt_len`.
+    - Fixed Pylance errors after `apply_diff`.
+    - Ran `pytest -k generate_pads`; confirmed all 8 tests pass.
+    - Updated Memory Bank (`code.md`).
+- **Status:** Completed (Green Phase). Pad generation enhanced, complexity tests pass.
+
+---
+
+
+### [2025-04-12 17:41:00] - Task: Define Failing Tests for Complex Pad Generation (REQ-ART-A01-v2 - Red Phase)
+- **Focus:** Implement new, failing unit tests in `tests/test_sacred_machinery.py` for `_generate_pads` complexity/evolution.
+- **Metrics Chosen:**
+    - Spectral Centroid Variance (`librosa.feature.spectral_centroid`, `np.var`)
+    - Spectral Flux (using `librosa.onset.onset_strength` mean as proxy)
+- **Actions:**
+    - Reviewed `_generate_pads` implementation and existing tests.
+    - Added `test_generate_pads_spectral_centroid_variance_fails` and `test_generate_pads_spectral_flux_fails`.
+    - Set initial thresholds (variance > 10000, flux > 0.1); tests passed.
+    - Increased thresholds significantly (variance > 50000, flux > 0.5).
+    - Ran `pytest -k generate_pads`; confirmed new tests fail as required.
+- **Status:** Completed (Red Phase). Failing tests successfully implemented, defining the target for enhancing `_generate_pads`.
+
+---
+
+### [2025-04-12 17:33:00] - Task: Complete P1 Stability & Quality Phase
+- **Focus:** Address requirements REQ-STAB-01 through REQ-STAB-04 based on `project_specification_v2.md`.
+- **Actions:**
+    - Delegated REQ-STAB-01 (Delay Feedback) investigation to `debug`. Confirmed library limitation; kept test `xfail`.
+    - Delegated REQ-STAB-02 (Chorus Voices) implementation to `code`. Manual multi-voice logic added.
+    - Delegated regression fix (Chorus `rate_hz`/`feedback`) to `code`. LFO and feedback added to manual chorus.
+    - Delegated REQ-STAB-03 (Glitch Repeat) fix to `code`. Logic corrected.
+    - Delegated REQ-STAB-04 (Melody Accuracy) investigation to `debug`. Confirmed test passes with required tolerance.
+- **Status:** Completed. All P1 tasks addressed. Next focus is P2: Core Artistic Enhancement (REQ-ART-A01-v2, REQ-ART-A02-v2).
+
+---
+
+### [2025-04-12 17:31:13] - Task: Investigate Melody Contour Accuracy XFail (REQ-STAB-04)
+- **Focus:** Analyze the supposed failure of `test_apply_melody_contour_shifts_pitch` in `tests/synthesis/test_vox_dei.py` and ensure pitch accuracy meets +/- 10 Hz tolerance.
+- **Actions:**
+    - Reviewed `_apply_melody_contour` implementation in `src/robotic_psalms/synthesis/vox_dei.py`.
+    - Reviewed `test_apply_melody_contour_shifts_pitch` test logic.
+    - Identified test used relative tolerance (`rtol=0.1`) instead of required absolute tolerance (`atol=10.0`).
+    - Ran test with `rtol=0.1` -> PASSED.
+    - Modified test assertion to use `atol=10.0`.
+    - Re-ran test with `atol=10.0` -> PASSED.
+- **Findings:** The test currently passes even with the correct absolute tolerance specified in REQ-STAB-04. The initial premise of a failing/xfail test appears outdated.
+- **Status:** Investigation complete. Preparing report.
+
+---
+
+### [2025-04-12 16:07:25] - Task: Fix Glitch Repeat Logic (REQ-STAB-03)
+- **Focus:** Modify `_apply_repeat_glitch` in `src/robotic_psalms/synthesis/effects.py` to correctly handle the `repeat_count` parameter and fix the failing `xfail` test `test_refined_glitch_repeat_count_affects_output`.
+- **Actions:**
+    - Reviewed `_apply_repeat_glitch` and identified that previous slicing logic (taking slices from tiled chunks) did not produce different outputs for varying `repeat_count` with periodic test signals.
+    - Implemented new logic: Repeat the initial segment of length `chunk_len / repeat_count`, `repeat_count` times to fill the chunk.
+    - Removed the `xfail` marker from `test_refined_glitch_repeat_count_affects_output`.
+    - Ran `pytest tests/synthesis/test_effects.py -k refined_glitch` and confirmed all 13 tests passed.
+- **Status:** Completed.
+
+---
+
+
+### [2025-04-12 06:28:29] - Task: Project Reassessment and Specification Update
+- **Focus:** Reviewed current codebase, specifications, and memory bank. Synthesized context including feedback and lessons learned. Re-evaluated priorities based on balancing quality attributes (Quality, Flexibility, Ease of Use, Modularity, Maintainability).
+- **Actions:**
+    - Analyzed Memory Bank (`activeContext.md`, `globalContext.md`, mode-specific files).
+    - Reviewed specifications (`artistic_specification.md`, `project_specification.md`).
+    - Analyzed codebase structure (`src/`) and definitions (`effects.py`, `vox_dei.py`, `sacred_machinery.py`).
+    - Analyzed test files (`test_effects.py`, `test_vox_dei.py`, `test_sacred_machinery.py`) to identify known issues (`xfail` tests).
+    - Created `project_specification_v2.md` summarizing findings, outlining revised priorities (P1: Stability/Quality, P2: Core Artistic Enhancement, P3: Melodic Refinement), and detailing requirements for next phases.
+- **Status:** Completed. Next focus is implementing P1 requirements from `project_specification_v2.md` (Stability & Quality: `REQ-STAB-01` to `REQ-STAB-04`).
+
+---
+
+
 ### [2025-04-12 06:06:30] - Task: Update Documentation for MIDI Melody Input (REQ-ART-MEL-02 - Documentation)
 - **Focus:** Update README.md, config.py, vox_dei.py, and midi_parser.py documentation to reflect the change from `melody` list argument to `midi_path` string argument for melodic input.
 - **Actions:**

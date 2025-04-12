@@ -288,8 +288,9 @@ def test_apply_melody_contour_shifts_pitch(sample_melody):
                 detected_pitch = np.nanmean(voiced_f0)
                 detected_pitches.append(detected_pitch)
                 # Basic assertion (likely too strict for real-world pyin results)
-                assert np.isclose(detected_pitch, target_pitch_hz, rtol=0.1), \
-                    f"Segment expected ~{target_pitch_hz:.1f} Hz, detected ~{detected_pitch:.1f} Hz"
+                # Use absolute tolerance of 10 Hz as per REQ-STAB-04
+                assert np.isclose(detected_pitch, target_pitch_hz, atol=10.0), \
+                    f"Segment expected {target_pitch_hz:.1f} Hz (+/- 10 Hz), detected ~{detected_pitch:.1f} Hz"
             else:
                 pytest.fail(f"Could not detect voiced pitch in segment for target {target_pitch_hz:.1f} Hz")
         else:

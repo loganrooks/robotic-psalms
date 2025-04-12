@@ -5,6 +5,10 @@
 ---
 
 
+### Plan Item: Update Enhanced Pad Generation Docs (REQ-ART-A01-v2) - [2025-04-12 18:35:30]
+- **Type**: Guide/API / **Audience**: Dev/User / **Outline**: 1. Delegate sacred_machinery.py docstring updates (_generate_pads, _apply_time_varying_lowpass) 2. Update README.md (Features, Roadmap) 3. Review architecture.md (No changes needed) / **Status**: Done / **Owner**: docs-writer -> code / **Source**: User Task REQ-ART-A01-v2 / **Location**: src/robotic_psalms/synthesis/sacred_machinery.py, README.md, src/robotic_psalms/architecture.md
+
+
 ### Plan Item: Update MIDI Melody Input Docs (REQ-ART-MEL-02) - [2025-04-12 06:06:30]
 - **Type**: Guide / **Audience**: User/Dev / **Outline**: 1. Update README (Param Guide for `midi_path`) 2. Delegate config.py update (add `midi_path` field) 3. Delegate vox_dei.py/midi_parser.py docstring updates / **Status**: Done / **Owner**: docs-writer -> code / **Source**: User Task REQ-ART-MEL-02 / **Location**: README.md, src/robotic_psalms/config.py, src/robotic_psalms/synthesis/vox_dei.py, src/robotic_psalms/utils/midi_parser.py
 

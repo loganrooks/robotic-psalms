@@ -49,6 +49,63 @@
 - Status: Draft
 
 
+### Feature: REQ-STAB-01 - Resolve Delay Feedback XFail
+- Added: 2025-04-12 06:28:29
+- Description: Investigate the failing test for `pedalboard.Delay` feedback (`test_complex_delay_feedback_parameter`). Determine if it's a library issue, test inaccuracy, or implementation error. If unresolvable with `pedalboard`, either find/implement an alternative delay function that supports reliable feedback or document the limitation and adjust the test/parameter.
+- Acceptance criteria: 1. The `test_complex_delay_feedback_parameter` test passes OR is documented as unachievable with the current library and potentially removed/modified.
+- Dependencies: `tests/synthesis/test_effects.py`, `src/robotic_psalms/synthesis/effects.py`, `pedalboard` library.
+- Status: Draft
+- TDD Anchors: Test delay feedback produces audible, distinctly different output for feedback=0.1 vs feedback=0.8, with increasing energy/repeats for higher feedback.
+
+### Feature: REQ-STAB-02 - Address Chorus NumVoices XFail
+- Added: 2025-04-12 06:28:29
+- Description: The `pedalboard.Chorus` ignores `num_voices`. Either implement multi-voice chorus logic manually (e.g., using multiple `pedalboard.Delay` instances with LFO modulation) within `apply_chorus`, or confirm the limitation is acceptable, remove the `num_voices` parameter from `ChorusParameters`, and remove the corresponding `xfail` test (`test_chorus_parameters_affect_output`).
+- Acceptance criteria: 1. The `test_chorus_parameters_affect_output` related to `num_voices` passes (if implemented) OR the `num_voices` parameter and test are removed.
+- Dependencies: `tests/synthesis/test_effects.py`, `src/robotic_psalms/synthesis/effects.py`, `pedalboard` library.
+- Status: Draft
+- TDD Anchors: (If implementing) Test `apply_chorus` output with `num_voices=4` is audibly thicker/different compared to `num_voices=2`.
+
+### Feature: REQ-STAB-03 - Fix Glitch Repeat Logic
+- Added: 2025-04-12 06:28:29
+- Description: Correct the offset calculation or slicing logic within the `_apply_repeat_glitch` helper function in `effects.py` so that the `repeat_count` parameter functions as intended, creating the specified number of repetitions.
+- Acceptance criteria: 1. The `test_refined_glitch_repeat_count_affects_output` test passes.
+- Dependencies: `tests/synthesis/test_effects.py`, `src/robotic_psalms/synthesis/effects.py`.
+- Status: Draft
+- TDD Anchors: Test `apply_refined_glitch` with `glitch_type='repeat'` produces output where `repeat_count=3` results in more repetitions / longer modified segment compared to `repeat_count=2`.
+
+### Feature: REQ-STAB-04 - Verify/Refine Melody Contour Accuracy
+- Added: 2025-04-12 06:28:29
+- Description: Analyze the failing `test_apply_melody_contour_shifts_pitch`. Improve the reliability of pitch detection within the test (e.g., using different algorithms, averaging over segments) or refine the `_apply_melody_contour` implementation in `vox_dei.py` (potentially adjusting `librosa.effects.pitch_shift` parameters) to ensure accurate pitch tracking.
+- Acceptance criteria: 1. The `test_apply_melody_contour_shifts_pitch` test passes consistently, demonstrating accurate pitch tracking within a defined tolerance (e.g., +/- 10 Hz).
+- Dependencies: `tests/synthesis/test_vox_dei.py`, `src/robotic_psalms/synthesis/vox_dei.py`, `librosa` library.
+- Status: Draft
+- TDD Anchors: Test `_apply_melody_contour` output segments match target melody pitches within +/- 10 Hz tolerance when analyzed with a reliable pitch detection method.
+
+### Feature: REQ-ART-A01-v2 - Complex Pad Generation
+- Added: 2025-04-12 06:28:29
+- Description: Enhance `_generate_pads` in `sacred_machinery.py` to produce more complex, evolving textures suitable for the target aesthetic. Explore techniques like wavetable synthesis, additive synthesis, or more sophisticated modulation (multiple LFOs, envelopes) on filters and amplitude. Define *new* tests first to quantify "complexity" and "evolution".
+- Acceptance criteria: 1. New tests measuring spectral complexity (e.g., number of significant peaks, spectral centroid variance) and spectral evolution (e.g., spectral flux over time) pass. 2. Subjective listening confirms richer, evolving pad sounds.
+- Dependencies: `tests/test_sacred_machinery.py`, `src/robotic_psalms/synthesis/sacred_machinery.py`.
+- Status: Draft
+- TDD Anchors: Define and implement tests: `test_generate_pads_spectral_centroid_variance`, `test_generate_pads_spectral_flux`. Ensure `_generate_pads` output passes these new metric thresholds.
+
+### Feature: REQ-ART-A02-v2 - Rich Drone Generation
+- Added: 2025-04-12 06:28:29
+- Description: Enhance `_generate_drones` in `sacred_machinery.py` for richer harmonic content and subtle movement. Explore techniques like FM synthesis, multiple detuned oscillators, slow crossfading between sound sources, or subtle filtering/modulation. Define *new* tests first to quantify "richness" and "movement".
+- Acceptance criteria: 1. New tests measuring harmonic richness (e.g., harmonic count, inharmonicity ratio) and spectral movement (e.g., low spectral flux but non-zero variance) pass. 2. Subjective listening confirms richer, subtly moving drone sounds.
+- Dependencies: `tests/test_sacred_machinery.py`, `src/robotic_psalms/synthesis/sacred_machinery.py`.
+- Status: Draft
+- TDD Anchors: Define and implement tests: `test_generate_drones_harmonic_richness`, `test_generate_drones_spectral_movement`. Ensure `_generate_drones` output passes these new metric thresholds.
+
+### Feature: REQ-ART-MEL-03 - Syllable/Note Duration Control
+- Added: 2025-04-12 06:28:29
+- Description: Implement a mechanism to control the duration of synthesized syllables or notes, allowing rhythmic phrasing aligned with the input melody (`REQ-ART-MEL-01`/`02`). Requires careful design: investigate options like modifying TTS phoneme timing (if possible with `espeak-ng`), or post-processing synthesized audio using time-stretching algorithms (e.g., `librosa.effects.time_stretch`, phase vocoder methods) aligned with syllable boundaries (which may require separate alignment tooling).
+- Acceptance criteria: 1. Vocal output rhythmically follows durations specified in conjunction with the melody input format.
+- Dependencies: `src/robotic_psalms/synthesis/vox_dei.py`, TTS engine capabilities (`espeak-ng`), potentially time-stretching libraries (`librosa`), potentially text-to-phoneme alignment tools.
+- Status: Draft
+- TDD Anchors: Test vocal output aligns specified syllable durations (e.g., 0.25s vs 0.5s) with corresponding melody notes, verifiable via segmentation and timing analysis.
+
+
 ## Non-Functional Requirements
 <!-- Append requirements here -->
 

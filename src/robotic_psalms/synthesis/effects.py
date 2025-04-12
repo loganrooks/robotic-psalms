@@ -1,7 +1,7 @@
 import numpy as np
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from pedalboard import Delay, Reverb
-from pedalboard._pedalboard import Pedalboard # Import as suggested by Pylance
+from pedalboard import Pedalboard # Correct import
 from scipy import signal # Added for filters
 import math # Added for RBJ filter calculations
 from scipy.interpolate import interp1d # Used for formant shifting spectral warping
@@ -493,7 +493,7 @@ def apply_bandpass_filter(audio: np.ndarray, sample_rate: int, params: BandpassF
 
 def apply_chorus(audio: np.ndarray, sample_rate: int, params: ChorusParameters) -> np.ndarray:
     """
-    Applies a chorus effect using pedalboard.Chorus.
+    Applies a multi-voice chorus effect manually using modulated delay lines and feedback.
 
     Args:
         audio: Input audio signal as a NumPy array (mono or stereo).
@@ -506,52 +506,116 @@ def apply_chorus(audio: np.ndarray, sample_rate: int, params: ChorusParameters) 
     if audio.size == 0:
         return np.array([], dtype=np.float32)
 
-    # Import Chorus here to avoid potential circular imports if effects were split
-    try:
-        from pedalboard import Chorus
-    except ImportError:
-        raise ImportError("Pedalboard library is required for the chorus effect. Please install it.")
-
-    # Instantiate the chorus effect
-    # Note: pedalboard.Chorus does not have a 'num_voices' parameter.
-    chorus_effect = Chorus(
-        rate_hz=params.rate_hz,
-        depth=params.depth,
-        centre_delay_ms=params.delay_ms, # Map delay_ms to centre_delay_ms
-        feedback=params.feedback,
-        mix=params.wet_dry_mix # Map wet_dry_mix to mix
-    )
-
-    # Create a Pedalboard instance with the chorus effect
-    board = Pedalboard([chorus_effect])
-
-    # Process the audio (pedalboard expects float32)
     audio_float32 = audio.astype(np.float32)
-    chorused_signal = board(audio_float32, sample_rate=sample_rate)
+    num_samples = audio_float32.shape[0]
+    is_stereo = audio_float32.ndim == 2 and audio_float32.shape[1] == 2
+    num_channels = 2 if is_stereo else 1
 
-    # Ensure output shape matches input channel count if possible
-    # Pedalboard Chorus usually outputs stereo, even for mono input
-    if audio.ndim == 1 and chorused_signal.ndim == 2:
-        # If input was mono, decide if output should be mono (average channels) or keep stereo
-        # For now, let's keep the stereo output as it's characteristic of chorus
-        pass # Keep stereo output
-    elif audio.ndim == 2 and chorused_signal.ndim == 1 and audio.shape[1] == 1:
-         # This case is unlikely with Chorus but handle defensively
-         chorused_signal = chorused_signal.reshape(-1, 1)
+    # --- Parameters ---
+    num_voices = max(1, params.num_voices)
+    base_delay_sec = params.delay_ms / 1000.0
+    base_delay_samples = base_delay_sec * sample_rate
+    # Max variation based on depth, ensuring it doesn't exceed base delay
+    max_variation_samples = min(params.depth * base_delay_samples, base_delay_samples - 1)
+    max_variation_samples = max(0, max_variation_samples) # Ensure non-negative
 
-    # Ensure output length matches input length (pedalboard chorus shouldn't change length)
-    if chorused_signal.shape[0] != audio.shape[0]:
-        # This shouldn't happen with Chorus, but handle defensively
-        target_len = audio.shape[0]
-        current_len = chorused_signal.shape[0]
-        if current_len > target_len:
-            chorused_signal = chorused_signal[:target_len, ...]
+    rate_hz = params.rate_hz
+    feedback = np.clip(params.feedback, 0.0, 0.98) # Clip feedback slightly below 1 for stability
+    mix = np.clip(params.wet_dry_mix, 0.0, 1.0)
+
+    # --- LFO Generation ---
+    t = np.arange(num_samples) / sample_rate
+    # Use a sine LFO for smooth modulation
+    lfo = np.sin(2 * np.pi * rate_hz * t)
+
+    # --- Static Delay Offsets per Voice ---
+    if num_voices > 1:
+        # Static offsets spread around 0, scaled by max_variation_samples
+        static_offsets = np.linspace(-max_variation_samples, max_variation_samples, num_voices, endpoint=True)
+    else:
+        static_offsets = np.array([0.0])
+
+    # --- Delay Line Initialization ---
+    # Determine max possible delay for buffer sizing
+    max_dynamic_delay = base_delay_samples + max_variation_samples
+    buffer_size = int(np.ceil(max_dynamic_delay)) + 2 # Add margin for interpolation
+
+    # Create delay buffers (one per voice per channel)
+    delay_buffers_shape = (num_voices, num_channels, buffer_size)
+    delay_buffers = np.zeros(delay_buffers_shape, dtype=np.float32)
+    write_pointers = np.zeros(num_voices, dtype=int)
+
+    # --- Output Signal Initialization ---
+    wet_signal = np.zeros_like(audio_float32)
+
+    # --- Sample-by-Sample Processing ---
+    for n in range(num_samples):
+        current_input = audio_float32[n] # Shape: (,) or (2,)
+        if not is_stereo:
+            current_input = np.array([current_input]) # Ensure shape (1,) for consistent indexing
+
+        total_delayed_sample_channels = np.zeros(num_channels, dtype=np.float32)
+
+        for i in range(num_voices):
+            # Calculate time-varying delay for this voice
+            lfo_modulation = static_offsets[i] + max_variation_samples * lfo[n]
+            current_delay_samples = base_delay_samples + lfo_modulation
+            current_delay_samples = np.clip(current_delay_samples, 1.0, buffer_size - 2) # Ensure valid delay
+
+            # Calculate read position (fractional)
+            read_pos_frac = write_pointers[i] - current_delay_samples
+            read_idx_0 = int(np.floor(read_pos_frac))
+            read_idx_1 = read_idx_0 + 1
+            frac = read_pos_frac - read_idx_0
+
+            # Wrap buffer indices
+            read_idx_0 = (read_idx_0 % buffer_size + buffer_size) % buffer_size
+            read_idx_1 = (read_idx_1 % buffer_size + buffer_size) % buffer_size
+
+            # Linear interpolation for each channel
+            delayed_sample_channels = np.zeros(num_channels, dtype=np.float32)
+            for ch in range(num_channels):
+                y0 = delay_buffers[i, ch, read_idx_0]
+                y1 = delay_buffers[i, ch, read_idx_1]
+                delayed_sample_channels[ch] = y0 + frac * (y1 - y0)
+
+            # Accumulate delayed samples for the wet mix
+            total_delayed_sample_channels += delayed_sample_channels
+
+            # Calculate feedback input and write to buffer for each channel
+            for ch in range(num_channels):
+                 buffer_input = current_input[ch] + feedback * delayed_sample_channels[ch]
+                 # Clip buffer input to prevent extreme values with high feedback
+                 buffer_input = np.clip(buffer_input, -1.0, 1.0)
+                 delay_buffers[i, ch, write_pointers[i]] = buffer_input
+
+            # Increment write pointer for this voice
+            write_pointers[i] = (write_pointers[i] + 1) % buffer_size
+
+        # Average the delayed samples across voices
+        avg_delayed_sample = total_delayed_sample_channels / num_voices
+
+        # Store the averaged wet sample (shape (1,) or (2,))
+        if is_stereo:
+            wet_signal[n] = avg_delayed_sample
         else:
-            padding_shape = (target_len - current_len,) + chorused_signal.shape[1:]
-            padding = np.zeros(padding_shape, dtype=chorused_signal.dtype)
-            chorused_signal = np.concatenate((chorused_signal, padding), axis=0)
+            wet_signal[n] = avg_delayed_sample[0]
 
-    return chorused_signal.astype(np.float32) # Return float32
+    # --- Mix wet and dry signals ---
+    output_signal = (audio_float32 * (1.0 - mix)) + (wet_signal * mix)
+
+    # Ensure output length matches original input length (should already match)
+    if output_signal.shape[0] != num_samples:
+        print(f"Warning: Final output signal length mismatch ({output_signal.shape[0]} vs {num_samples}). Truncating.")
+        output_signal = output_signal[:num_samples, ...]
+
+    # Ensure output shape matches input channel count (should already match)
+    if audio.ndim == 1 and output_signal.ndim == 2 and output_signal.shape[1] == 1:
+        output_signal = output_signal.flatten()
+    elif audio.ndim == 2 and output_signal.ndim == 1 and audio.shape[1] == 1:
+         output_signal = output_signal.reshape(-1, 1)
+
+    return output_signal.astype(np.float32)
 
 
 # --- Spectral Freeze Constants ---
@@ -730,41 +794,38 @@ def apply_smooth_spectral_freeze(audio: np.ndarray, sample_rate: int, params: Sp
 # --- Glitch Helper Functions ---
 
 def _apply_repeat_glitch(audio_chunk: np.ndarray, sample_rate: int, params: GlitchParameters) -> np.ndarray:
-    """Applies repeat or stutter glitch to an audio chunk."""
-    if audio_chunk.size == 0 or params.repeat_count <= 1:
+    """
+    Applies repeat or stutter glitch to an audio chunk.
+    'repeat': Repeats the initial segment of length chunk_len / repeat_count, repeat_count times.
+    'stutter': Repeats the initial 10ms segment multiple times.
+    Ensures output length matches input length.
+    """
+    if audio_chunk.size == 0:
         return audio_chunk
 
     chunk_len = audio_chunk.shape[0]
 
     if params.glitch_type == 'repeat':
-        # Repeat the entire chunk.
-        tiled_chunk = np.tile(audio_chunk, (params.repeat_count,) + (1,) * (audio_chunk.ndim - 1))
-        # Take a slice starting from a small offset (1 sample) within the tiled chunk.
-        # This ensures the output differs from the input even for periodic signals,
-        # as long as repeat_count > 1.
-        start_offset = 1 # Use a small, non-zero offset
-        # Ensure the offset doesn't exceed the bounds if the tiled chunk is very short
-        start_offset = min(start_offset, tiled_chunk.shape[0] - 1)
-        start_offset = max(0, start_offset) # Ensure non-negative
-        # Ensure the slice doesn't go out of bounds
-        end_offset = min(start_offset + chunk_len, tiled_chunk.shape[0])
-        repeated_chunk = tiled_chunk[start_offset : end_offset, ...]
-        # Pad if the slice was shorter than the original chunk_len due to offset near the end
-        if repeated_chunk.shape[0] < chunk_len:
-             padding_needed = chunk_len - repeated_chunk.shape[0]
-             padding_shape = (padding_needed,) + audio_chunk.shape[1:]
-             padding = np.zeros(padding_shape, dtype=audio_chunk.dtype)
-             repeated_chunk = np.concatenate((repeated_chunk, padding), axis=0)
+        if params.repeat_count <= 1:
+             return audio_chunk # No repetition needed
+        # Calculate the length of the initial segment to repeat
+        segment_len = max(1, chunk_len // params.repeat_count)
+        segment_to_repeat = audio_chunk[:segment_len, ...]
+        # Tile this segment `repeat_count` times
+        num_tiles = params.repeat_count
+        repeated_chunk = np.tile(segment_to_repeat, (num_tiles,) + (1,) * (audio_chunk.ndim - 1))
+
     elif params.glitch_type == 'stutter':
         # Repeat a small initial part of the chunk (hardcoded 10ms stutter length).
-        stutter_len_ms = 10.0 # Hardcoded stutter length
+        stutter_len_ms = 10.0
         stutter_len_samples = max(1, int(round(stutter_len_ms / 1000.0 * sample_rate)))
-        stutter_len_samples = min(stutter_len_samples, chunk_len) # Ensure it's not longer than the chunk
+        stutter_len_samples = min(stutter_len_samples, chunk_len)
 
         if stutter_len_samples > 0:
             stutter_part = audio_chunk[:stutter_len_samples, ...]
-            num_repeats_stutter = max(1, chunk_len // stutter_len_samples)
-            repeated_chunk = np.tile(stutter_part, (num_repeats_stutter,) + (1,) * (audio_chunk.ndim - 1))
+            # Calculate how many times to tile to approximately fill the chunk
+            num_tiles = (chunk_len + stutter_len_samples - 1) // stutter_len_samples # Ceiling division
+            repeated_chunk = np.tile(stutter_part, (num_tiles,) + (1,) * (audio_chunk.ndim - 1))
         else:
             repeated_chunk = audio_chunk # Should not happen if chunk_len > 0
     else:
@@ -779,7 +840,7 @@ def _apply_repeat_glitch(audio_chunk: np.ndarray, sample_rate: int, params: Glit
         padding = np.zeros(padding_shape, dtype=audio_chunk.dtype)
         repeated_chunk = np.concatenate((repeated_chunk, padding), axis=0)
 
-    return repeated_chunk
+    return repeated_chunk.astype(audio_chunk.dtype) # Ensure output dtype matches input
 
 def _apply_tape_stop_glitch(audio_chunk: np.ndarray, sample_rate: int, params: GlitchParameters) -> np.ndarray:
     """Applies tape stop simulation to an audio chunk using resampling."""
@@ -895,6 +956,8 @@ def apply_refined_glitch(audio: np.ndarray, sample_rate: int, params: GlitchPara
     for i in range(0, num_samples, chunk_size_samples):
         # Check probability based on intensity
         if random.random() < params.intensity:
+            # print(f"DEBUG: Applying glitch type {params.glitch_type} to chunk {i // chunk_size_samples}") # DEBUG - Removed
+            print(f"DEBUG: Applying glitch type {params.glitch_type} to chunk {i // chunk_size_samples}") # DEBUG
             start_sample = i
             end_sample = min(i + chunk_size_samples, num_samples)
             current_chunk = audio_out[start_sample:end_sample, ...]
@@ -909,6 +972,8 @@ def apply_refined_glitch(audio: np.ndarray, sample_rate: int, params: GlitchPara
             else:
                 # Should not happen due to Pydantic validation, but handle defensively
                 glitched_chunk = current_chunk
+
+            # print(f"DEBUG: Chunk {i // chunk_size_samples} modified by helper: {not np.allclose(current_chunk, glitched_chunk)}") # DEBUG - Removed
 
             # Place the glitched chunk back into the output audio
             # Ensure the glitched chunk fits (it should if helpers maintain length)

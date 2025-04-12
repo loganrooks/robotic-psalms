@@ -23,6 +23,13 @@
 ## Current Test Focus
 <!-- Describe the component/feature being tested -->
 
+
+### Test Plan: `_generate_pads` Complexity (REQ-ART-A01-v2) - [2025-04-12 17:41:00]
+#### Unit Tests (`tests/test_sacred_machinery.py`):
+- Test Case: Spectral Centroid Variance / Expected: Variance > 50000.0 / Status: Written (Failing)
+- Test Case: Mean Spectral Flux (Onset Strength Proxy) / Expected: Mean Flux > 0.5 / Status: Written (Failing)
+#### Integration Tests: - N/A
+#### Edge Cases Covered: - Short audio duration (skipped)
 ### Test Plan: MIDI Melody Input (REQ-ART-MEL-02) - [2025-04-12 04:50:53]
 #### Unit Tests (`tests/utils/test_midi_parser.py`):
 - Test Case: Parse valid single-track MIDI / Expected: `List[Tuple[float, float]]` / Status: Written (Failing - Red)
@@ -319,6 +326,15 @@
 - **Refactor**: Improvements made: N/A (Red phase only)
 - **Outcomes**: Established test harness for melodic input feature.
 
+
+
+### TDD Cycle: `_generate_pads` Complexity (REQ-ART-A01-v2) - [2025-04-12 17:41:00]
+- **Start**: [2025-04-12 17:39:00]
+- **End**: [2025-04-12 17:41:00]
+- **Red**: Added `test_generate_pads_spectral_centroid_variance_fails` and `test_generate_pads_spectral_flux_fails` using `librosa` features. Initial thresholds passed; increased thresholds significantly (variance > 50000.0, flux > 0.5) to ensure tests fail against current implementation.
+- **Green**: Implementation approach: Pending enhancement of `_generate_pads` in `src/robotic_psalms/synthesis/sacred_machinery.py` to meet the new complexity thresholds.
+- **Refactor**: Improvements made: N/A (Red phase only)
+- **Outcomes**: Established quantitative, failing tests to drive the implementation of more complex and evolving pad generation as required by REQ-ART-A01-v2.
 ### TDD Cycle: MIDI Melody Input (REQ-ART-MEL-02 - Red Phase) - [2025-04-12 04:50:53]
 - **Start**: [2025-04-12 04:49:45]
 - **Red**: Tests created:

@@ -3,6 +3,8 @@ import numpy as np
 from unittest.mock import patch, MagicMock, ANY, call # Add call
 from unittest.mock import patch, MagicMock, ANY # Add ANY
 import numpy.fft as fft
+import librosa
+import numpy as np
 from typing import cast # Added for casting
 from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters, ChorusParameters, SpectralFreezeParameters, GlitchParameters, SaturationParameters, MasterDynamicsParameters # Add MasterDynamicsParameters
 from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters, ChorusParameters, SpectralFreezeParameters, GlitchParameters, SaturationParameters # Add GlitchParameters, SaturationParameters
@@ -564,6 +566,56 @@ def test_generate_pads_non_repetitive(engine: SacredMachineryEngine): # Renamed
     # This assertion should now FAIL if only minor LFO changes occur
     assert not np.allclose(segment1, segment2, atol=1e-12), "Pad seems repetitive between segments (within tolerance)" # Extremely low tolerance
 
+
+
+
+# --- NEW FAILING TESTS FOR PAD COMPLEXITY (REQ-ART-A01-v2) ---
+
+def test_generate_pads_spectral_centroid_variance_fails(engine: SacredMachineryEngine):
+    """(FAILING TEST) Test that pad spectral centroid variance exceeds a high threshold."""
+    duration = 4.0 # Longer duration to capture evolution
+    sample_rate = engine.sample_rate
+    pads = engine._generate_pads(duration)
+
+    if len(pads) < 2048: # Need enough samples for STFT
+        pytest.skip("Generated pad is too short for spectral analysis.")
+
+    # Calculate spectral centroid per frame
+    centroids = librosa.feature.spectral_centroid(y=pads, sr=sample_rate)[0]
+
+    # Calculate variance of the centroid over time
+    centroid_variance = np.var(centroids)
+
+    # Define a threshold expected to FAIL against the current implementation
+    # Baseline is likely low due to simple LFO. Set threshold much higher.
+    min_expected_variance = 50000.0 # Increased threshold significantly
+
+    print(f"\n[DEBUG] Pad Centroid Variance: {centroid_variance:.2f}") # Temporary debug
+
+    assert centroid_variance > min_expected_variance, \
+        f"Pad spectral centroid variance ({centroid_variance:.2f}) is too low, expected > {min_expected_variance}"
+
+def test_generate_pads_spectral_flux_fails(engine: SacredMachineryEngine):
+    """(FAILING TEST) Test that pad mean spectral flux exceeds a high threshold."""
+    duration = 4.0
+    sample_rate = engine.sample_rate
+    pads = engine._generate_pads(duration)
+
+    if len(pads) < 2048:
+        pytest.skip("Generated pad is too short for spectral analysis.")
+
+    # Calculate spectral flux
+    onset_env = librosa.onset.onset_strength(y=pads, sr=sample_rate)
+    spectral_flux = np.mean(onset_env) # Using onset strength as a proxy for spectral flux
+
+    # Define a threshold expected to FAIL against the current implementation
+    # Baseline flux is likely low. Set threshold much higher.
+    min_expected_flux = 0.5 # Increased threshold significantly
+
+    print(f"\n[DEBUG] Pad Mean Spectral Flux (Onset Strength): {spectral_flux:.4f}") # Temporary debug
+
+    assert spectral_flux > min_expected_flux, \
+        f"Pad mean spectral flux ({spectral_flux:.4f}) is too low, expected > {min_expected_flux}"
 
 # --- Test _generate_drones Method ---
 

@@ -21,3 +21,8 @@
 - **Issue/Feedback**: Failed to run the full test suite after implementing MIDI parsing and fixing related errors, potentially missing regressions introduced in other modules (specifically `vox_dei.py`).
 - **Analysis**: Running only module-specific tests after changes is insufficient. The full test suite must be run to catch unintended side effects or regressions in dependent code.
 - **Action Taken/Learnings**: Will ensure the full test suite (`poetry run pytest`) is executed after significant changes or fixes, especially those involving shared functions or modified interfaces, before considering a task complete. Recorded this feedback.
+
+### [2025-04-12 18:02:42] - Source: User/System
+- **Issue/Feedback**: User identified repeated incorrect tool usage format (e.g., `<tool_name>list_files</tool_name>` instead of `<list_files><path>...</path></list_files>`). User suggested the system prompt phrase "The tool name is enclosed in opening and closing tags" might be misinterpreted.
+- **Analysis**: The user's hypothesis is plausible. The phrasing could indeed be interpreted ambiguously, leading to the observed incorrect format.
+- **Action Taken/Learnings**: Acknowledged the feedback. Will ensure strict adherence to the correct XML format (`<tool_name><param>value</param></tool_name>`) going forward. This feedback highlights the importance of precise instruction wording for LLM interaction.

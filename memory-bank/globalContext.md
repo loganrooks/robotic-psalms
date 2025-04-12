@@ -62,8 +62,40 @@
 - **Decision:** Use the `pedalboard.Reverb` class for the initial implementation of `apply_high_quality_reverb`.
 - **Justification:** `pedalboard` is a capable audio effects library, suggested in the task guidance. It provides a readily available reverb effect suitable for a minimal implementation. Parameter mapping from `ReverbParameters` (defined by tests) to `pedalboard.Reverb` parameters is feasible, although some parameters like `pre_delay` require simulation (padding).
 - **Alternatives Considered:** Implementing a reverb algorithm from scratch (too complex for minimal implementation), using `scipy.signal.convolve` with an Impulse Response (requires finding/managing IR files).
+
+#### [2025-04-12 06:28:29] - Decision: Project Reassessment and Reprioritization (v2.0)
+- **Context:** Completed initial implementation phase based on `artistic_specification.md`. User requested pause for reassessment.
+- **Analysis:** Reviewed codebase, tests (`xfail` issues identified), specifications, and memory bank. Synthesized current state, limitations, and lessons learned. Evaluated remaining/deferred requirements against goals of Quality, Flexibility, Ease of Use, Modularity, Maintainability.
+- **Decision:** Created `project_specification_v2.md`. Revised priorities:
+    1.  **[P1] Stability & Quality:** Address `xfail` tests (Delay feedback, Chorus voices, Glitch repeat, Melody contour accuracy).
+    2.  **[P2] Core Artistic Enhancement:** Define new tests and enhance Pad/Drone generation (`REQ-ART-A01-v2`, `REQ-ART-A02-v2`).
+    3.  **[P3] Melodic Refinement:** Revisit Syllable Duration Control (`REQ-ART-MEL-03`).
+    4.  **[P4] Optional Features:** Defer Granular Vocals (`REQ-ART-V04`), Panning (`REQ-ART-M02`).
+- **Justification:** Prioritizes stability and core quality before adding further complexity. Addresses technical debt and improves maintainability. Focuses next efforts on high-impact artistic enhancements (pads/drones) and critical flexibility features (duration control).
+- **Alternatives Considered:** Immediately tackling complex deferred features (e.g., duration control) without addressing stability; focusing only on new features.
+
+---
+
 ## Progress
 *Milestones, completed tasks, overall status.*
+
+#### [2025-04-12 18:34:09] - Task: Update Docstrings in Sacred Machinery
+- **Status:** Completed.
+- **Deliverables:** Updated docstrings for `_apply_time_varying_lowpass` and `_generate_pads` in `src/robotic_psalms/synthesis/sacred_machinery.py` based on user-provided diff.
+---
+
+
+#### [2025-04-12 17:31:39] - Task: Investigate Melody Contour Accuracy XFail (REQ-STAB-04)
+- **Status:** Completed.
+- **Deliverables:** Investigated `test_apply_melody_contour_shifts_pitch`. Found the test passes, even after updating its assertion to use the required absolute tolerance (`atol=10.0`). The initial premise of a failing/xfail test was likely outdated. Requirement REQ-STAB-04 is met according to this specific test.
+---
+
+
+#### [2025-04-12 16:07:41] - Task: Fix Glitch Repeat Logic (REQ-STAB-03)
+- **Status:** Completed.
+- **Deliverables:** Modified `_apply_repeat_glitch` in `src/robotic_psalms/synthesis/effects.py` to correctly implement repeat logic based on `repeat_count`. Removed `xfail` marker from `test_refined_glitch_repeat_count_affects_output`. Confirmed all `refined_glitch` tests pass.
+---
+
 
 #### [2025-04-12 06:06:30] - Task: Update Documentation for MIDI Melody Input (REQ-ART-MEL-02 - Documentation)
 - **Status:** Completed.
@@ -379,6 +411,13 @@
 #### [2025-04-12 04:03:56] - Feature: Master Dynamics Processing (REQ-ART-M01)
 - **Status:** Completed & Ready for Commit.
 - **Deliverables:** Implemented `apply_master_dynamics` function and `MasterDynamicsParameters`/`MasterDynamicsConfig` models using `pedalboard.Compressor` and `pedalboard.Limiter` in `src/robotic_psalms/synthesis/effects.py` and `src/robotic_psalms/config.py`. Integrated conditionally as the final step in `SacredMachineryEngine`. Core tests passing, documentation updated.
+---
+
+
+
+#### [2025-04-12 06:28:29] - Task: Project Reassessment and Specification Update
+- **Status:** Completed.
+- **Deliverables:** Created `project_specification_v2.md` summarizing current state, known issues, revised priorities (P1: Stability, P2: Core Art, P3: Melodic Refinement), and detailed requirements for next phases. Updated Memory Bank (`activeContext.md`, `globalContext.md`, `spec-pseudocode.md`).
 ---
 
 

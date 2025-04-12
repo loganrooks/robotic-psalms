@@ -33,6 +33,18 @@ class SynthesisResult:
 
 class SacredMachineryEngine:
     """Main synthesis engine combining all sound elements"""
+    # Pad Generation Constants
+    _PAD_LFO_AMP_FREQ = 0.1
+    _PAD_LFO_FILTER_FREQ = 0.15
+    _PAD_LFO_HARMONICITY_FREQ = 0.08
+    _PAD_OSC_GAIN = 0.3
+    _PAD_FILTER_SEGMENT_LEN = 1024
+    _PAD_FILTER_ORDER = 2
+    _PAD_FILTER_MIN_CUTOFF_HZ = 500.0 # Use float
+    _PAD_FILTER_MAX_CUTOFF_HZ = 8000.0 # Use float
+    _PAD_FILTER_MIN_NORM_CUTOFF = 0.001 # Safety margin
+    _PAD_FILTER_MAX_NORM_CUTOFF = 0.999 # Safety margin
+
 
     def __init__(self, config: PsalmConfig):
         """Initialize the sacred machinery engine
@@ -374,6 +386,92 @@ class SacredMachineryEngine:
                 result /= max_val
 
             return result.astype(np.float32)
+    def _apply_time_varying_lowpass(
+        self,
+        audio: npt.NDArray[np.float32],
+        lfo_filter: npt.NDArray[np.float32],
+        sample_rate: int,
+        segment_len: int = _PAD_FILTER_SEGMENT_LEN, # Access class constant directly
+        filter_order: int = _PAD_FILTER_ORDER,     # Access class constant directly
+        min_cutoff_hz: float = _PAD_FILTER_MIN_CUTOFF_HZ, # Access class constant directly
+        max_cutoff_hz: float = _PAD_FILTER_MAX_CUTOFF_HZ, # Access class constant directly
+        min_norm_cutoff: float = _PAD_FILTER_MIN_NORM_CUTOFF, # Access class constant directly
+        max_norm_cutoff: float = _PAD_FILTER_MAX_NORM_CUTOFF, # Access class constant directly
+    ) -> npt.NDArray[np.float32]:
+        """Applies a time-varying low-pass filter using segmented processing.
+
+        The filter cutoff frequency is modulated over time based on the provided
+        LFO signal (`lfo_filter`). The audio is processed in segments to
+        efficiently apply different filter parameters over time. The cutoff
+        frequency for each segment is determined by the average LFO value
+        within that segment, mapped exponentially between `min_cutoff_hz` and
+        `max_cutoff_hz`. A Butterworth filter is used.
+
+        Args:
+            audio: The input audio signal.
+            lfo_filter: Low-frequency oscillator signal (range 0.0 to 1.0)
+                        controlling the filter cutoff modulation.
+            sample_rate: The sample rate of the audio.
+            segment_len: The length of each processing segment in samples.
+            filter_order: The order of the Butterworth filter.
+            min_cutoff_hz: The minimum cutoff frequency in Hz.
+            max_cutoff_hz: The maximum cutoff frequency in Hz.
+            min_norm_cutoff: The minimum normalized cutoff frequency (safety clamp).
+            max_norm_cutoff: The maximum normalized cutoff frequency (safety clamp).
+
+        Returns:
+            The audio signal with the time-varying low-pass filter applied.
+
+        Raises:
+            ValueError: If filter design fails (logged, returns unfiltered segment).
+        """
+        num_samples = len(audio)
+        filtered_audio = np.zeros_like(audio)
+        nyquist = 0.5 * sample_rate
+        num_segments = num_samples // segment_len
+        last_norm_cutoff = min_norm_cutoff # Initialize for the remainder block
+
+        log_min_cutoff = np.log(min_cutoff_hz)
+        log_max_cutoff = np.log(max_cutoff_hz)
+
+        for i in range(num_segments):
+            start = i * segment_len
+            end = start + segment_len
+            segment = audio[start:end]
+
+            # Calculate average cutoff for this segment using exponential mapping
+            segment_lfo_filter_avg = np.mean(lfo_filter[start:end])
+            cutoff_freq_segment = np.exp(log_min_cutoff + segment_lfo_filter_avg * (log_max_cutoff - log_min_cutoff))
+
+            norm_cutoff = cutoff_freq_segment / nyquist
+            # Clamp normalized cutoff frequency
+            norm_cutoff = np.clip(norm_cutoff, min_norm_cutoff, max_norm_cutoff)
+            last_norm_cutoff = norm_cutoff # Store for the remainder
+
+            try:
+                sos = signal.butter(filter_order, norm_cutoff, btype='low', output='sos')
+                filtered_segment = signal.sosfilt(sos, segment)
+                filtered_audio[start:end] = filtered_segment
+            except ValueError as filter_err:
+                 self.logger.error(f"Failed to apply filter segment {i} (cutoff={norm_cutoff}): {filter_err}")
+                 filtered_audio[start:end] = segment # Use unfiltered segment on error
+
+        # Handle any remaining samples
+        remainder_start = num_segments * segment_len
+        if remainder_start < num_samples:
+            segment = audio[remainder_start:]
+            try:
+                 # Use the cutoff from the last full segment for the remainder
+                 sos = signal.butter(filter_order, last_norm_cutoff, btype='low', output='sos')
+                 filtered_segment = signal.sosfilt(sos, segment)
+                 filtered_audio[remainder_start:] = filtered_segment
+            except ValueError as filter_err:
+                 self.logger.error(f"Failed to apply final filter segment (cutoff={last_norm_cutoff}): {filter_err}")
+                 filtered_audio[remainder_start:] = segment # Use unfiltered segment on error
+
+        return filtered_audio
+
+
 
 
 
@@ -415,7 +513,28 @@ class SacredMachineryEngine:
 
 
     def _generate_pads(self, duration: float) -> npt.NDArray[np.float32]:
-        """Generate glacial synthesizer pads"""
+        """Generate evolving synthesizer pads with modulated harmonicity and filter.
+
+        This method creates ambient pad sounds by summing oscillators based on the
+        current musical mode's frequencies. The timbre evolves through:
+        1.  **Modulated Harmonicity:** An LFO (`_PAD_LFO_HARMONICITY_FREQ`) varies
+            the mix between sine and sawtooth waveforms for each oscillator,
+            scaled by `config.celestial_harmonicity`.
+        2.  **Time-Varying Filter:** A low-pass filter is applied using the
+            `_apply_time_varying_lowpass` helper method. The filter's cutoff
+            frequency is modulated by another LFO (`_PAD_LFO_FILTER_FREQ`).
+        3.  **Amplitude Modulation:** An overall amplitude LFO (`_PAD_LFO_AMP_FREQ`)
+            is applied to the final pad sound.
+
+        Internal constants (`_PAD_*`) control LFO frequencies, oscillator gain,
+        and filter parameters. The final output is normalized.
+
+        Args:
+            duration: The desired duration of the pads in seconds.
+
+        Returns:
+            An array containing the generated pad audio signal.
+        """
         num_samples = int(duration * self.sample_rate)
         t = np.arange(num_samples) / self.sample_rate
 
@@ -423,21 +542,41 @@ class SacredMachineryEngine:
         frequencies = self.mode_frequencies[self.config.mode]
 
         pad = np.zeros(num_samples, dtype=np.float32)
-        harmonicity = self.config.celestial_harmonicity
 
+        # LFOs for modulation (using class constants)
+        lfo_amp = 0.7 + 0.3 * np.sin(2 * np.pi * self._PAD_LFO_AMP_FREQ * t)
+        lfo_filter = 0.5 + 0.5 * np.sin(2 * np.pi * self._PAD_LFO_FILTER_FREQ * t) # Range [0, 1]
+        lfo_harmonicity = 0.5 + 0.5 * np.sin(2 * np.pi * self._PAD_LFO_HARMONICITY_FREQ * t) # Range [0, 1]
+
+        # Base harmonicity from config, modulated by LFO
+        base_harmonicity = self.config.celestial_harmonicity
+        harmonicity = base_harmonicity * lfo_harmonicity # Effective range [0, base_harmonicity]
+
+        # Generate base waveform by summing oscillators
         for freq in frequencies:
-            # Mix sine and sawtooth waves based on harmonicity
+            # Mix sine and sawtooth waves based on time-varying harmonicity
             sine = np.sin(2 * np.pi * freq * t)
-            saw = 2 * (t * freq - np.floor(0.5 + t * freq))
+            saw = 2 * (t * freq - np.floor(0.5 + t * freq)) # Basic sawtooth
 
+            # Ensure harmonicity is broadcastable if needed (should be same length as t)
             wave = sine * (1 - harmonicity) + saw * harmonicity
-            pad += wave * 0.3
+            pad += wave * self._PAD_OSC_GAIN # Use class constant for gain
 
-        # Apply slow evolution
-        lfo = np.sin(2 * np.pi * 0.1 * t)
-        pad *= 0.7 + 0.3 * lfo
+        # Apply Time-Varying Low-Pass Filter using helper function
+        pad = self._apply_time_varying_lowpass(
+            audio=pad,
+            lfo_filter=lfo_filter,
+            sample_rate=self.sample_rate
+            # Uses default constants defined in the class for other parameters
+        )
 
-        return pad
+        # Apply overall amplitude LFO
+        pad *= lfo_amp
+
+        # Normalize final output
+        pad = self._normalize_audio(pad) # Use helper function
+
+        return pad.astype(np.float32)
 
     def _generate_percussion(self, duration: float) -> npt.NDArray[np.float32]:
         """Generate stochastic metallic percussion"""

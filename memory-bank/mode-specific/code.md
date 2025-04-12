@@ -5,6 +5,30 @@
 ---
 
 
+### Implementation: Enhance Pad Generation Logic (REQ-ART-A01-v2 - Green Phase) - 2025-04-12 18:06:09
+- **Approach**: Modified `_generate_pads` in `src/robotic_psalms/synthesis/sacred_machinery.py` to meet new complexity requirements (spectral centroid variance > 50000, mean spectral flux > 0.5). Introduced two new LFOs: one modulating the `harmonicity` (mix between sine and sawtooth waves) and another modulating the cutoff frequency of a 2nd-order Butterworth low-pass filter. To implement the time-varying filter, a segmented approach was used: the audio was processed in 1024-sample chunks, with the filter coefficients recalculated for each chunk based on the average LFO value within that chunk, using `scipy.signal.sosfilt`.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/sacred_machinery.py` (Modified `_generate_pads`).
+- **Notes**: This approach successfully passed the new failing tests (`test_generate_pads_spectral_centroid_variance_fails`, `test_generate_pads_spectral_flux_fails`) and maintained passing status for existing pad tests. Initial attempt using an average filter cutoff for the whole duration failed the complexity tests. Fixed an `AttributeError` related to `scipy.signal.sosfilt_len` and removed a leftover `except` block during implementation.
+
+---
+
+
+### Implementation: Fix Glitch Repeat Logic (REQ-STAB-03) - 2025-04-12 16:07:50
+- **Approach**: Modified `_apply_repeat_glitch` in `src/robotic_psalms/synthesis/effects.py`. Previous attempts using slicing from tiled chunks failed to make the output dependent on `repeat_count` for periodic test signals. The final successful approach implements the 'repeat' glitch by taking the initial segment of length `chunk_len / repeat_count` and tiling it `repeat_count` times to fill the output chunk. This ensures the output structure directly reflects the `repeat_count` parameter.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Modified `_apply_repeat_glitch`), `tests/synthesis/test_effects.py` (Removed `xfail` marker).
+- **Notes**: This change successfully fixed the failing test `test_refined_glitch_repeat_count_affects_output`. All 13 tests related to `refined_glitch` now pass.
+
+---
+
+
+### Implementation: Manual Chorus LFO & Feedback (REQ-STAB-02 Regression Fix) - 2025-04-12 15:05:12
+- **Approach**: Modified `apply_chorus` in `src/robotic_psalms/synthesis/effects.py` to implement LFO modulation and feedback. Replaced the previous numpy slicing approach with sample-by-sample processing. Created delay buffers for each voice and channel. Calculated time-varying delay based on `rate_hz`, `depth`, and static offsets. Used linear interpolation to read from delay buffers. Implemented a feedback loop by adding the scaled delayed output back to the buffer input. Clipped feedback near 1.0 and buffer input for stability.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Modified `apply_chorus`).
+- **Notes**: The implementation successfully addresses the regression where `rate_hz` and `feedback` were ignored. All 6 chorus tests in `tests/synthesis/test_effects.py` now pass.
+
+---
+
+
 ### Implementation: Update Docstrings for MIDI Input (REQ-ART-MEL-02 - Documentation) - 2025-04-12 06:05:12
 - **Approach**: Updated docstrings for `synthesize_text` in `src/robotic_psalms/synthesis/vox_dei.py` and `parse_midi_melody` in `src/robotic_psalms/utils/midi_parser.py`.
 - **Key Files Modified/Created**: `src/robotic_psalms/synthesis/vox_dei.py` (Modified docstring), `src/robotic_psalms/utils/midi_parser.py` (Modified docstring).
@@ -284,4 +308,12 @@
 - **Approach**: Implemented the minimal `SaturationParameters` Pydantic model with fields (`drive`, `tone`, `mix`) and basic validation (`ge`, `le`). Implemented the `apply_saturation(audio: np.ndarray, sample_rate: int, params: SaturationParameters) -> np.ndarray` function signature with a minimal body (`return audio.astype(np.float32).copy()`) to resolve import errors.
 - **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Added model and function).
 - **Notes**: This minimal implementation resolves the `ImportError`/`NameError` reported by the `tdd` mode for `tests/synthesis/test_effects.py` related to saturation. Tests should now collect and run, failing on assertions. Unrelated Pylance error noted in `test_effects.py` regarding `GlitchParameters` instantiation.
+
+
+
+### Implementation: Manual Multi-Voice Chorus (REQ-STAB-02) - 2025-04-12 14:50:23
+- **Approach**: Modified `apply_chorus` in `src/robotic_psalms/synthesis/effects.py` to implement a manual multi-voice chorus effect. Replaced the `pedalboard.Chorus` implementation with logic using `numpy` for delay lines. The number of voices is controlled by `params.num_voices`. Delay times are varied linearly around `params.delay_ms` based on `params.depth`. The delayed voices are summed and mixed with the dry signal according to `params.wet_dry_mix`. The `rate_hz` and `feedback` parameters are intentionally ignored by this implementation.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Modified `apply_chorus`), `tests/synthesis/test_effects.py` (Removed `xfail` marker from `test_chorus_parameters_affect_output`).
+- **Notes**: The implementation successfully addresses the `xfail` related to `num_voices`. Tests for `rate_hz` and `feedback` within `test_chorus_parameters_affect_output` now fail as expected, confirming these parameters are ignored. All other chorus tests pass.
+ The `rate_hz` and `feedback` parameters were ignored to manage complexity and focus on the core requirement of supporting `num_voices`. Implementing LFO modulation (`rate_hz`) and feedback loops manually adds significant complexity beyond the scope of fixing the `num_voices` test failure.
 

@@ -27,7 +27,6 @@ from robotic_psalms.synthesis.effects import (
     apply_master_dynamics, # Placeholder
     MasterDynamicsParameters, # Placeholder
 )
-from pedalboard._pedalboard import Pedalboard # Import as suggested by Pylance
 
 SAMPLE_RATE = 44100
 
@@ -652,7 +651,6 @@ def test_apply_chorus_stereo(dry_stereo_signal, default_chorus_params):
     assert chorused_signal.shape[0] == dry_stereo_signal.shape[0]
     assert not np.allclose(chorused_signal, dry_stereo_signal), "Chorus did not alter stereo signal"
 
-@pytest.mark.xfail(reason="pedalboard.Chorus does not support num_voices")
 def test_chorus_parameters_affect_output(dry_mono_signal, default_chorus_params):
     """Test that changing chorus parameters alters the output."""
     chorused_default = apply_chorus(dry_mono_signal, SAMPLE_RATE, default_chorus_params)
@@ -940,7 +938,6 @@ def test_refined_glitch_chunk_size_affects_output(dry_mono_signal, default_glitc
 
     # Could add similar check for 'stutter' if needed
 
-@pytest.mark.xfail(reason="Current offset logic in _apply_repeat_glitch means repeat_count > 1 yields same output slice")
 def test_refined_glitch_repeat_count_affects_output(dry_mono_signal, default_glitch_params):
     """Test that repeat_count affects output for relevant types (repeat) (ensuring glitches run)."""
     # Use intensity=1.0 to guarantee glitches are applied for comparison

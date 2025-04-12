@@ -65,6 +65,29 @@
 ## Progress
 *Milestones, completed tasks, overall status.*
 
+#### [2025-04-12 06:06:30] - Task: Update Documentation for MIDI Melody Input (REQ-ART-MEL-02 - Documentation)
+- **Status:** Completed.
+- **Deliverables:** Updated `README.md` Parameter Guide for `midi_path`. Delegated and confirmed updates for `PsalmConfig` in `config.py` (add `midi_path` field) and docstrings in `vox_dei.py` (`synthesize_text`) and `midi_parser.py` (`parse_midi_melody`).
+---
+
+
+#### [2025-04-12 06:05:12] - Task: Update Docstrings for MIDI Input (REQ-ART-MEL-02 - Documentation)
+- **Status:** Completed.
+- **Deliverables:** Updated docstrings in `src/robotic_psalms/synthesis/vox_dei.py` (`synthesize_text`) and `src/robotic_psalms/utils/midi_parser.py` (`parse_midi_melody`) to accurately reflect MIDI path input and parsing logic.
+---
+
+
+#### [2025-04-12 05:30:31] - Feature: Functional MIDI Parser (REQ-ART-MEL-02 - Green Phase Part 1)
+- **Status:** Completed.
+- **Deliverables:** Implemented `parse_midi_melody` function in `src/robotic_psalms/utils/midi_parser.py` using `pretty_midi` and `librosa`. Added `pretty_midi` dependency. Created script to generate test fixtures. Fixed regressions in `src/robotic_psalms/synthesis/vox_dei.py` related to the previous `melody` parameter removal. All tests pass (153 passed, 8 xfailed).
+---
+
+
+#### [2025-04-12 04:47:51] - Task: Stage and Commit Melodic Contour Input (REQ-ART-MEL-01)
+- **Status:** Completed.
+- **Deliverables:** Staged all changes using `git add .` and committed with message `feat(synthesis): Implement melodic contour input (REQ-ART-MEL-01) ...`.
+---
+
 #### [2025-04-12 04:30:41] - Task: Update Docstrings for Melodic Contour (REQ-ART-MEL-01 Related)
 - **Status:** Completed.
 - **Deliverables:** Updated docstrings for `synthesize_text` and `_apply_melody_contour` in `src/robotic_psalms/synthesis/vox_dei.py` to include details about the `melody` parameter and improve the description of the contour application process.
@@ -340,6 +363,12 @@
 #### [2025-04-12 04:32:12] - Feature: Melodic Contour Input (REQ-ART-MEL-01)
 - **Status:** Completed.
 - **Deliverables:** Implemented melodic contour application in `VoxDeiSynthesizer` using `librosa` pitch shifting based on `melody` input argument (`List[Tuple[float, float]]`). Updated `synthesize_text` signature. Relevant tests created/updated and passing. Documentation updated.
+---
+
+
+#### [2025-04-12 06:07:43] - Feature: MIDI Melody Input (REQ-ART-MEL-02)
+- **Status:** Completed.
+- **Deliverables:** Implemented `parse_midi_melody` utility using `pretty_midi`. Updated `VoxDeiSynthesizer` and `PsalmConfig` to use `midi_path` argument/field. Updated tests and documentation.
 ---
 #### [2025-04-12 04:03:56] - Feature: Master Dynamics Processing (REQ-ART-M01)
 - **Status:** Completed & Ready for Commit.

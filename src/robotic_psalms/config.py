@@ -267,6 +267,11 @@ class PsalmConfig(BaseModel):
         default_factory=VoiceRange,
         description="Voice range settings"
     )
+    midi_path: Optional[str] = Field(
+        default=None,
+        description='Optional path to a MIDI file for melodic input. Overrides internal pitch settings if provided.'
+    )
+
     vocal_timbre: VocalTimbre = Field(
         default_factory=VocalTimbre,
         description="Voice timbre blend settings"

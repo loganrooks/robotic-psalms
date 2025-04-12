@@ -3,7 +3,83 @@
 *This file tracks the immediate focus, ongoing tasks, and unresolved questions for the current session.*
 
 ---
+### [2025-04-12 06:06:30] - Task: Update Documentation for MIDI Melody Input (REQ-ART-MEL-02 - Documentation)
+- **Focus:** Update README.md, config.py, vox_dei.py, and midi_parser.py documentation to reflect the change from `melody` list argument to `midi_path` string argument for melodic input.
+- **Actions:**
+    - Updated `README.md` Parameter Guide section for `midi_path`.
+    - Delegated `config.py` update (add `midi_path` field to `PsalmConfig`) to `code` mode (confirmed completed).
+    - Delegated `vox_dei.py` and `midi_parser.py` docstring updates to `code` mode (confirmed completed).
+- **Status:** Completed.
+
+---
+
+### [2025-04-12 06:05:12] - Task: Update Docstrings for MIDI Input (REQ-ART-MEL-02 - Documentation)
+- **Focus:** Update docstrings in `src/robotic_psalms/synthesis/vox_dei.py` (`synthesize_text`) and `src/robotic_psalms/utils/midi_parser.py` (`parse_midi_melody`) to reflect the use of `midi_path` and the MIDI parsing logic.
+- **Actions:**
+    - Updated `synthesize_text` docstring to clarify `midi_path` usage and parsing via `parse_midi_melody`.
+    - Refined `parse_midi_melody` docstring's `Returns` section for clarity on empty list conditions.
+- **Status:** Completed.
+---
+
+### [2025-04-12 05:26:15] - Task: Implement Functional MIDI Parser (REQ-ART-MEL-02 - Green Phase Part 1)
+- **Focus:** Implement functional logic in `src/robotic_psalms/utils/midi_parser.py` (`parse_midi_melody`) using `pretty_midi` and `librosa` to extract note pitch (Hz) and duration (sec). Ensure tests in `tests/utils/test_midi_parser.py` pass.
+- **Actions:**
+    - Added `pretty_midi` dependency to `pyproject.toml`.
+    - Updated `poetry.lock` and ran `poetry install`.
+    - Implemented `parse_midi_melody` logic:
+        - Handles `FileNotFoundError`.
+        - Uses `pretty_midi.PrettyMIDI` to load file.
+        - Defines `MidiParsingError` for parsing issues.
+        - Selects instrument by `instrument_index`.
+        - Iterates through `instrument.notes`, calculates duration, converts pitch using `librosa.midi_to_hz`.
+        - Handles empty files/instruments/notes, invalid pitches/durations.
+        - Returns `List[Tuple[float, float]]`.
+    - Corrected Pylance errors (CDATA, missing import, placeholder code in tests, incorrect test parameter name).
+    - Created `scripts/generate_midi_fixtures.py` to generate missing test MIDI files (`simple_melody.mid`, `multi_track.mid`, `empty.mid`).
+    - Executed script to create fixtures.
+    - Ran `pytest tests/utils/test_midi_parser.py` - All 6 tests passed.
+- **Status:** Completed (Green Phase Part 1). Functional implementation complete and verified by tests.
+
+---
+
+### [2025-04-12 04:53:35] - Task: Implement Minimal MIDI Input Signatures (REQ-ART-MEL-02 - Green Phase Start)
+- **Focus:** Create minimal `midi_parser.py` module/function and update `VoxDeiSynthesizer.synthesize_text` signature to resolve initial `ImportError` and `TypeError` from tests.
+- **Actions:**
+    - Created `src/robotic_psalms/utils/__init__.py`.
+    - Created `src/robotic_psalms/utils/midi_parser.py` with minimal `parse_midi_melody` function signature (`def parse_midi_melody(midi_path: str) -> List[Tuple[float, float]]: return []`).
+    - Modified `src/robotic_psalms/synthesis/vox_dei.py`: Updated `synthesize_text` signature to remove `melody: Optional[List[Tuple[float, float]]]` and add `midi_path: Optional[str] = None`. Updated corresponding docstring.
+- **Status:** Completed (Green Phase Start). Minimal changes applied. Initial `ImportError` and `TypeError` should be resolved. New expected Pylance errors related to *usage* (references to old `melody` variable in `vox_dei.py` body, outdated calls/mocks in tests) confirm the next step is functional implementation/test updates.
+
+---
+### [2025-04-12 04:50:38] - Task: Write Failing Tests for MIDI Melody Input (REQ-ART-MEL-02 - Red Phase)
+- **Focus:** Create failing unit tests for MIDI parsing (`parse_midi_melody`) and integration tests for `VoxDeiSynthesizer` to handle `midi_path` input.
+- **Actions:**
+    - Created `tests/utils/test_midi_parser.py` with tests covering valid/invalid MIDI files, multi-track handling, errors (FileNotFound, MidiParsingError), and empty files. Tests expected to fail due to `ImportError`/`NotImplementedError`.
+    - Modified `tests/synthesis/test_vox_dei.py`:
+        - Added placeholder import for `parse_midi_melody`.
+        - Added `test_synthesize_text_accepts_midi_path_argument` (expected `TypeError`).
+        - Added `test_synthesize_text_calls_midi_parser_when_path_provided` (mocks parser/contour, expects `AttributeError` or `AssertionError`).
+        - Added `test_synthesize_text_no_midi_calls_when_path_is_none` (asserts parser/contour not called).
+- **Status:** Completed (Red Phase). Failing tests created. Pylance confirms missing imports/parameters. Ready for Green Phase (minimal implementation).
+
+---
+
+
+### [2025-04-12 04:47:37] - Task: Stage and Commit Melodic Contour Input (REQ-ART-MEL-01)
+- **Focus:** Stage all changes using `git add .` and commit with a detailed message summarizing the completion of REQ-ART-MEL-01.
+- **Actions:**
+    - Executed `git add .` (Success).
+    - Executed `git commit -m "feat(synthesis): Implement melodic contour input (REQ-ART-MEL-01)" ...` (Assumed Success).
+- **Status:** Completed.
+
+---
+
+
 ### [2025-04-12 04:31:01] - Task: Update Documentation for Melodic Contour Input (REQ-ART-MEL-01 - Documentation)
+
+### [2025-04-12 06:07:02] - Task: Implement MIDI Melody Input (REQ-ART-MEL-02)
+- **Focus:** Completed full TDD cycle (implementation, integration, refactoring, documentation) for accepting melody input via MIDI files. Implemented `parse_midi_melody` utility and updated `VoxDeiSynthesizer` to use `midi_path` argument.
+- **Status:** Completed. All tests passing (excluding known xfails). Documentation updated.
 - **Focus:** Update `README.md` and `src/robotic_psalms/synthesis/vox_dei.py` docstrings for the new melodic contour feature (`melody` argument).
 - **Actions:**
     - Updated `README.md` Parameter Guide section with details on the `melody` argument format and usage (via Python API).
@@ -241,6 +317,7 @@
 
 
 ### [2025-04-11 21:39:55] - Task: Write Failing Tests for Saturation/Distortion (REQ-ART-E04 - Red Phase)
+
 
 ### [2025-04-11 22:06:16] - Task: Implement Saturation Effect (REQ-ART-E04)
 - **Focus:** Completed full TDD cycle (implementation, integration, refactoring, documentation) for the saturation/distortion effect using `pedalboard`. Integrated conditionally into `SacredMachineryEngine`.

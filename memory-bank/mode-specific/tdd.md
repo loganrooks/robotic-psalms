@@ -23,6 +23,28 @@
 ## Current Test Focus
 <!-- Describe the component/feature being tested -->
 
+### Test Plan: MIDI Melody Input (REQ-ART-MEL-02) - [2025-04-12 04:50:53]
+#### Unit Tests (`tests/utils/test_midi_parser.py`):
+- Test Case: Parse valid single-track MIDI / Expected: `List[Tuple[float, float]]` / Status: Written (Failing - Red)
+- Test Case: Parse multi-track MIDI (default track) / Expected: Correct list for default track / Status: Written (Failing - Red)
+- Test Case: Parse multi-track MIDI (select index) / Expected: Correct list for selected track / Status: Written (Failing - Red)
+- Test Case: Handle FileNotFoundError / Expected: `FileNotFoundError` / Status: Written (Failing - Red)
+- Test Case: Handle non-MIDI file / Expected: `MidiParsingError` or `ValueError` / Status: Written (Failing - Red)
+- Test Case: Handle empty/no-note MIDI / Expected: `[]` / Status: Written (Failing - Red)
+#### Integration Tests (`tests/synthesis/test_vox_dei.py`):
+- Test Case: `synthesize_text` accepts `midi_path` argument / Expected: No `TypeError` (initially fails) / Status: Written (Failing - Red)
+- Test Case: `parse_midi_melody` called when `midi_path` provided / Expected: Mock parser called with path / Status: Written (Failing - Red)
+- Test Case: `_apply_melody_contour` called with parsed melody / Expected: Mock contour called with parser result / Status: Written (Failing - Red)
+- Test Case: No MIDI calls if `midi_path` is None / Expected: Parser and contour mocks not called / Status: Written (Failing - Red)
+#### Edge Cases Covered:
+- Valid/Invalid MIDI files
+- Single/Multi-track files
+- File not found
+- Empty/No-note files
+- `midi_path` provided vs. None
+
+
+
 
 ### Test Plan: Melodic Contour Input (REQ-ART-MEL-01) - [2025-04-12 04:16:30]
 #### Unit Tests:
@@ -296,6 +318,20 @@
 - **Green**: Implementation approach: Next step is to modify `VoxDeiSynthesizer.synthesize_text` signature to accept `melody: Optional[List[Tuple[float, float]]] = None` and add a placeholder call to a (currently non-existent) internal method like `_apply_melody_contour` when `melody` is provided.
 - **Refactor**: Improvements made: N/A (Red phase only)
 - **Outcomes**: Established test harness for melodic input feature.
+
+### TDD Cycle: MIDI Melody Input (REQ-ART-MEL-02 - Red Phase) - [2025-04-12 04:50:53]
+- **Start**: [2025-04-12 04:49:45]
+- **Red**: Tests created:
+    - Unit tests in `tests/utils/test_midi_parser.py` for `parse_midi_melody` (valid/invalid files, multi-track, errors, empty). Failing due to `ImportError`/`NotImplementedError`.
+    - Integration tests in `tests/synthesis/test_vox_dei.py` for `midi_path` argument handling, `parse_midi_melody` call, and `_apply_melody_contour` call with parsed result. Failing due to `TypeError`, `AttributeError`, or `AssertionError`.
+- **Green**: Implementation approach: Next step is to:
+    1. Create `src/robotic_psalms/utils/midi_parser.py` with minimal `parse_midi_melody` function and `MidiParsingError` class.
+    2. Update `VoxDeiSynthesizer.synthesize_text` signature to accept `midi_path: Optional[str] = None`.
+    3. Add minimal logic to `synthesize_text` to import and call `parse_midi_melody` if `midi_path` is provided, then call `_apply_melody_contour` with the result.
+- **Refactor**: Improvements made: N/A (Red phase only)
+- **Outcomes**: Established test harness for MIDI melody input feature (REQ-ART-MEL-02).
+
+
 
 
 

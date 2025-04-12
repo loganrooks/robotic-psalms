@@ -279,19 +279,20 @@ robotic-psalms examples/psalm.txt output.wav --config examples/config.yml --visu
   - `enable_limiter`: (Boolean, Default: true) Enables the limiter.
   - `limiter_threshold_db`: (Float, <= 0.0, Default: -1.0) The maximum level (dB) the output signal is allowed to reach. Prevents clipping.
 
-- `melody` (Python API Argument): (Optional) Provides a target melodic contour for the synthesized vocals. This argument is passed directly to the `VoxDeiSynthesizer.synthesize_text` method, not set via YAML.
-  - **Format**: `List[Tuple[float, float]]`, where each tuple represents `(pitch_in_hz, duration_in_seconds)`.
-  - **Example (Conceptual Python)**:
-    ```python
-    melody_contour = [
-        (261.63, 0.5), # C4 for 0.5 seconds
-        (293.66, 0.5), # D4 for 0.5 seconds
-        (329.63, 1.0)  # E4 for 1.0 second
-    ]
-    synthesizer.synthesize_text(text="...", melody=melody_contour)
+- `midi_path`: (Optional, String) Path to a MIDI file containing the desired melody. If provided, the system will parse the MIDI file (typically using the first instrument track) to extract pitch and duration information, overriding any internal pitch generation or other melodic settings for the vocals.
+  - **Format**: A valid file path string (e.g., `"./melodies/my_melody.mid"`).
+  - **Parsing**: The `src.robotic_psalms.utils.midi_parser.parse_midi_melody` utility is used internally to convert the MIDI notes into a list of `(pitch_hz, duration_sec)` tuples.
+  - **Example (Configuration)**:
+    ```yaml
+    # In your config.yml
+    midi_path: "path/to/your/melody.mid"
     ```
-  - **Notes**: The total duration of the melody should ideally match the expected duration of the synthesized speech. The feature uses `librosa` for pitch estimation and shifting, which may introduce audible artifacts, especially with large pitch shifts or noisy input.
-
+  - **Example (Python API)**:
+    ```python
+    # When calling the synthesizer directly
+    synthesizer.synthesize_text(text="...", midi_path="path/to/your/melody.mid")
+    ```
+  - **Notes**: Ensure the MIDI file is accessible. Parsing errors might occur for invalid MIDI files. The quality of the melodic contour application depends on the accuracy of the MIDI data and the underlying pitch shifting capabilities.
 ### Voice Timbre
 Blend between three voice characteristics:
 - `choirboy`: Pure, angelic qualities

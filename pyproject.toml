@@ -24,6 +24,7 @@ pyworld = ">=0.3.2" # For WORLD vocoder analysis/synthesis
 mido = ">=1.2.10"
 python-rtmidi = ">=1.4.9"
 
+pretty_midi = ">=0.2.9" # For high-level MIDI structure access
 # Configuration
 pydantic = ">=2.0.0"
 pyyaml = ">=6.0.0"

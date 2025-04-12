@@ -1,6 +1,5 @@
 import logging
 from typing import Optional, cast, List, Tuple # Removed Protocol
-from typing import Optional, cast # Removed Protocol
 
 import numpy as np
 import numpy.typing as npt
@@ -12,7 +11,13 @@ from scipy import signal
 from ..config import PsalmConfig, VocalTimbre
 # Corrected imports for TTS engines and base class
 from .tts.base import TTSEngine, ParameterEnum
-from .effects import FormantShiftParameters, apply_robust_formant_shift, ResonantFilterParameters, BandpassFilterParameters, apply_rbj_lowpass_filter, apply_bandpass_filter
+from .effects import (
+    FormantShiftParameters, apply_robust_formant_shift,
+    ResonantFilterParameters, BandpassFilterParameters,
+    apply_rbj_lowpass_filter, apply_bandpass_filter
+)
+# Import the MIDI parser function and error
+from ..utils.midi_parser import parse_midi_melody, MidiParsingError
 from .tts.engines.espeak import EspeakNGWrapper
 
 
@@ -107,15 +112,16 @@ class VoxDeiSynthesizer:
              # Consider raising an error here if TTS is essential
 
 
-    def synthesize_text(self, text: str, melody: Optional[List[Tuple[float, float]]] = None) -> tuple[npt.NDArray[np.float32], int]: # Reverted type hint
+    def synthesize_text(self, text: str, midi_path: Optional[str] = None) -> tuple[npt.NDArray[np.float32], int]: # Reverted type hint
         """Synthesize text using TTS engine, optionally applying melody contour, and return audio data and sample rate.
 
         Args:
             text (str): The text to synthesize.
-            melody (Optional[List[Tuple[float, float]]]): An optional list of (pitch_hz, duration_sec)
-                tuples defining a target melodic contour. If provided, the synthesizer
-                will attempt to shift the pitch of the synthesized speech segments
-                to match this contour. Defaults to None (no contour applied).
+            midi_path (Optional[str]): An optional path to a MIDI file containing a melody.
+                If provided, the synthesizer will parse the MIDI using
+                `robotic_psalms.utils.midi_parser.parse_midi_melody` and apply the
+                resulting melodic contour (List[Tuple[float, float]]) to the synthesized speech.
+                Defaults to None (no MIDI contour applied).
 
         Returns:
             tuple[npt.NDArray[np.float32], int]: A tuple containing the synthesized audio
@@ -198,12 +204,42 @@ class VoxDeiSynthesizer:
 
             self.logger.debug(f"Post-processing max amplitude: {np.max(np.abs(audio))}")
 
-            # --- Apply Melody Contour ---
-            if melody: # Check if melody is not None and not empty
-                self.logger.debug("Applying melody contour...")
-                audio = self._apply_melody_contour(audio, synth_sample_rate, melody)
+            # --- Apply Melody Contour from MIDI ---
+            parsed_melody: Optional[List[Tuple[float, float]]] = None
+            if midi_path:
+                self.logger.info(f"MIDI path provided: {midi_path}. Attempting to parse melody.")
+                try:
+                    # Assuming default instrument index 0 for now
+                    parsed_melody = parse_midi_melody(midi_path, instrument_index=0)
+                    if not parsed_melody:
+                         self.logger.warning(f"MIDI parsing resulted in an empty melody for path: {midi_path}")
+                except FileNotFoundError:
+                    self.logger.error(f"MIDI file not found at path: {midi_path}. Skipping contour application.")
+                except MidiParsingError as e:
+                    self.logger.error(f"Failed to parse MIDI file '{midi_path}': {e}. Skipping contour application.")
+                except Exception as e: # Catch any other unexpected errors during parsing
+                    self.logger.exception(f"Unexpected error parsing MIDI file '{midi_path}': {e}. Skipping contour application.")
+
+            # Check if parsing was successful and yielded notes before applying contour
+            if parsed_melody:
+                self.logger.debug(f"Applying melody contour from parsed MIDI ({len(parsed_melody)} notes)...")
+                try:
+                    audio = self._apply_melody_contour(audio, synth_sample_rate, parsed_melody)
+                    # --- DEBUG: Save audio after melody contour ---
+                    if self.logger.isEnabledFor(logging.DEBUG):
+                        import soundfile as sf
+                        from pathlib import Path
+                        try:
+                            contour_path = Path("debug_vocals_04_after_contour.wav")
+                            sf.write(contour_path, audio, synth_sample_rate)
+                            self.logger.debug(f"Saved audio after melody contour to {contour_path}")
+                        except Exception as write_err:
+                            self.logger.error(f"Failed to save audio after melody contour: {write_err}")
+                    # --- END DEBUG ---
+                except Exception as contour_err:
+                     self.logger.exception(f"Error applying melody contour: {contour_err}. Proceeding without contour.")
             else:
-                self.logger.debug("No melody provided, skipping contour application.")
+                self.logger.debug("No valid MIDI melody provided or parsed, skipping contour application.")
             # --- End Melody Contour ---
 
             return audio, synth_sample_rate

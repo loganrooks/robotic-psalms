@@ -5,6 +5,11 @@
 ---
 
 
+### Plan Item: Update MIDI Melody Input Docs (REQ-ART-MEL-02) - [2025-04-12 06:06:30]
+- **Type**: Guide / **Audience**: User/Dev / **Outline**: 1. Update README (Param Guide for `midi_path`) 2. Delegate config.py update (add `midi_path` field) 3. Delegate vox_dei.py/midi_parser.py docstring updates / **Status**: Done / **Owner**: docs-writer -> code / **Source**: User Task REQ-ART-MEL-02 / **Location**: README.md, src/robotic_psalms/config.py, src/robotic_psalms/synthesis/vox_dei.py, src/robotic_psalms/utils/midi_parser.py
+
+
+
 ### Plan Item: Update Melodic Contour Docs (REQ-ART-MEL-01) - [2025-04-12 04:31:23]
 - **Type**: Guide / **Audience**: User/Dev / **Outline**: 1. Update README (Param Guide for API arg) 2. Delegate vox_dei.py docstring update / **Status**: Done / **Owner**: docs-writer -> code / **Source**: User Task REQ-ART-MEL-01 / **Location**: README.md, src/robotic_psalms/synthesis/vox_dei.py
 

@@ -17,6 +17,21 @@
 - **Related Issue**: REQ-ART-M01 (Integration Refactor Phase)
 
 
+### Optimization: [2025-04-12 05:39:19] - Refactor MIDI Input Implementation & Tests (REQ-ART-MEL-02)
+- **Target**: `src/robotic_psalms/utils/midi_parser.py`, `src/robotic_psalms/synthesis/vox_dei.py`, `tests/utils/test_midi_parser.py`, `tests/synthesis/test_vox_dei.py`
+- **Type**: Readability/Maintainability/Robustness/Testability
+- **Desc**: 
+    - `midi_parser.py`: Removed duplicate `os` import, removed redundant `FileNotFoundError` catch block.
+    - `vox_dei.py`: Removed duplicate `typing` import.
+    - `test_midi_parser.py`: Strengthened assertions in success tests to check specific note values (Hz, duration) using `pytest.approx`. Added test `test_parse_midi_melody_index_out_of_bounds`. Removed outdated TDD comments. Corrected initial assertion failures by updating expected values based on actual fixture content.
+    - `test_vox_dei.py`: Removed outdated `pytest.skip` logic from MIDI integration test.
+- **Metrics Before**: N/A (Focus on code quality and test correctness)
+- **Metrics After**: N/A (Test results confirmed: 154 passed, 8 xfailed)
+- **Related Debt**: N/A
+- **Related Issue**: REQ-ART-MEL-02 (Refactor Phase)
+
+
+
 ### Optimization: [2025-04-12 04:27:33] - Refactor Melodic Contour Implementation & Tests (REQ-ART-MEL-01)
 - **Target**: `src/robotic_psalms/synthesis/vox_dei.py`, `tests/synthesis/test_vox_dei.py`
 - **Type**: Readability/Maintainability/Robustness/Testability

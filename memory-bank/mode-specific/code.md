@@ -5,6 +5,22 @@
 ---
 
 
+### Implementation: Update Docstrings for MIDI Input (REQ-ART-MEL-02 - Documentation) - 2025-04-12 06:05:12
+- **Approach**: Updated docstrings for `synthesize_text` in `src/robotic_psalms/synthesis/vox_dei.py` and `parse_midi_melody` in `src/robotic_psalms/utils/midi_parser.py`.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/vox_dei.py` (Modified docstring), `src/robotic_psalms/utils/midi_parser.py` (Modified docstring).
+- **Notes**: Clarified the `midi_path` parameter description in `synthesize_text` to mention parsing via `parse_midi_melody`. Refined the `Returns` description in `parse_midi_melody` for better accuracy regarding when an empty list is returned.
+
+---
+
+
+### Implementation: Functional MIDI Parser (REQ-ART-MEL-02 - Green Phase Part 1) - 2025-04-12 05:30:46
+- **Approach**: Implemented `parse_midi_melody` in `src/robotic_psalms/utils/midi_parser.py`. Used `pretty_midi.PrettyMIDI` to load the file, selected the instrument based on `instrument_index`, iterated through notes, calculated duration (`note.end - note.start`), and converted pitch to Hz using `librosa.midi_to_hz`. Added error handling for `FileNotFoundError` and general parsing errors (`MidiParsingError`). Handled cases with no instruments, invalid index, no notes, invalid pitch, and zero/negative duration. Added `pretty_midi` dependency and created a script (`scripts/generate_midi_fixtures.py`) to generate missing test MIDI files. Fixed regressions in `src/robotic_psalms/synthesis/vox_dei.py` (imported parser, used `parsed_melody` variable) and updated `tests/synthesis/test_vox_dei.py` (removed obsolete tests, fixed assertion).
+- **Key Files Modified/Created**: `src/robotic_psalms/utils/midi_parser.py` (Implemented function), `pyproject.toml` (Added dependency), `scripts/generate_midi_fixtures.py` (Created), `tests/utils/test_midi_parser.py` (Removed placeholders, fixed param name), `src/robotic_psalms/synthesis/vox_dei.py` (Imported parser, fixed logic), `tests/synthesis/test_vox_dei.py` (Removed obsolete tests, fixed assertion).
+- **Notes**: All tests pass (153 passed, 8 xfailed). The parser defaults to `instrument_index=0`. Further integration into `VoxDeiSynthesizer` to actually *use* the parsed melody for contour application is required in the next phase.
+
+---
+
+
 ### Implementation: Functional Melodic Contour (REQ-ART-MEL-01 - Green Phase) - 2025-04-12 04:23:22
 - **Approach**: Implemented the functional logic for applying a melodic contour to synthesized speech. Added conditional logic in `synthesize_text` to call `_apply_melody_contour` only when a `melody` list (tuples of Hz, duration) is provided. The `_apply_melody_contour` method iterates through the melody segments, estimates the original pitch of the corresponding audio segment using `librosa.pyin`, calculates the required pitch shift in semitones to match the target pitch, and applies the shift using `librosa.effects.pitch_shift`. Handled edge cases like short segments (skipped pyin), zero/invalid pitches (skipped shift), and potential errors during processing. Concatenated processed segments and ensured final audio length matched the original.
 - **Key Files Modified/Created**: `src/robotic_psalms/synthesis/vox_dei.py` (Modified `synthesize_text`, `_apply_melody_contour`), `tests/synthesis/test_vox_dei.py` (Modified tests `test_synthesize_text_accepts_melody_argument`, `test_synthesize_text_applies_melody_contour`).
@@ -212,6 +228,13 @@
 - **Purpose**: High-quality speech analysis/synthesis (vocoder) used for formant shifting.
 - **Used by**: `src/robotic_psalms/synthesis/effects.py`
 - **Config notes**: Added back to main dependencies in `pyproject.toml`.
+
+
+### Dependency: pretty_midi - 2025-04-12 05:30:46
+- **Version**: >=0.2.9
+- **Purpose**: Provides a high-level interface for parsing MIDI files, accessing instruments, notes, pitch, and timing information.
+- **Used by**: `src/robotic_psalms/utils/midi_parser.py`
+- **Config notes**: Added to main dependencies in `pyproject.toml`.
 
 ### Implementation: Pylance Fixes for vox_dei.py - 2025-04-08 10:23:06
 - **Approach**: Resolved Pylance static analysis issues in `src/robotic_psalms/synthesis/vox_dei.py`. Removed unused imports and deprecated `EspeakWrapper` fallback. Refactored filter methods (`_choir_filter`, `_android_filter`, `_machinery_filter`) to use `signal.butter(..., output='sos')` and `signal.sosfiltfilt` for improved stability and type inference, resolving errors related to `signal.butter` return types.

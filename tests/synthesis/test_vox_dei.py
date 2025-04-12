@@ -2,12 +2,16 @@ import pytest
 import numpy as np
 import logging
 from unittest.mock import patch, MagicMock, ANY
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 
 from robotic_psalms.synthesis.vox_dei import VoxDeiSynthesisError
 from robotic_psalms.synthesis.tts.engines.espeak import EspeakNGWrapper
 from robotic_psalms.synthesis.effects import FormantShiftParameters # Added import
+
+# Attempt to import the non-existent MIDI parser function and error for patching
+# Import the actual MIDI parser function and error class
+from robotic_psalms.utils.midi_parser import parse_midi_melody, MidiParsingError
 
 # Import the actual synthesizer and config
 from robotic_psalms.config import PsalmConfig # Import config
@@ -157,39 +161,8 @@ def sample_melody() -> List[Tuple[float, float]]:
         (349.23, 0.5), # F4
     ]
 
-def test_synthesize_text_accepts_melody_argument(sample_melody):
-    """Test that synthesize_text can be called with a melody argument (will fail initially)."""
-    config = PsalmConfig()
-    synthesizer = VoxDeiSynthesizer(config=config)
-    text_input = "Ah"
-
-    # Mock the underlying synth call to avoid actual synthesis
-    with patch.object(EspeakNGWrapper, 'synth', return_value=(np.zeros(100, dtype=np.float32), 22050)):
-        # This call should now succeed as the signature accepts the melody argument.
-        # We pass melody as a keyword argument for clarity
-            synthesizer.synthesize_text(text_input, melody=sample_melody)
-
-@patch('robotic_psalms.synthesis.vox_dei.VoxDeiSynthesizer._apply_melody_contour', return_value=np.zeros(100, dtype=np.float32))
-def test_synthesize_text_applies_melody_contour(mock_apply_melody, sample_melody):
-    """Test that synthesize_text calls an internal method to apply melody (will fail initially)."""
-    config = PsalmConfig()
-    synthesizer = VoxDeiSynthesizer(config=config)
-    text_input = "Ah"
-    base_audio = np.random.rand(100).astype(np.float32)
-    sample_rate = 22050
-
-    # Mock the base TTS synthesis
-    with patch.object(EspeakNGWrapper, 'synth', return_value=(base_audio, sample_rate)):
-        # Assume synthesize_text accepts melody (this test focuses on the *application*)
-        # We might need to temporarily adjust the signature or use a different approach
-        # if the TypeError from the previous test blocks this one.
-        # For now, let's assume the signature is updated conceptually for this test.
-        # Attempt the call, expecting the mock _apply_melody_contour to be checked
-        # The try/except/skip block is removed as the signature now accepts 'melody'
-        synthesizer.synthesize_text(text_input, melody=sample_melody)
-
-    # This assertion will fail until _apply_melody_contour is actually called
-    mock_apply_melody.assert_called_once_with(ANY, sample_rate, sample_melody) # Check it's called with audio, sample_rate, and melody
+# Removed obsolete test: test_synthesize_text_accepts_melody_argument
+# Removed obsolete test: test_synthesize_text_applies_melody_contour
 
 def test_synthesize_text_handles_no_melody():
     """Test that synthesize_text works normally without a melody argument."""
@@ -213,6 +186,65 @@ def test_synthesize_text_handles_no_melody():
 
     # Assert that melody application was NOT called
     mock_apply_melody.assert_not_called()
+
+
+# --- MIDI Input Tests (REQ-ART-MEL-02 - Red Phase) ---
+
+# Placeholder path for a dummy MIDI file
+TEST_MIDI_PATH = "tests/fixtures/simple_melody.mid"
+
+# Removed obsolete test: test_synthesize_text_accepts_midi_path_argument
+
+@patch('robotic_psalms.synthesis.vox_dei.parse_midi_melody')
+@patch('robotic_psalms.synthesis.vox_dei.VoxDeiSynthesizer._apply_melody_contour')
+def test_synthesize_text_calls_midi_parser_when_path_provided(mock_apply_contour, mock_parse_midi, sample_melody):
+    """Test that parse_midi_melody is called when midi_path is provided."""
+    config = PsalmConfig()
+    synthesizer = VoxDeiSynthesizer(config=config)
+    text_input = "MIDI Melody"
+    base_audio = np.random.rand(100).astype(np.float32)
+    sample_rate = 22050
+
+    # Configure the mock parser to return a sample melody
+    mock_parse_midi.return_value = sample_melody
+
+    # Mock the base TTS synthesis
+    with patch.object(EspeakNGWrapper, 'synth', return_value=(base_audio, sample_rate)):
+        # Call synthesize_text with the midi_path
+        synthesizer.synthesize_text(text_input, midi_path=TEST_MIDI_PATH)
+
+
+    # Assert that the MIDI parser was called correctly
+    # This will fail with AttributeError if parse_midi_melody is not imported/used,
+    # or AssertionError if not called.
+    mock_parse_midi.assert_called_once_with(TEST_MIDI_PATH, instrument_index=0)
+
+    # Assert that the contour application was called with the result from the parser
+    mock_apply_contour.assert_called_once_with(ANY, sample_rate, sample_melody)
+
+
+@patch('robotic_psalms.synthesis.vox_dei.parse_midi_melody')
+@patch('robotic_psalms.synthesis.vox_dei.VoxDeiSynthesizer._apply_melody_contour')
+def test_synthesize_text_no_midi_calls_when_path_is_none(mock_apply_contour, mock_parse_midi):
+    """Test that MIDI parser and contour application are not called if midi_path is None."""
+    config = PsalmConfig()
+    synthesizer = VoxDeiSynthesizer(config=config)
+    text_input = "No MIDI"
+    base_audio = np.random.rand(100).astype(np.float32)
+    sample_rate = 22050
+
+    # Mock the base TTS synthesis
+    with patch.object(EspeakNGWrapper, 'synth', return_value=(base_audio, sample_rate)):
+        # Call without midi_path (it should default to None)
+        synthesizer.synthesize_text(text_input)
+        # Explicitly call with midi_path=None
+        synthesizer.synthesize_text(text_input, midi_path=None)
+
+    # Assert that neither the parser nor the contour application were called
+    mock_parse_midi.assert_not_called()
+    mock_apply_contour.assert_not_called()
+
+# TODO: Add test case where BOTH melody and midi_path are provided (define expected behavior - e.g., midi_path takes precedence?)
 
 
 

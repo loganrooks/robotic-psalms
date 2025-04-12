@@ -1604,6 +1604,21 @@ sftp = ["paramiko (>=2.7.0)"]
 xxhash = ["xxhash (>=1.4.3)"]
 
 [[package]]
+name = "pretty-midi"
+version = "0.2.10"
+description = "Functions and classes for handling MIDI data conveniently."
+optional = false
+python-versions = "*"
+files = [
+    {file = "pretty_midi-0.2.10.tar.gz", hash = "sha256:ea6e192f94044674e833336ea1f415318ddf28e320302ac7b109edff0d4534bd"},
+]
+
+[package.dependencies]
+mido = ">=1.1.16"
+numpy = ">=1.7.0"
+six = "*"
+
+[[package]]
 name = "pycodestyle"
 version = "2.13.0"
 description = "Python style guide checker"
@@ -2536,4 +2551,4 @@ espeak-ng = ["espeakng"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "e76f6380fe57e43776b2348019eaad00c206ac1238e784b529de6f7dc6b76a3f"
+content-hash = "ea6b9091cc7d742c6444eadf1faeae2e9a99ae88d2835f27f44f400433797779"

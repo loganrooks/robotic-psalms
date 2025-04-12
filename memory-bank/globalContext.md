@@ -65,6 +65,24 @@
 ## Progress
 *Milestones, completed tasks, overall status.*
 
+#### [2025-04-11 22:45:32] - Task: Update Documentation for Vocal Layering Integration (REQ-ART-V03 - Documentation)
+- **Status:** Completed.
+- **Deliverables:** Updated `README.md` example configuration and Parameter Guide for `num_vocal_layers`, `layer_pitch_variation`, `layer_timing_variation_ms`. Verified docstrings in `src/robotic_psalms/config.py` are adequate.
+---
+
+
+#### [2025-04-11 22:31:39] - Task: Add Configuration for Vocal Layering (REQ-ART-V03 - Config)
+- **Status:** Completed.
+- **Deliverables:** Added `num_vocal_layers`, `layer_pitch_variation`, and `layer_timing_variation_ms` fields to `PsalmConfig` in `src/robotic_psalms/config.py`.
+---
+
+
+#### [2025-04-11 22:29:46] - Task: Write Failing Tests for Vocal Layering (REQ-ART-V03 - Red Phase)
+- **Status:** Completed (Red Phase).
+- **Deliverables:** Added failing unit tests (`test_process_psalm_applies_vocal_layering_when_configured`, `test_process_psalm_vocal_layering_varies_parameters`) to `tests/test_sacred_machinery.py`. Tests define the required interface and behavior for vocal layering, currently failing due to missing implementation in `SacredMachineryEngine`.
+---
+
+
 #### [2025-04-11 22:05:58] - Task: Update Documentation for Saturation Effect Integration (REQ-ART-E04 - Documentation)
 - **Status:** Completed.
 - **Deliverables:** Updated `README.md` example configuration and Parameter Guide for `saturation_effect`. Verified docstrings in `src/robotic_psalms/config.py` and `src/robotic_psalms/synthesis/effects.py` are adequate.
@@ -261,4 +279,10 @@
 #### [2025-04-11 22:06:38] - Feature: Saturation Effect (REQ-ART-E04)
 - **Status:** Completed.
 - **Deliverables:** Implemented `apply_saturation` function and `SaturationParameters`/`SaturationConfig` models using `pedalboard.Distortion` and `pedalboard.LowpassFilter` in `src/robotic_psalms/synthesis/effects.py` and `src/robotic_psalms/config.py`. Integrated conditionally into `SacredMachineryEngine`. Core tests passing, documentation updated.
+---
+
+
+#### [2025-04-11 22:46:26] - Feature: Vocal Layering (REQ-ART-V03)
+- **Status:** Completed.
+- **Deliverables:** Implemented vocal layering logic in `SacredMachineryEngine` (`sacred_machinery.py`), synthesizing multiple layers with random pitch/timing variations based on new `PsalmConfig` parameters (`num_vocal_layers`, `layer_pitch_variation`, `layer_timing_variation_ms`). Layers are mixed and normalized. Relevant tests created/updated and passing.
 ---

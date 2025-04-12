@@ -116,3 +116,13 @@
 - **Metrics After**: N/A (Test results: 28 passed)
 - **Related Debt**: N/A
 - **Related Issue**: REQ-ART-E04 (Integration Refactor Phase)
+
+
+### Optimization: [2025-04-11 22:43:12] - Refactor Vocal Layering Integration Code & Tests (REQ-ART-V03)
+- **Target**: `src/robotic_psalms/synthesis/sacred_machinery.py`, `tests/test_sacred_machinery.py`
+- **Type**: Modularity/Readability/Maintainability
+- **Desc**: Refactored vocal layering logic in `sacred_machinery.py`: cleaned duplicate imports, extracted pitch and timing shift logic into helper methods (`_apply_pitch_shift`, `_apply_timing_shift`). Refactored layering tests in `test_sacred_machinery.py`: updated tests to use actual `PsalmConfig` fields (`num_vocal_layers`, `layer_pitch_variation`, `layer_timing_variation_ms`) instead of dictionary injection, added clarifying comments to the mixing test assertion.
+- **Metrics Before**: N/A
+- **Metrics After**: N/A (Test results: 132 passed, 8 xfailed - consistent)
+- **Related Debt**: N/A
+- **Related Issue**: REQ-ART-V03 (Integration Refactor Phase)

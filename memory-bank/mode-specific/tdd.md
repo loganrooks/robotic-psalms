@@ -227,6 +227,20 @@
 - Configuration enabled vs. disabled.
 
 
+
+
+### Test Plan: Vocal Layering (REQ-ART-V03) - [2025-04-11 22:29:54]
+#### Unit Tests:
+- Test Case: `synthesize_text` called once by default / Expected: Call count == 1 / Status: Written
+- Test Case: `synthesize_text` called `num_vocal_layers` times when configured / Expected: Call count == `num_vocal_layers` / Status: Written (Failing - Red)
+- Test Case: `synthesize_text` call parameters vary between layers / Expected: `call_args_list` shows different kwargs / Status: Written (Failing - Red)
+- Test Case: Layered results are mixed / Expected: Final output differs from single layer output / Status: Written
+#### Integration Tests:
+- None yet (Focus is unit tests within `SacredMachineryEngine` logic)
+#### Edge Cases Covered:
+- Default configuration (no layering)
+- Layering enabled (`num_vocal_layers` > 1)
+
 ## Refactoring Targets (Post-Pass)
 <!-- Identify areas for refactoring after tests pass -->
 
@@ -512,6 +526,16 @@
 - **Outcomes**: Confirmed Red phase for integration test. Ready for Green phase (modifying `sacred_machinery.py`).
 
 
+
+
+
+### TDD Cycle: Vocal Layering (REQ-ART-V03 - Red Phase) - [2025-04-11 22:29:54]
+- **Start**: [2025-04-11 22:29:01]
+- **End**: [2025-04-11 22:29:54]
+- **Red**: Tests created: Wrote failing tests in `tests/test_sacred_machinery.py` for vocal layering (`test_process_psalm_applies_vocal_layering_when_configured`, `test_process_psalm_vocal_layering_varies_parameters`). Tests use `@patch` on `VoxDeiSynthesizer.synthesize_text` and assert call count and argument variation based on anticipated `PsalmConfig` fields. Failing due to incorrect call count (current implementation calls only once).
+- **Green**: Implementation approach: Next step is to modify `SacredMachineryEngine.process_psalm` to loop based on `config.num_vocal_layers`, call `synthesize_text` multiple times with varied parameters, and mix the results. Also requires adding layering parameters to `PsalmConfig`.
+- **Refactor**: Improvements made: N/A (Red phase only)
+- **Outcomes**: Established test harness for the vocal layering feature.
 
 ### Test Run: Complex Pad Generation (REQ-ART-A01 - Initial Complexity) - [2025-04-11 18:03:36]
 - **Trigger**: Manual / **Env**: Local / **Suite**: `tests/test_sacred_machinery.py -k generate_pads`

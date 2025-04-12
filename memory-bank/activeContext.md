@@ -3,6 +3,69 @@
 *This file tracks the immediate focus, ongoing tasks, and unresolved questions for the current session.*
 
 ---
+### [2025-04-11 22:45:17] - Task: Update Documentation for Vocal Layering Integration (REQ-ART-V03 - Documentation)
+- **Focus:** Update `README.md` and check docstrings in `config.py` for the new vocal layering parameters (`num_vocal_layers`, `layer_pitch_variation`, `layer_timing_variation_ms`).
+- **Actions:**
+    - Read `README.md`.
+    - Inserted vocal layering parameters into example config and Parameter Guide in `README.md`.
+    - Read `src/robotic_psalms/config.py`.
+    - Verified docstrings for `num_vocal_layers`, `layer_pitch_variation`, `layer_timing_variation_ms` are adequate.
+- **Status:** Completed. Documentation updated.
+
+---
+
+### [2025-04-11 22:39:13] - Task: Implement Vocal Layering Logic (REQ-ART-V03 - Green Phase)
+- **Focus:** Modify `src/robotic_psalms/synthesis/sacred_machinery.py` to implement vocal layering based on `PsalmConfig` parameters (`num_vocal_layers`, `layer_pitch_variation`, `layer_timing_variation_ms`).
+- **Actions:**
+    - Added `random` and `librosa` imports.
+    - Replaced single `self.vox_dei.synthesize_text` call with a loop iterating `config.num_vocal_layers` times.
+    - Inside loop:
+        - Calculated random pitch shift (`random.uniform`, `config.layer_pitch_variation`).
+        - Calculated random timing shift (`random.uniform`, `config.layer_timing_variation_ms`, `sample_rate`).
+        - Called `self.vox_dei.synthesize_text` for the layer, handling `VoxDeiSynthesisError`.
+        - Resampled layer audio if necessary.
+        - Applied pitch shift using `librosa.effects.pitch_shift`.
+        - Applied timing shift using `np.pad` and slicing.
+        - Stored processed layer.
+    - After loop:
+        - Aligned layers to max length (padding/trimming).
+        - Summed aligned layers.
+        - Normalized mixed vocals using `_normalize_audio`.
+    - Fixed Pylance errors related to type inference.
+    - Fixed test failures in `tests/test_sacred_machinery.py` by changing mock strategy (patching instance method directly) and updating assertions.
+    - Ran full test suite (`pytest tests`).
+- **Status:** Completed. Vocal layering implemented. All tests pass (132 passed, 8 xfailed).
+
+---
+
+### [2025-04-11 22:31:39] - Task: Add Configuration for Vocal Layering (REQ-ART-V03 - Config)
+- **Focus:** Modify `src/robotic_psalms/config.py` to include configuration settings for vocal layering (`num_vocal_layers`, `layer_pitch_variation`, `layer_timing_variation_ms`) within the `PsalmConfig` model.
+- **Actions:**
+    - Read `src/robotic_psalms/config.py`.
+    - Inserted the new fields into `PsalmConfig` after the `vocal_timbre` field (line 268).
+- **Status:** Completed. Configuration added. Ready for Green phase (implementing layering logic in `sacred_machinery.py`).
+
+---
+
+
+### [2025-04-11 22:29:32] - Task: Write Failing Tests for Vocal Layering (REQ-ART-V03 - Red Phase)
+- **Focus:** Create failing unit tests in `tests/test_sacred_machinery.py` to drive the implementation of vocal layering based on anticipated `PsalmConfig` parameters (`num_vocal_layers`, variations).
+- **Actions:**
+    - Read `tests/test_sacred_machinery.py`.
+    - Added tests using `@patch` for `VoxDeiSynthesizer.synthesize_text`:
+        - `test_process_psalm_no_layering_by_default`: Checks single call (expected pass).
+        - `test_process_psalm_applies_vocal_layering_when_configured`: Checks multiple calls (expected fail).
+        - `test_process_psalm_vocal_layering_varies_parameters`: Checks varied call arguments (expected fail).
+        - `test_process_psalm_vocal_layering_mixes_results`: Conceptual check for mixing.
+    - Updated `unittest.mock` import to include `call`.
+
+### [2025-04-11 22:46:02] - Task: Implement Vocal Layering (REQ-ART-V03)
+- **Focus:** Completed full TDD cycle (implementation, integration, refactoring, documentation) for the vocal layering feature. Added config parameters and modified `SacredMachineryEngine` to synthesize and mix multiple varied vocal layers.
+- **Status:** Completed. All tests passing (excluding known xfails). Documentation updated.
+- **Status:** Red phase complete. Failing tests added. Ready for Green phase (implementing layering logic in `sacred_machinery.py` and updating `config.py`).
+
+---
+
 ### [2025-04-11 22:05:45] - Task: Update Documentation for Saturation Effect Integration (REQ-ART-E04 - Documentation)
 - **Focus:** Update `README.md` and check docstrings in `config.py`/`effects.py` for the new `saturation_effect` (`SaturationParameters`) configuration.
 - **Actions:**

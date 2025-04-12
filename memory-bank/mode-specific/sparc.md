@@ -406,5 +406,45 @@
 - Completion time: 2025-04-11 22:06:16
 - Outcome: Documentation updated successfully.
 
+### [2025-04-11 22:25:06] Task: REQ-ART-V03 - Write Failing Tests (Vocal Layering)
+- Assigned to: tdd
+- Description: Create failing integration tests for vocal layering.
+- Expected deliverable: Failing tests in `tests/test_sacred_machinery.py`.
+- Status: completed
+- Completion time: 2025-04-11 22:30:25
+- Outcome: Failing tests created successfully.
+
+### [2025-04-11 22:30:25] Task: REQ-ART-V03 - Add Vocal Layering Configuration
+- Assigned to: code
+- Description: Add layering parameters to `PsalmConfig` in `config.py`.
+- Expected deliverable: Updated `config.py`.
+- Status: completed
+- Completion time: 2025-04-11 22:32:40
+- Outcome: Configuration added successfully.
+
+### [2025-04-11 22:32:40] Task: REQ-ART-V03 - Implement Vocal Layering Logic (Green Phase)
+- Assigned to: code
+- Description: Implement layering loop, variations, and mixing in `sacred_machinery.py`.
+- Expected deliverable: Passing integration tests.
+- Status: completed
+- Completion time: 2025-04-11 22:40:06
+- Outcome: Layering implemented. All tests pass (132 passed, 8 xfailed).
+
+### [2025-04-11 22:40:06] Task: REQ-ART-V03 - Refactor Vocal Layering Integration
+- Assigned to: refinement-optimization-mode
+- Description: Refactor layering code in `sacred_machinery.py` and tests.
+- Expected deliverable: Refactored code, passing tests.
+- Status: completed
+- Completion time: 2025-04-11 22:43:42
+- Outcome: Logic extracted to helpers, tests clarified. Test results stable (132 passed, 8 xfailed).
+
+### [2025-04-11 22:43:42] Task: REQ-ART-V03 - Update Documentation (Vocal Layering)
+- Assigned to: docs-writer
+- Description: Update `README.md` and verify docstrings for vocal layering.
+- Expected deliverable: Updated documentation files.
+- Status: completed
+- Completion time: 2025-04-11 22:46:02
+- Outcome: Documentation updated successfully.
+
 ## Workflow State
 <!-- Update current workflow state here -->

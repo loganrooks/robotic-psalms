@@ -1,4 +1,6 @@
 import logging
+import random
+import librosa
 from typing import Any, Optional, cast # Removed Protocol, runtime_checkable
 from pathlib import Path
 import soundfile as sf
@@ -7,15 +9,14 @@ import numpy.typing as npt
 from scipy import signal
 from ..config import PsalmConfig, HauntingParameters, LiturgicalMode
 from .vox_dei import VoxDeiSynthesizer, VoxDeiSynthesisError
-from .effects import apply_high_quality_reverb, ReverbParameters
-from .effects import apply_complex_delay, DelayParameters
-from .effects import apply_chorus, ChorusParameters
-from .effects import (apply_high_quality_reverb, ReverbParameters,
-                    apply_complex_delay, DelayParameters,
-                    apply_chorus, ChorusParameters,
-                    apply_smooth_spectral_freeze, SpectralFreezeParameters,
-                    apply_refined_glitch, GlitchParameters,
-                    apply_saturation, SaturationParameters)
+from .effects import (
+    apply_high_quality_reverb, ReverbParameters,
+    apply_complex_delay, DelayParameters,
+    apply_chorus, ChorusParameters,
+    apply_smooth_spectral_freeze, SpectralFreezeParameters,
+    apply_refined_glitch, GlitchParameters,
+    apply_saturation, SaturationParameters
+)
 # Removed unused import: from scipy.signal.windows import hann
 from dataclasses import dataclass
 
@@ -75,29 +76,78 @@ class SacredMachineryEngine:
             A SynthesisResult object containing individual stems and the combined mix.
         """
         # Generate base components
-        try:
-            # Synthesize and get actual sample rate
-            raw_vocals, tts_sample_rate = self.vox_dei.synthesize_text(text)
+        # --- Vocal Layering Implementation ---
+        vocal_layers = []
+        target_samples_for_layers = int(duration * self.sample_rate) # Pre-calculate target length for error case
 
-            # Resample to engine sample rate *immediately* if needed
-            if tts_sample_rate != self.sample_rate:
-                self.logger.debug(f"Resampling vocals from {tts_sample_rate}Hz to {self.sample_rate}Hz")
-                num_samples_target = int(len(raw_vocals) * self.sample_rate / tts_sample_rate)
-                vocals = signal.resample(raw_vocals, num_samples_target)
-                # --- DEBUG: Save resampled vocals (Step 04) ---
-                if self.logger.isEnabledFor(logging.DEBUG):
-                    try:
-                        resampled_path = Path("debug_vocals_04_resampled.wav")
-                        sf.write(resampled_path, vocals, self.sample_rate)
-                        self.logger.debug(f"Saved resampled vocals to {resampled_path}")
-                    except Exception as write_err:
-                        self.logger.error(f"Failed to save resampled vocals: {write_err}")
-                # --- END DEBUG ---
-            else:
-                vocals = raw_vocals
-        except VoxDeiSynthesisError as e:
-            self.logger.error(f"Vocal synthesis failed: {e}")
-            vocals = np.zeros(int(duration * self.sample_rate), dtype=np.float32)
+        for i in range(self.config.num_vocal_layers):
+            self.logger.debug(f"Synthesizing vocal layer {i+1}/{self.config.num_vocal_layers}")
+            pitch_shift_semitones = 0.0
+            timing_shift_samples = 0
+
+            # Calculate variations (skip for the first layer)
+            if i > 0:
+                if self.config.layer_pitch_variation > 0:
+                    pitch_shift_semitones = random.uniform(
+                        -self.config.layer_pitch_variation, self.config.layer_pitch_variation
+                    )
+                    self.logger.debug(f"  Layer {i+1} pitch shift: {pitch_shift_semitones:.2f} semitones")
+                if self.config.layer_timing_variation_ms > 0:
+                    timing_shift_ms = random.uniform(
+                        -self.config.layer_timing_variation_ms, self.config.layer_timing_variation_ms
+                    )
+                    timing_shift_samples = int(timing_shift_ms / 1000.0 * self.sample_rate)
+                    self.logger.debug(f"  Layer {i+1} timing shift: {timing_shift_ms:.2f} ms ({timing_shift_samples} samples)")
+
+            # Synthesize layer
+            try:
+                raw_layer, tts_sample_rate = self.vox_dei.synthesize_text(text)
+
+                # Resample to engine sample rate if needed
+                if tts_sample_rate != self.sample_rate:
+                    self.logger.debug(f"  Resampling layer {i+1} from {tts_sample_rate}Hz to {self.sample_rate}Hz")
+                    num_samples_target = int(len(raw_layer) * self.sample_rate / tts_sample_rate)
+                    layer_audio = signal.resample(raw_layer, num_samples_target)
+                else:
+                    layer_audio = raw_layer # Keep original type for now
+
+            except VoxDeiSynthesisError as e:
+                self.logger.error(f"Vocal synthesis failed for layer {i+1}: {e}")
+                layer_audio = np.zeros(target_samples_for_layers, dtype=np.float32)
+
+            # Apply pitch shift
+            # Ensure layer_audio is float32 before pitch shift
+            # Explicitly cast to reassure Pylance before using numpy methods
+            layer_audio = cast(npt.NDArray[Any], layer_audio).astype(np.float32)
+
+            # Apply pitch shift using helper
+            if abs(pitch_shift_semitones) > 1e-6: # Avoid processing if shift is negligible
+                layer_audio = self._apply_pitch_shift(layer_audio, pitch_shift_semitones, layer_index=i+1)
+            # Apply timing shift using helper
+            if timing_shift_samples != 0:
+                layer_audio = self._apply_timing_shift(layer_audio, timing_shift_samples)
+            vocal_layers.append(layer_audio)
+
+        # Align and mix layers
+        if not vocal_layers:
+             # Should not happen if num_vocal_layers >= 1, but handle defensively
+            vocals = np.zeros(target_samples_for_layers, dtype=np.float32)
+        else:
+            max_len = max(len(layer) for layer in vocal_layers)
+            aligned_layers = []
+            for layer in vocal_layers:
+                if len(layer) < max_len:
+                    aligned_layers.append(np.pad(layer, (0, max_len - len(layer)), mode='constant'))
+                else:
+                    aligned_layers.append(layer[:max_len]) # Trim if longer
+
+            # Sum layers
+            mixed_vocals = np.sum(np.array(aligned_layers), axis=0)
+
+            # Normalize the mixed result (using existing helper)
+            vocals = self._normalize_audio(mixed_vocals)
+            self.logger.debug(f"Mixed {len(vocal_layers)} vocal layers.")
+        # --- End Vocal Layering Implementation ---
 
         pads = self._generate_pads(duration)
         percussion = self._generate_percussion(duration)
@@ -466,6 +516,63 @@ class SacredMachineryEngine:
             return audio / peak
         return audio
 
+    # --- Helper Methods for Effects ---
+
+    def _apply_pitch_shift(
+        self,
+        audio: npt.NDArray[np.float32],
+        semitones: float,
+        layer_index: Optional[int] = None # Optional for logging context
+    ) -> npt.NDArray[np.float32]:
+        """Applies pitch shifting using librosa.
+
+        Args:
+            audio: The input audio array (must be float32).
+            semitones: The number of semitones to shift.
+            layer_index: Optional index of the layer for logging purposes.
+
+        Returns:
+            The pitch-shifted audio array, or the original if shifting fails.
+        """
+        try:
+            shifted_audio = librosa.effects.pitch_shift(
+                y=audio, sr=self.sample_rate, n_steps=semitones
+            )
+            return shifted_audio
+        except Exception as pitch_err:
+            log_prefix = f"layer {layer_index}" if layer_index is not None else "audio"
+            self.logger.error(f"Pitch shift failed for {log_prefix}: {pitch_err}")
+            return audio # Continue with unshifted audio on error
+
+    def _apply_timing_shift(
+        self,
+        audio: npt.NDArray[np.float32],
+        shift_samples: int
+    ) -> npt.NDArray[np.float32]:
+        """Applies a timing shift to the audio using padding and slicing.
+
+        Args:
+            audio: The input audio array.
+            shift_samples: The number of samples to shift.
+                           Positive shifts earlier (pads start, trims end).
+                           Negative shifts later (pads end, trims start).
+
+        Returns:
+            The time-shifted audio array.
+        """
+        current_len = len(audio)
+        if shift_samples > 0: # Shift earlier (pad start, trim end)
+            pad_width = (shift_samples, 0)
+            shifted_audio = np.pad(audio, pad_width, mode='constant')
+            return shifted_audio[:current_len] # Trim end to original length
+        elif shift_samples < 0: # Shift later (pad end, trim start)
+            shift_abs = abs(shift_samples)
+            pad_width = (0, shift_abs)
+            shifted_audio = np.pad(audio, pad_width, mode='constant')
+            return shifted_audio[shift_abs:shift_abs + current_len] # Trim start
+        else: # No shift
+            return audio
+
     def _apply_configured_saturation(
         self,
         audio: npt.NDArray[np.float32]
@@ -484,8 +591,6 @@ class SacredMachineryEngine:
         else:
             return audio # Return original if not configured or mix is zero
 
-
-
     def _apply_configured_chorus(
         self,
         audio: npt.NDArray[np.float32]
@@ -503,7 +608,6 @@ class SacredMachineryEngine:
                 return audio # Return original audio on error
         else:
             return audio # Return original if not configured or mix is zero
-
 
     def _apply_configured_delay(
         self,

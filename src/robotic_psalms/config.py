@@ -265,6 +265,22 @@ class PsalmConfig(BaseModel):
         default_factory=VocalTimbre,
         description="Voice timbre blend settings"
     )
+    num_vocal_layers: int = Field(
+        default=1,
+        ge=1,
+        description="Number of vocal layers to synthesize and mix."
+    )
+    layer_pitch_variation: float = Field(
+        default=0.1,
+        ge=0.0,
+        description="Maximum random pitch variation (in semitones) applied to each layer."
+    )
+    layer_timing_variation_ms: float = Field(
+        default=10.0,
+        ge=0.0,
+        description="Maximum random timing shift (in milliseconds) applied to each layer."
+    )
+
     midi_mapping: MIDIMapping = Field(
         default_factory=MIDIMapping,
         description="MIDI CC control mappings"

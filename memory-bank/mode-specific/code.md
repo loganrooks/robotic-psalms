@@ -6,6 +6,13 @@
 
 
 
+### Implementation: Vocal Layering (REQ-ART-V03 - Green Phase) - 2025-04-11 22:39:35
+- **Approach**: Replaced the single call to `self.vox_dei.synthesize_text` in `SacredMachineryEngine.process_psalm` with a loop iterating `config.num_vocal_layers` times. Inside the loop, random pitch and timing variations are calculated using `random.uniform` based on `config.layer_pitch_variation` and `config.layer_timing_variation_ms` (first layer has no variation). Each layer is synthesized, handling potential `VoxDeiSynthesisError`. Pitch variation is applied using `librosa.effects.pitch_shift`. Timing variation is applied using `np.pad` and array slicing to shift the audio. After the loop, all generated layers are aligned to the maximum length by padding or trimming, summed together, and then normalized using the existing `_normalize_audio` helper method.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/sacred_machinery.py` (Modified `process_psalm`, added imports for `random`, `librosa`).
+- **Notes**: Required fixing Pylance type inference errors by ensuring consistent `astype(np.float32)` conversion before `librosa` call. Test failures were resolved by changing the `@patch` strategy in `tests/test_sacred_machinery.py` to patch the `synthesize_text` method directly on the `engine.vox_dei` instance within the test functions, rather than using the decorator with a string path. All tests pass (132 passed, 8 xfailed).
+
+
+
 ### Implementation: Integrate Saturation Effect (REQ-ART-E04 - Integration Green Phase) - 2025-04-11 21:59:52
 - **Approach**: Integrated `apply_saturation` from `.effects` into `SacredMachineryEngine.process_psalm`. Added conditional logic to apply the effect to the `combined` audio signal before chorus and delay, only if `config.saturation_effect` is configured and `mix > 0`. The `SaturationParameters` model is instantiated from the configuration before calling the effect function.
 - **Key Files Modified/Created**: `src/robotic_psalms/synthesis/sacred_machinery.py` (Modified).
@@ -92,6 +99,14 @@
     - Implemented `apply_resonant_filter` using RBJ Audio EQ Cookbook formulas for a 2nd-order lowpass filter to incorporate the `resonance` parameter as Q. Calculated transfer function coefficients (`b`, `a`), converted them to second-order sections using `scipy.signal.tf2sos`, and applied the filter using `scipy.signal.sosfiltfilt`.
 - **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Modified functions, added imports `scipy.signal`, `math`).
 - **Notes**: The initial attempt for `apply_resonant_filter` using `signal.butter('lowpass')` failed tests because Butterworth doesn't directly use resonance/Q for low/high pass. Switching to RBJ formulas resolved this. All relevant tests in `tests/synthesis/test_effects.py` now pass.
+
+
+
+### Implementation: Add Vocal Layering Configuration (REQ-ART-V03 - Config) - 2025-04-11 22:31:39
+- **Approach**: Added configuration fields for vocal layering to the `PsalmConfig` model in `src/robotic_psalms/config.py`. The fields were inserted after `vocal_timbre`.
+- **Key Files Modified/Created**: `src/robotic_psalms/config.py` (Modified `PsalmConfig` model).
+- **Notes**: Added `num_vocal_layers: int`, `layer_pitch_variation: float`, and `layer_timing_variation_ms: float` with appropriate defaults, validation (ge), and descriptions.
+
 
 
 

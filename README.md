@@ -161,6 +161,9 @@ vocal_timbre:
       drive: 0.5          # Amount of distortion (float, 0.0 to 1.0)
       tone: 0.5           # Tone control (0.0=dark, 1.0=bright)
       mix: 0.3            # Wet/dry mix (0.0=dry, 1.0=wet)
+    num_vocal_layers: 1           # Number of vocal layers to generate (int, >= 1)
+    layer_pitch_variation: 0.0    # Max random pitch shift per layer in semitones (float, >= 0.0)
+    layer_timing_variation_ms: 0.0 # Max random timing shift per layer in milliseconds (float, >= 0.0)
 ```
 
 ### Input Format
@@ -256,6 +259,9 @@ robotic-psalms examples/psalm.txt output.wav --config examples/config.yml --visu
   - `drive`: The amount of distortion applied (0.0 to 1.0). Higher values increase saturation.
   - `tone`: Controls the brightness of the distortion (0.0 for dark, 1.0 for bright).
   - `mix`: The balance between the original (dry) signal and the saturated (wet) signal (0.0 for full dry, 1.0 for full wet).
+- `num_vocal_layers`: (Integer, >= 1, Default: 1) The number of individual vocal layers to synthesize and mix. Setting to 1 disables layering.
+- `layer_pitch_variation`: (Float, >= 0.0, Default: 0.0) The maximum random pitch variation applied to each vocal layer, measured in semitones. A value of 0.5 means each layer's pitch can be shifted randomly between -0.5 and +0.5 semitones relative to the base pitch.
+- `layer_timing_variation_ms`: (Float, >= 0.0, Default: 0.0) The maximum random timing variation applied to each vocal layer, measured in milliseconds. A value of 50 means each layer can start randomly between -50ms and +50ms relative to the original timing.
 
 ### Voice Timbre
 Blend between three voice characteristics:

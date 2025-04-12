@@ -10,7 +10,7 @@ import librosa # Added for spectral freeze
 from typing import Literal
 from typing import Literal, cast
 import random # For glitch probability
-from pedalboard import Distortion, LowpassFilter # Added for saturation
+from pedalboard import Distortion, LowpassFilter, Compressor, Limiter # Added for saturation and dynamics
 # Removed module-level seed
 
 # Pedalboard's Reverb defaults: room_size=0.5, damping=0.5, wet_level=0.33, dry_level=0.4, width=1.0, freeze_mode=0.0
@@ -129,6 +129,19 @@ class SaturationParameters(BaseModel):
 
     model_config = ConfigDict(extra='forbid')
 
+
+
+class MasterDynamicsParameters(BaseModel):
+    """Parameters for the master dynamics processing (compressor, limiter)."""
+    enable_compressor: bool = Field(False, description="Enable the master compressor.")
+    compressor_threshold_db: float = Field(-20.0, description="Compressor threshold in dB.")
+    compressor_ratio: float = Field(4.0, ge=1.0, description="Compressor ratio (>= 1.0).")
+    compressor_attack_ms: float = Field(5.0, gt=0.0, description="Compressor attack time in milliseconds (> 0.0).")
+    compressor_release_ms: float = Field(100.0, gt=0.0, description="Compressor release time in milliseconds (> 0.0).")
+    enable_limiter: bool = Field(True, description="Enable the master limiter.")
+    limiter_threshold_db: float = Field(-1.0, le=0.0, description="Limiter threshold in dB (<= 0.0).")
+
+    model_config = ConfigDict(extra='forbid')
 # --- Effect Functions ---
 
 def apply_high_quality_reverb(audio: np.ndarray, sample_rate: int, params: ReverbParameters) -> np.ndarray:
@@ -996,3 +1009,68 @@ def apply_saturation(audio: np.ndarray, sample_rate: int, params: SaturationPara
 
     return output_signal.astype(np.float32)
 
+
+
+
+def apply_master_dynamics(audio: np.ndarray, sample_rate: int, params: MasterDynamicsParameters) -> np.ndarray:
+    """
+    Applies master dynamics processing (compression and limiting) to the audio signal
+    using pedalboard.Compressor and pedalboard.Limiter.
+
+    Args:
+        audio: Input audio signal as a NumPy array (mono or stereo).
+        sample_rate: Sample rate of the audio signal.
+        params: An instance of MasterDynamicsParameters containing effect settings.
+
+    Returns:
+        The processed audio signal (float32).
+    """
+    if audio.size == 0:
+        return np.array([], dtype=np.float32)
+
+    board = Pedalboard()
+
+    # Add Compressor if enabled
+    if params.enable_compressor:
+        compressor = Compressor(
+            threshold_db=params.compressor_threshold_db,
+            ratio=params.compressor_ratio,
+            attack_ms=params.compressor_attack_ms,
+            release_ms=params.compressor_release_ms
+        )
+        board.append(compressor)
+
+    # Add Limiter if enabled (typically after compressor)
+    if params.enable_limiter:
+        limiter = Limiter(
+            threshold_db=params.limiter_threshold_db,
+            release_ms=1.0 # Set a fast release time for potentially better impulse response
+        )
+        board.append(limiter)
+
+    # Process audio only if effects were added
+    if len(board) > 0:
+        audio_float32 = audio.astype(np.float32)
+        processed_audio = board(audio_float32, sample_rate=sample_rate)
+
+        # Ensure output shape matches input channel count if possible
+        if audio.ndim == 1 and processed_audio.ndim == 2 and processed_audio.shape[1] == 1:
+            processed_audio = processed_audio.flatten()
+        elif audio.ndim == 2 and processed_audio.ndim == 1 and audio.shape[1] == 1:
+             processed_audio = processed_audio.reshape(-1, 1)
+
+        # Ensure length matches original input length (pedalboard dynamics shouldn't change length)
+        if processed_audio.shape[0] != audio.shape[0]:
+            target_len = audio.shape[0]
+            current_len = processed_audio.shape[0]
+            if current_len > target_len:
+                processed_audio = processed_audio[:target_len, ...]
+            else:
+                padding_shape = (target_len - current_len,) + processed_audio.shape[1:]
+                padding = np.zeros(padding_shape, dtype=processed_audio.dtype)
+                processed_audio = np.concatenate((processed_audio, padding), axis=0)
+
+        return processed_audio.astype(np.float32)
+    else:
+        # No effects enabled, return original audio as float32
+        return audio.astype(np.float32).copy()

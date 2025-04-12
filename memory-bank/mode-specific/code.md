@@ -6,6 +6,20 @@
 
 
 
+### Implementation: Add Configuration for Master Dynamics Effect (REQ-ART-M01 - Config) - 2025-04-12 01:13:43
+- **Approach**: Added configuration for the master dynamics effect to `src/robotic_psalms/config.py`. Imported `MasterDynamicsParameters` from `.synthesis.effects` and added an optional field `master_dynamics: Optional[MasterDynamicsParameters] = Field(default=None, ...)` to the `PsalmConfig` model, including a descriptive docstring.
+- **Key Files Modified/Created**: `src/robotic_psalms/config.py` (Modified).
+- **Notes**: The configuration was added after the `saturation_effect` field. This allows users to optionally enable and configure the master dynamics processing via the main configuration file.
+
+
+
+### Implementation: Minimal Master Dynamics (REQ-ART-M01 - Green Phase Start) - 2025-04-11 23:58:52
+- **Approach**: Implemented the minimal `MasterDynamicsParameters` Pydantic model with fields (`enable_compressor`, `compressor_threshold_db`, `compressor_ratio`, `compressor_attack_ms`, `compressor_release_ms`, `enable_limiter`, `limiter_threshold_db`) and basic validation (`ge`, `gt`, `le`). Implemented the `apply_master_dynamics(audio: np.ndarray, sample_rate: int, params: MasterDynamicsParameters) -> np.ndarray` function signature with a minimal body (`return audio.astype(np.float32).copy()`) to resolve import errors.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Added model and function).
+- **Notes**: This minimal implementation is intended to resolve the `ImportError` reported by the `tdd` mode for `tests/synthesis/test_effects.py`. Tests related to this effect should now collect and run, likely failing on assertions because the function does not yet modify the audio.
+
+
+
 ### Implementation: Vocal Layering (REQ-ART-V03 - Green Phase) - 2025-04-11 22:39:35
 - **Approach**: Replaced the single call to `self.vox_dei.synthesize_text` in `SacredMachineryEngine.process_psalm` with a loop iterating `config.num_vocal_layers` times. Inside the loop, random pitch and timing variations are calculated using `random.uniform` based on `config.layer_pitch_variation` and `config.layer_timing_variation_ms` (first layer has no variation). Each layer is synthesized, handling potential `VoxDeiSynthesisError`. Pitch variation is applied using `librosa.effects.pitch_shift`. Timing variation is applied using `np.pad` and array slicing to shift the audio. After the loop, all generated layers are aligned to the maximum length by padding or trimming, summed together, and then normalized using the existing `_normalize_audio` helper method.
 - **Key Files Modified/Created**: `src/robotic_psalms/synthesis/sacred_machinery.py` (Modified `process_psalm`, added imports for `random`, `librosa`).

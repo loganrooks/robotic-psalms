@@ -5,6 +5,10 @@
 ---
 
 
+### Plan Item: Update Master Dynamics Docs (REQ-ART-M01) - [2025-04-12 04:00:47]
+- **Type**: Guide / **Audience**: User/Dev / **Outline**: 1. Update README (Example, Param Guide) 2. Verify config.py/effects.py docstrings / **Status**: Done / **Owner**: docs-writer / **Source**: User Task REQ-ART-M01 / **Location**: README.md, src/robotic_psalms/config.py, src/robotic_psalms/synthesis/effects.py
+
+
 ### Plan Item: Update Vocal Layering Docs (REQ-ART-V03) - [2025-04-11 22:45:39]
 - **Type**: Guide / **Audience**: User/Dev / **Outline**: 1. Update README (Example, Param Guide) 2. Verify config.py docstrings / **Status**: Done / **Owner**: docs-writer / **Source**: User Task REQ-ART-V03 / **Location**: README.md, src/robotic_psalms/config.py
 

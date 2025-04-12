@@ -65,6 +65,25 @@
 ## Progress
 *Milestones, completed tasks, overall status.*
 
+#### [2025-04-12 04:00:58] - Task: Update Documentation for Master Dynamics Integration (REQ-ART-M01 - Documentation)
+- **Status:** Completed.
+- **Deliverables:** Updated `README.md` example configuration and Parameter Guide for `master_dynamics`. Verified docstrings in `src/robotic_psalms/config.py` and `src/robotic_psalms/synthesis/effects.py` are adequate.
+---
+
+
+#### [2025-04-12 01:13:35] - Task: Add Configuration for Master Dynamics Effect (REQ-ART-M01 - Config)
+- **Status:** Completed.
+- **Deliverables:** Added `MasterDynamicsParameters` import and `master_dynamics: Optional[MasterDynamicsParameters]` field to `PsalmConfig` in `src/robotic_psalms/config.py`.
+---
+
+
+#### [2025-04-11 23:58:42] - Task: Implement Minimal Master Dynamics (REQ-ART-M01 - Green Phase Start)
+- **Status:** Completed (Minimal Implementation).
+- **Deliverables:** Added `MasterDynamicsParameters` Pydantic model and `apply_master_dynamics` function signature (with minimal body) to `src/robotic_psalms/synthesis/effects.py`. This resolves the `ImportError` in `tests/synthesis/test_effects.py`, allowing tests to collect and run.
+---
+
+
+
 #### [2025-04-11 22:45:32] - Task: Update Documentation for Vocal Layering Integration (REQ-ART-V03 - Documentation)
 - **Status:** Completed.
 - **Deliverables:** Updated `README.md` example configuration and Parameter Guide for `num_vocal_layers`, `layer_pitch_variation`, `layer_timing_variation_ms`. Verified docstrings in `src/robotic_psalms/config.py` are adequate.
@@ -286,3 +305,15 @@
 - **Status:** Completed.
 - **Deliverables:** Implemented vocal layering logic in `SacredMachineryEngine` (`sacred_machinery.py`), synthesizing multiple layers with random pitch/timing variations based on new `PsalmConfig` parameters (`num_vocal_layers`, `layer_pitch_variation`, `layer_timing_variation_ms`). Layers are mixed and normalized. Relevant tests created/updated and passing.
 ---
+
+
+#### [2025-04-12 04:01:51] - Feature: Master Dynamics Processing (REQ-ART-M01)
+- **Status:** Completed.
+- **Deliverables:** Implemented `apply_master_dynamics` function and `MasterDynamicsParameters`/`MasterDynamicsConfig` models using `pedalboard.Compressor` and `pedalboard.Limiter` in `src/robotic_psalms/synthesis/effects.py` and `src/robotic_psalms/config.py`. Integrated conditionally as the final step in `SacredMachineryEngine`. Core tests passing, documentation updated.
+---
+#### [2025-04-12 04:03:56] - Feature: Master Dynamics Processing (REQ-ART-M01)
+- **Status:** Completed & Ready for Commit.
+- **Deliverables:** Implemented `apply_master_dynamics` function and `MasterDynamicsParameters`/`MasterDynamicsConfig` models using `pedalboard.Compressor` and `pedalboard.Limiter` in `src/robotic_psalms/synthesis/effects.py` and `src/robotic_psalms/config.py`. Integrated conditionally as the final step in `SacredMachineryEngine`. Core tests passing, documentation updated.
+---
+
+

@@ -164,6 +164,14 @@ vocal_timbre:
     num_vocal_layers: 1           # Number of vocal layers to generate (int, >= 1)
     layer_pitch_variation: 0.0    # Max random pitch shift per layer in semitones (float, >= 0.0)
     layer_timing_variation_ms: 0.0 # Max random timing shift per layer in milliseconds (float, >= 0.0)
+  master_dynamics: # Optional master dynamics processing
+    enable_compressor: true
+    compressor_threshold_db: -18.0
+    compressor_ratio: 3.0
+    compressor_attack_ms: 5.0
+    compressor_release_ms: 150.0
+    enable_limiter: true
+    limiter_threshold_db: -0.5
 ```
 
 ### Input Format
@@ -262,6 +270,14 @@ robotic-psalms examples/psalm.txt output.wav --config examples/config.yml --visu
 - `num_vocal_layers`: (Integer, >= 1, Default: 1) The number of individual vocal layers to synthesize and mix. Setting to 1 disables layering.
 - `layer_pitch_variation`: (Float, >= 0.0, Default: 0.0) The maximum random pitch variation applied to each vocal layer, measured in semitones. A value of 0.5 means each layer's pitch can be shifted randomly between -0.5 and +0.5 semitones relative to the base pitch.
 - `layer_timing_variation_ms`: (Float, >= 0.0, Default: 0.0) The maximum random timing variation applied to each vocal layer, measured in milliseconds. A value of 50 means each layer can start randomly between -50ms and +50ms relative to the original timing.
+- `master_dynamics`: (Optional) Configuration for master bus dynamics processing (compressor and limiter). Applied to the final mix. If omitted, or if individual `enable_` flags are false, the respective effect is disabled.
+  - `enable_compressor`: (Boolean, Default: false) Enables the compressor.
+  - `compressor_threshold_db`: (Float, Default: -20.0) The level (dB) above which compression starts.
+  - `compressor_ratio`: (Float, >= 1.0, Default: 4.0) The amount of gain reduction (e.g., 4.0 means 4:1 ratio).
+  - `compressor_attack_ms`: (Float, > 0.0, Default: 5.0) How quickly the compressor reacts to signals above the threshold (milliseconds).
+  - `compressor_release_ms`: (Float, > 0.0, Default: 100.0) How quickly the compressor stops reducing gain after the signal falls below the threshold (milliseconds).
+  - `enable_limiter`: (Boolean, Default: true) Enables the limiter.
+  - `limiter_threshold_db`: (Float, <= 0.0, Default: -1.0) The maximum level (dB) the output signal is allowed to reach. Prevents clipping.
 
 ### Voice Timbre
 Blend between three voice characteristics:

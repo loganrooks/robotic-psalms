@@ -15,7 +15,8 @@ from .effects import (
     apply_chorus, ChorusParameters,
     apply_smooth_spectral_freeze, SpectralFreezeParameters,
     apply_refined_glitch, GlitchParameters,
-    apply_saturation, SaturationParameters
+    apply_saturation, SaturationParameters,
+    apply_master_dynamics, MasterDynamicsParameters
 )
 # Removed unused import: from scipy.signal.windows import hann
 from dataclasses import dataclass
@@ -230,6 +231,19 @@ class SacredMachineryEngine:
         combined = self._apply_configured_chorus(combined)
 
         combined = self._apply_configured_delay(combined)
+        # Apply master dynamics if configured (final step)
+        if self.config.master_dynamics is not None:
+            self.logger.debug("Applying master dynamics...")
+            try:
+                # Assuming config.master_dynamics is already a validated Pydantic model instance
+                master_params = self.config.master_dynamics
+                combined = apply_master_dynamics(combined, self.sample_rate, master_params)
+                # Ensure audio is float32 after effect
+                combined = np.array(combined, dtype=np.float32)
+            except Exception as master_dyn_err:
+                self.logger.error(f"Failed to apply master dynamics: {master_dyn_err}")
+                # Continue with un-effected audio on error
+
         return SynthesisResult(
             vocals=vocals.astype(np.float32),
             pads=pads.astype(np.float32),

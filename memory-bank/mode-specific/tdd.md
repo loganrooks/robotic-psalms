@@ -241,6 +241,40 @@
 - Default configuration (no layering)
 - Layering enabled (`num_vocal_layers` > 1)
 
+
+
+### Test Plan: Master Dynamics (REQ-ART-M01) - [2025-04-11 23:56:15]
+#### Unit Tests:
+- Test Case: Master dynamics module/function/class exists / Expected: Import succeeds / Status: Failing
+- Test Case: Apply dynamics to mono signal / Expected: Output shape matches input, content differs / Status: Failing
+- Test Case: Apply dynamics to stereo signal / Expected: Output shape matches input (stereo), content differs / Status: Failing
+- Test Case: Compression reduces dynamic range (RMS ratio) / Expected: Output RMS ratio < Input RMS ratio / Status: Failing
+- Test Case: Limiter attenuates peaks above threshold / Expected: Output peak <= threshold (approx) / Status: Failing
+- Test Case: Changing compressor threshold affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing compressor ratio affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing limiter threshold affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Changing makeup gain affects output / Expected: Output differs from default / Status: Failing
+- Test Case: Disabling compressor and limiter results in no change / Expected: Output is close to input / Status: Failing
+- Test Case: Handle zero-length input / Expected: Output is zero-length / Status: Failing
+- Test Case: Handle invalid compressor ratio (<1) / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid compressor attack (<=0) / Expected: Raises ValidationError or ValueError / Status: Failing
+- Test Case: Handle invalid compressor release (<=0) / Expected: Raises ValidationError or ValueError / Status: Failing
+#### Integration Tests:
+- None yet (Focus is unit tests for the effect itself)
+#### Edge Cases Covered:
+- Zero-length input
+- Invalid parameter values (ratio, attack, release)
+- Bypass functionality (both effects disabled)
+
+
+### Test Plan: Master Dynamics Integration (REQ-ART-M01) - [2025-04-12 03:05:48]
+#### Unit Tests:
+- N/A (Unit tests are in `test_effects.py`)
+#### Integration Tests:
+- Test Case: `apply_master_dynamics` is called when `PsalmConfig.master_dynamics` is set / Expected: Mock `apply_master_dynamics` called / Status: Written (Failing - Red)
+- Test Case: `apply_master_dynamics` is NOT called when `PsalmConfig.master_dynamics` is None / Expected: Mock `apply_master_dynamics` not called / Status: Written (Failing - Red)
+#### Edge Cases Covered:
+- Configuration enabled vs. disabled.
 ## Refactoring Targets (Post-Pass)
 <!-- Identify areas for refactoring after tests pass -->
 
@@ -363,6 +397,13 @@
 ### Fixture: default_saturation_params - [2025-04-11 21:40:50]
 - **Purpose**: Provides default parameters for saturation/distortion (REQ-ART-E04) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for saturation tests.
 
+
+
+### Fixture: default_master_dynamics_params - [2025-04-11 23:56:15]
+- **Purpose**: Provides default parameters for master dynamics (REQ-ART-M01) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for master dynamics tests.
+
+### Fixture: dynamic_signal_mono - [2025-04-11 23:56:15]
+- **Purpose**: Provides a mono signal with distinct quiet and loud sections / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Input for testing compression dynamic range reduction.
 ### Test Run: 2025-04-08 10:41:13
 - **Trigger**: Manual / **Env**: Local / **Suite**: tests/synthesis/
 - **Result**: PASS / **Summary**: 30 Passed / 0 Failed / 0 Skipped
@@ -537,6 +578,23 @@
 - **Refactor**: Improvements made: N/A (Red phase only)
 - **Outcomes**: Established test harness for the vocal layering feature.
 
+
+
+### TDD Cycle: Master Dynamics (REQ-ART-M01 - Red Phase) - [2025-04-11 23:56:15]
+- **Start**: [2025-04-11 23:55:37]
+- **End**: [2025-04-11 23:56:28]
+- **Red**: Tests created: Wrote failing tests in `tests/synthesis/test_effects.py` for `apply_master_dynamics` and `MasterDynamicsParameters`. Tests cover existence, basic application, compression, limiting, parameter control, bypass, and edge cases. Failing due to `ImportError`.
+- **Green**: Implementation approach: Next step is to create minimal placeholder implementations for the function and Pydantic model in `src/robotic_psalms/synthesis/effects.py`.
+- **Refactor**: Improvements made: N/A (Red phase only)
+- **Outcomes**: Established test harness for the master dynamics effect.
+
+
+### TDD Cycle: Integration Test for `apply_master_dynamics` - [2025-04-12 03:05:48]
+- **Start**: [2025-04-12 03:05:29]
+- **Red**: Added `test_process_psalm_applies_master_dynamics_when_configured` and `test_process_psalm_does_not_apply_master_dynamics_when_none` to `tests/test_sacred_machinery.py`. Tests fail with `AttributeError` during `@patch` setup for `apply_master_dynamics` in `sacred_machinery` module, confirming the function is not yet imported/used.
+- **Green**: [Pending]
+- **Refactor**: [Pending]
+- **Outcomes**: Confirmed Red phase for integration test. Ready for Green phase (modifying `sacred_machinery.py`).
 ### Test Run: Complex Pad Generation (REQ-ART-A01 - Initial Complexity) - [2025-04-11 18:03:36]
 - **Trigger**: Manual / **Env**: Local / **Suite**: `tests/test_sacred_machinery.py -k generate_pads`
 - **Result**: PASS / **Summary**: 6 Passed / 12 Deselected / 0 Failed
@@ -576,3 +634,23 @@
 - **Report Link**: N/A
 - **Failures**: `test_process_psalm_applies_saturation_when_configured`: `AttributeError: ... does not have the attribute 'apply_saturation'`, `test_process_psalm_does_not_apply_saturation_when_none`: `AttributeError: ... does not have the attribute 'apply_saturation'`
 
+
+
+### Test Run: Master Dynamics (REQ-ART-M01 - Red Phase) - [2025-04-11 23:56:28]
+- **Trigger**: Manual
+- **Env**: Local
+- **Suite**: `tests/synthesis/test_effects.py -k master_dynamics`
+- **Result**: FAIL (Collection Error)
+- **Summary**: 0 Collected / 1 Error
+- **Report Link**: N/A
+- **Failures**: `ERROR collecting tests/synthesis/test_effects.py`: `ImportError: cannot import name 'apply_master_dynamics' from 'robotic_psalms.synthesis.effects'`
+
+
+### Test Run: Integration Test for `apply_master_dynamics` - [2025-04-12 03:06:04]
+- **Trigger**: Manual
+- **Env**: Local
+- **Suite**: `tests/test_sacred_machinery.py -k master_dynamics`
+- **Result**: FAIL
+- **Summary**: 0 Passed / 2 Failed / 32 Deselected
+- **Report Link**: N/A
+- **Failures**: `test_process_psalm_applies_master_dynamics_when_configured`: `AttributeError: ... does not have the attribute 'apply_master_dynamics'`, `test_process_psalm_does_not_apply_master_dynamics_when_none`: `AttributeError: ... does not have the attribute 'apply_master_dynamics'`

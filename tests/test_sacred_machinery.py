@@ -4,6 +4,7 @@ from unittest.mock import patch, MagicMock, ANY, call # Add call
 from unittest.mock import patch, MagicMock, ANY # Add ANY
 import numpy.fft as fft
 from typing import cast # Added for casting
+from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters, ChorusParameters, SpectralFreezeParameters, GlitchParameters, SaturationParameters, MasterDynamicsParameters # Add MasterDynamicsParameters
 from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters, ChorusParameters, SpectralFreezeParameters, GlitchParameters, SaturationParameters # Add GlitchParameters, SaturationParameters
 
 # Import actual implementations
@@ -885,4 +886,79 @@ def test_process_psalm_vocal_layering_mixes_results(default_config: PsalmConfig,
     else:
         # If layering didn't happen, this test is less meaningful
         pass
+
+
+
+# --- NEW TESTS FOR MASTER DYNAMICS (REQ-ART-M01) ---
+
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_master_dynamics', autospec=True)
+def test_process_psalm_applies_master_dynamics_when_configured(mock_apply_dynamics: MagicMock, default_config: PsalmConfig, engine_factory):
+    """Test that master dynamics effect is applied when configured in PsalmConfig."""
+    # Modify config to enable master dynamics (e.g., limiter)
+    test_config = default_config.model_copy(deep=True)
+    test_dynamics_params = MasterDynamicsParameters(
+        enable_compressor=False, compressor_threshold_db=0.0, compressor_ratio=1.0, compressor_attack_ms=1.0, compressor_release_ms=100.0, # Defaults for disabled compressor
+        enable_limiter=True, limiter_threshold_db=-1.0
+    )
+    test_config.master_dynamics = test_dynamics_params
+    # Disable other potentially interfering effects for isolation
+    test_config.glitch_effect = None
+    test_config.haunting_intensity = HauntingParameters()
+    test_config.delay_effect = None
+    test_config.chorus_params = None
+    test_config.saturation_effect = None
+
+    # Create engine with modified config using the factory
+    engine = engine_factory(test_config)
+
+    psalm_text = "Master dynamics test"
+    duration = 2.0
+    expected_samples = int(duration * engine.sample_rate)
+    # Provide simple input audio via the mock
+    input_vocals = np.ones(expected_samples, dtype=np.float32) * 0.5
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
+
+    # Configure mock to return a copy to avoid downstream issues
+    mock_apply_dynamics.side_effect = lambda audio, sr, params: audio.copy()
+
+    # Process the psalm
+    result = engine.process_psalm(psalm_text, duration)
+
+    # Assert that the dynamics function was called (EXPECTED TO FAIL)
+    # Assuming dynamics is applied once to the final mix
+    mock_apply_dynamics.assert_called_once()
+
+    # Check arguments (basic check using ANY for audio)
+    call_args = mock_apply_dynamics.call_args[0]
+    assert isinstance(call_args[0], np.ndarray) # audio data
+    assert call_args[1] == engine.sample_rate # sample rate
+    assert isinstance(call_args[2], MasterDynamicsParameters) # MasterDynamicsParameters instance
+    # Verify parameters passed correctly from config
+    assert call_args[2].enable_limiter == test_dynamics_params.enable_limiter
+    assert call_args[2].limiter_threshold_db == test_dynamics_params.limiter_threshold_db
+
+    # Ensure synth was called
+    cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
+
+
+@patch('robotic_psalms.synthesis.sacred_machinery.apply_master_dynamics', autospec=True)
+def test_process_psalm_does_not_apply_master_dynamics_when_none(mock_apply_dynamics: MagicMock, engine: SacredMachineryEngine):
+    """Test that master dynamics effect is NOT applied when not configured (default)."""
+    # Engine fixture uses default config where master_dynamics is None
+
+    psalm_text = "No master dynamics test"
+    duration = 2.0
+    expected_samples = int(duration * engine.sample_rate)
+    # Provide simple input audio via the mock
+    input_vocals = np.ones(expected_samples, dtype=np.float32) * 0.5
+    cast(MagicMock, engine.vox_dei).synthesize_text.return_value = (input_vocals, engine.sample_rate)
+
+    # Process the psalm
+    result = engine.process_psalm(psalm_text, duration)
+
+    # Assert that the dynamics function was NOT called
+    mock_apply_dynamics.assert_not_called()
+
+    # Ensure synth was called
+    cast(MagicMock, engine.vox_dei).synthesize_text.assert_called_once_with(psalm_text)
 

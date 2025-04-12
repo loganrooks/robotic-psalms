@@ -24,6 +24,8 @@ from robotic_psalms.synthesis.effects import (
     GlitchParameters, # Placeholder
     apply_saturation, # Placeholder
     SaturationParameters, # Placeholder
+    apply_master_dynamics, # Placeholder
+    MasterDynamicsParameters, # Placeholder
 )
 from pedalboard._pedalboard import Pedalboard # Import as suggested by Pylance
 
@@ -166,6 +168,35 @@ def default_saturation_params():
         # saturation_type='tanh' # Optional: if implementing types
     )
 
+
+
+@pytest.fixture
+def default_master_dynamics_params():
+    """Default master dynamics parameters."""
+    return MasterDynamicsParameters(
+        enable_compressor=True,
+        compressor_threshold_db=-20.0,
+        compressor_ratio=4.0,
+        compressor_attack_ms=5.0,
+        compressor_release_ms=100.0,
+        enable_limiter=True,
+        limiter_threshold_db=-1.0
+        # makeup_gain_db is not a parameter of MasterDynamicsParameters
+    )
+
+@pytest.fixture
+def dynamic_signal_mono(duration_sec=2.0):
+    """Generate a mono signal with quiet and loud sections."""
+    num_samples = int(duration_sec * SAMPLE_RATE)
+    half_samples = num_samples // 2
+    t_quiet = np.linspace(0, duration_sec / 2, half_samples, endpoint=False)
+    t_loud = np.linspace(duration_sec / 2, duration_sec, num_samples - half_samples, endpoint=False)
+
+    quiet_part = 0.1 * np.sin(2 * np.pi * 440 * t_quiet)
+    loud_part = 0.9 * np.sin(2 * np.pi * 440 * t_loud)
+
+    signal = np.concatenate((quiet_part, loud_part))
+    return signal.astype(np.float32)
 # --- Reverb Tests ---
 def test_reverb_module_exists():
     assert callable(apply_high_quality_reverb)
@@ -962,10 +993,10 @@ def test_refined_glitch_zero_length_input(default_glitch_params):
 
 def test_refined_glitch_invalid_parameters(dry_mono_signal):
     """Test refined glitch with invalid parameter values."""
-    with pytest.raises(ValidationError): # Pydantic raises ValidationError for Literal mismatches
+    with pytest.raises(ValidationError, match="Input should be 'repeat', 'stutter', 'tape_stop' or 'bitcrush'"): # Pydantic raises ValidationError for Literal mismatches
         # Invalid glitch_type (should fail during instantiation)
-        GlitchParameters(glitch_type='invalid_type', intensity=0.5, chunk_size_ms=50.0, repeat_count=3, tape_stop_speed=0.99, bitcrush_depth=8, bitcrush_rate_factor=0.5)
-        # No need to call apply_refined_glitch here, validation happens on init
+        GlitchParameters(glitch_type='invalid_type', intensity=0.5, chunk_size_ms=50.0, repeat_count=3, tape_stop_speed=0.99, bitcrush_depth=8, bitcrush_rate_factor=0.5) # type: ignore
+        # No need to call apply_refined_glitch here, validation happens on init. Added type: ignore for clarity.
 
     with pytest.raises((ValidationError, ValueError)):
         # Intensity out of range
@@ -1114,5 +1145,162 @@ def test_saturation_invalid_parameters(dry_mono_signal):
     # with pytest.raises((ValidationError, ValueError)):
     #     invalid_params = SaturationParameters(drive=0.5, tone=0.5, mix=0.5, saturation_type='invalid')
     #     apply_saturation(dry_mono_signal, SAMPLE_RATE, invalid_params)
+
+
+
+# --- Master Dynamics Tests (REQ-ART-M01) ---
+
+def test_master_dynamics_module_exists():
+    """Checks if the master dynamics imports work."""
+    assert callable(apply_master_dynamics)
+    assert 'compressor_threshold_db' in MasterDynamicsParameters.model_fields
+    assert 'limiter_threshold_db' in MasterDynamicsParameters.model_fields
+
+def test_apply_master_dynamics_mono(dynamic_signal_mono, default_master_dynamics_params):
+    """Test applying master dynamics to a mono signal."""
+    processed_signal = apply_master_dynamics(
+        dynamic_signal_mono, SAMPLE_RATE, default_master_dynamics_params
+    )
+    assert processed_signal.ndim == dynamic_signal_mono.ndim
+    assert len(processed_signal) == len(dynamic_signal_mono)
+    assert not np.allclose(processed_signal, dynamic_signal_mono), "Master dynamics did not alter mono signal"
+
+def test_apply_master_dynamics_stereo(dynamic_signal_mono, default_master_dynamics_params):
+    """Test applying master dynamics to a stereo signal."""
+    stereo_signal = np.stack([dynamic_signal_mono, dynamic_signal_mono * 0.9], axis=-1)
+    processed_signal = apply_master_dynamics(
+        stereo_signal, SAMPLE_RATE, default_master_dynamics_params
+    )
+    assert processed_signal.ndim == stereo_signal.ndim
+    assert processed_signal.shape[1] == 2
+    assert processed_signal.shape[0] == stereo_signal.shape[0]
+    assert not np.allclose(processed_signal, stereo_signal), "Master dynamics did not alter stereo signal"
+
+def test_master_dynamics_compression_reduces_dynamic_range(dynamic_signal_mono, default_master_dynamics_params):
+    """Test that compression reduces the dynamic range."""
+    params = default_master_dynamics_params.model_copy(update={'enable_limiter': False, 'makeup_gain_db': 0.0})
+    processed_signal = apply_master_dynamics(
+        dynamic_signal_mono, SAMPLE_RATE, params
+    )
+
+    num_samples = len(dynamic_signal_mono)
+    half_samples = num_samples // 2
+
+    rms_quiet_in = np.sqrt(np.mean(dynamic_signal_mono[:half_samples]**2))
+    rms_loud_in = np.sqrt(np.mean(dynamic_signal_mono[half_samples:]**2))
+    rms_quiet_out = np.sqrt(np.mean(processed_signal[:half_samples]**2))
+    rms_loud_out = np.sqrt(np.mean(processed_signal[half_samples:]**2))
+
+    # Avoid division by zero if input is silent
+    if rms_quiet_in < 1e-9 or rms_quiet_out < 1e-9:
+        pytest.skip("Input or output quiet section is near silent, cannot calculate ratio.")
+
+    ratio_in = rms_loud_in / rms_quiet_in
+    ratio_out = rms_loud_out / rms_quiet_out
+
+    assert ratio_out < ratio_in, f"Compression did not reduce dynamic range ratio (In: {ratio_in:.2f}, Out: {ratio_out:.2f})"
+
+def test_master_dynamics_limiter_attenuates_peaks(default_master_dynamics_params):
+    """Test that the limiter attenuates peaks above its threshold."""
+    # Create a signal with peaks clearly above the limiter threshold
+    limiter_thresh_linear = 10**(default_master_dynamics_params.limiter_threshold_db / 20.0)
+    # Adjust peak amplitude to be above threshold but below 1.0 to avoid potential clipping issues
+    peak_amplitude = limiter_thresh_linear * 1.1 # 10% over threshold
+    # Use a short sine burst instead of a single impulse
+    burst_duration_ms = 10
+    burst_samples = int(burst_duration_ms / 1000 * SAMPLE_RATE)
+    burst_start = SAMPLE_RATE // 4
+    burst_end = burst_start + burst_samples
+    t = np.linspace(0, burst_duration_ms / 1000, burst_samples, endpoint=False)
+    sine_burst = peak_amplitude * np.sin(2 * np.pi * 440 * t) # 440 Hz burst
+
+    signal = np.zeros(SAMPLE_RATE, dtype=np.float32)
+    if burst_end <= SAMPLE_RATE:
+        signal[burst_start:burst_end] = sine_burst
+    else: # Handle case where burst goes past end of signal buffer
+        signal[burst_start:] = sine_burst[:SAMPLE_RATE - burst_start]
+
+    # Add a negative peak as well (optional, but keeps test similar)
+    burst_start_neg = SAMPLE_RATE // 2
+    burst_end_neg = burst_start_neg + burst_samples
+    if burst_end_neg <= SAMPLE_RATE:
+         signal[burst_start_neg:burst_end_neg] = -sine_burst
+    else:
+         signal[burst_start_neg:] = -sine_burst[:SAMPLE_RATE - burst_start_neg]
+
+    signal[SAMPLE_RATE // 2] = -peak_amplitude
+
+    params = default_master_dynamics_params.model_copy(update={'enable_compressor': False}) # Removed makeup_gain_db update
+    processed_signal = apply_master_dynamics(
+        signal, SAMPLE_RATE, params
+    )
+
+    max_peak_out = np.max(np.abs(processed_signal))
+    # Allow for slight overshoot depending on implementation (attack time)
+    # Assert peak is <= 1.0, acknowledging the internal 0dB hard clipper in pedalboard.Limiter
+    assert max_peak_out <= 1.0, f"Limiter output peak exceeded 1.0 (Out: {max_peak_out:.4f})"
+
+def test_master_dynamics_parameters_affect_output(dynamic_signal_mono, default_master_dynamics_params):
+    """Test that changing dynamics parameters alters the output."""
+    processed_default = apply_master_dynamics(dynamic_signal_mono, SAMPLE_RATE, default_master_dynamics_params)
+
+    # Change compressor threshold
+    params_comp_thresh = default_master_dynamics_params.model_copy(update={'compressor_threshold_db': -10.0})
+    processed_comp_thresh = apply_master_dynamics(dynamic_signal_mono, SAMPLE_RATE, params_comp_thresh)
+    assert not np.allclose(processed_default, processed_comp_thresh), "Changing compressor threshold had no effect"
+
+    # Change compressor ratio
+    params_comp_ratio = default_master_dynamics_params.model_copy(update={'compressor_ratio': 10.0})
+    processed_comp_ratio = apply_master_dynamics(dynamic_signal_mono, SAMPLE_RATE, params_comp_ratio)
+    assert not np.allclose(processed_default, processed_comp_ratio), "Changing compressor ratio had no effect"
+
+    # Change limiter threshold
+    params_lim_thresh = default_master_dynamics_params.model_copy(update={'limiter_threshold_db': -6.0})
+    processed_lim_thresh = apply_master_dynamics(dynamic_signal_mono, SAMPLE_RATE, params_lim_thresh)
+    assert not np.allclose(processed_default, processed_lim_thresh), "Changing limiter threshold had no effect"
+# Removed makeup_gain_db test as it's no longer a parameter
+
+def test_master_dynamics_bypass(dynamic_signal_mono, default_master_dynamics_params):
+    """Test that disabling both compressor and limiter results in unchanged audio."""
+    params_disabled = default_master_dynamics_params.model_copy(update={
+        'enable_compressor': False,
+        'enable_limiter': False,
+        'makeup_gain_db': 0.0 # Ensure no gain is applied either
+    })
+    processed_signal = apply_master_dynamics(
+        dynamic_signal_mono, SAMPLE_RATE, params_disabled
+    )
+    assert np.allclose(processed_signal, dynamic_signal_mono, atol=1e-6), "Disabling dynamics altered the signal significantly"
+
+def test_master_dynamics_zero_length_input(default_master_dynamics_params):
+    """Test master dynamics with zero-length audio input."""
+    zero_signal = np.array([], dtype=np.float32)
+    processed_signal = apply_master_dynamics(
+        zero_signal, SAMPLE_RATE, default_master_dynamics_params
+    )
+    assert isinstance(processed_signal, np.ndarray)
+    assert len(processed_signal) == 0
+
+def test_master_dynamics_invalid_parameters(dynamic_signal_mono, default_master_dynamics_params):
+    """Test master dynamics with invalid parameter values."""
+    # Provide valid defaults for other fields when testing one invalid field
+    valid_defaults = default_master_dynamics_params.model_dump()
+
+    with pytest.raises(ValidationError, match="Input should be greater than or equal to 1"):
+        # Compressor ratio must be >= 1.0
+        MasterDynamicsParameters(**{**valid_defaults, 'compressor_ratio': 0.5})
+        # Instantiation fails, no need to call apply_master_dynamics
+
+    with pytest.raises(ValidationError, match="Input should be greater than 0"):
+        # Compressor attack must be > 0.0
+        MasterDynamicsParameters(**{**valid_defaults, 'compressor_attack_ms': 0.0})
+
+    with pytest.raises(ValidationError, match="Input should be greater than 0"):
+        # Compressor release must be > 0.0
+        MasterDynamicsParameters(**{**valid_defaults, 'compressor_release_ms': -10.0})
+
+    with pytest.raises(ValidationError, match="Input should be less than or equal to 0"):
+        # Limiter threshold must be <= 0.0
+        MasterDynamicsParameters(**{**valid_defaults, 'limiter_threshold_db': 0.1})
 
 

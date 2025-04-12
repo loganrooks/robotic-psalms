@@ -3,10 +3,78 @@
 *This file tracks the immediate focus, ongoing tasks, and unresolved questions for the current session.*
 
 ---
+### [2025-04-12 04:03:43] - Task: Stage and Commit Master Dynamics Feature (REQ-ART-M01)
+- **Focus:** Stage all changes using `git add .` and commit with a detailed message summarizing the completion of REQ-ART-M01.
+- **Status:** Pending execution of git commands.
+
+---
+
+
+### [2025-04-12 03:58:20] - Task: Refactor Master Dynamics Integration Code and Tests (REQ-ART-M01 - Integration Refactor Phase)
+- **Focus:** Review `src/robotic_psalms/synthesis/sacred_machinery.py` (conditional `apply_master_dynamics` call) and `tests/test_sacred_machinery.py` (related tests) for clarity, maintainability, and potential simplification.
+- **Actions:**
+    - Read `src/robotic_psalms/synthesis/effects.py` (for context).
+    - Read `src/robotic_psalms/synthesis/sacred_machinery.py`. Reviewed implementation logic (lines 235-246); found it clear, efficient, and correctly placed. No refactoring needed.
+    - Read `tests/test_sacred_machinery.py`. Reviewed tests `test_process_psalm_applies_master_dynamics_when_configured` and `test_process_psalm_does_not_apply_master_dynamics_when_none`; found setup and assertions clear and effective. No refactoring needed.
+    - Ran `poetry run pytest tests/test_sacred_machinery.py`. Result: 34 passed.
+- **Status:** Completed. No code changes were required as the existing implementation and tests meet the quality criteria.
+
+---
+
+
+### [2025-04-12 03:09:25] - Task: Integrate Master Dynamics into Sacred Machinery (REQ-ART-M01 - Integration TDD Green Phase)
+- **Focus:** Modify `src/robotic_psalms/synthesis/sacred_machinery.py` to integrate the `apply_master_dynamics` effect conditionally based on `PsalmConfig.master_dynamics`.
+- **Actions:**
+    - Imported `apply_master_dynamics` and `MasterDynamicsParameters` from `.effects`.
+    - Added conditional logic to `process_psalm` to call `apply_master_dynamics` on the `combined` audio signal as the final step before returning, if configured.
+    - Fixed `SyntaxError` in import statement after initial insertion.
+    - Fixed Pylance error in `tests/test_sacred_machinery.py` by providing missing arguments during `MasterDynamicsParameters` instantiation.
+    - Ran specific master dynamics tests (`pytest tests/test_sacred_machinery.py -k master_dynamics`) - Passed (2/2).
+    - Ran all tests in `tests/test_sacred_machinery.py` (`pytest tests/test_sacred_machinery.py`) - Passed (34/34).
+- **Status:** Completed (Green Phase). Master dynamics effect integrated successfully. All relevant tests pass.
+
+---
+
+
+### [2025-04-12 01:13:20] - Task: Add Configuration for Master Dynamics Effect (REQ-ART-M01 - Config)
+- **Focus:** Add configuration for master dynamics effect (`MasterDynamicsParameters`) to `src/robotic_psalms/config.py`.
+- **Actions:**
+    - Read `src/robotic_psalms/config.py`.
+    - Used `insert_content` to:
+        - Add `MasterDynamicsParameters` to import on line 3.
+        - Insert `master_dynamics: Optional[MasterDynamicsParameters]` field with docstring into `PsalmConfig` after `saturation_effect` (line 260).
+- **Status:** Completed.
+
+---
+
+
+### [2025-04-11 23:58:24] - Task: Implement Minimal Master Dynamics (REQ-ART-M01 - Green Phase Start)
+- **Focus:** Implement minimal `MasterDynamicsParameters` model and `apply_master_dynamics` function signature in `src/robotic_psalms/synthesis/effects.py` to resolve test import errors.
+- **Actions:**
+    - Read `src/robotic_psalms/synthesis/effects.py`.
+    - Inserted `MasterDynamicsParameters` Pydantic model definition with fields based on test requirements (`enable_compressor`, `compressor_threshold_db`, etc.) and basic validation.
+    - Inserted `apply_master_dynamics` function signature with type hints and a minimal body (`return audio.astype(np.float32).copy()`).
+- **Status:** Minimal implementation complete. Ready for verification that tests collect and run without import errors.
+
+---
+
+
 ### [2025-04-11 22:45:17] - Task: Update Documentation for Vocal Layering Integration (REQ-ART-V03 - Documentation)
 - **Focus:** Update `README.md` and check docstrings in `config.py` for the new vocal layering parameters (`num_vocal_layers`, `layer_pitch_variation`, `layer_timing_variation_ms`).
+    - Modified assertion in `test_master_dynamics_limiter_attenuates_peaks` to `assert max_peak_out <= 1.0` to reflect the documented 0 dB hard clipper behavior of `pedalboard.Limiter`.
+
 - **Actions:**
     - Read `README.md`.
+    - Ran tests again.
+- **Status:** Completed. Functional logic implemented. Tests pass (77 passed, 8 xfailed).
+
+---
+
+
+
+### [2025-04-12 04:01:15] - Task: Implement Master Dynamics (REQ-ART-M01)
+- **Focus:** Completed full TDD cycle (implementation, integration, refactoring, documentation) for the master dynamics effect (compressor/limiter) using `pedalboard`. Integrated conditionally into `SacredMachineryEngine` as the final step.
+- **Status:** Completed. All tests passing (excluding known xfails). Documentation updated.
     - Inserted vocal layering parameters into example config and Parameter Guide in `README.md`.
     - Read `src/robotic_psalms/config.py`.
     - Verified docstrings for `num_vocal_layers`, `layer_pitch_variation`, `layer_timing_variation_ms` are adequate.

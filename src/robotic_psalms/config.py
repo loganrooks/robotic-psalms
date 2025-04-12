@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Optional
+from .synthesis.effects import ResonantFilterParameters, BandpassFilterParameters, ChorusParameters, SpectralFreezeParameters, GlitchParameters, SaturationParameters, MasterDynamicsParameters
 from .synthesis.effects import ResonantFilterParameters, BandpassFilterParameters, ChorusParameters, SpectralFreezeParameters, GlitchParameters, SaturationParameters
 from pydantic import BaseModel, Field, model_validator # Corrected import
 from dataclasses import dataclass
@@ -257,6 +258,11 @@ class PsalmConfig(BaseModel):
         default=None,
         description="Optional configuration for the saturation/distortion effect. If None, the effect is disabled."
     )
+    master_dynamics: Optional[MasterDynamicsParameters] = Field(
+        default=None,
+        description="Optional configuration for the master dynamics processing (compressor/limiter). If None, the effect is disabled."
+    )
+
     voice_range: VoiceRange = Field(
         default_factory=VoiceRange,
         description="Voice range settings"

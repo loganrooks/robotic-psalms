@@ -5,6 +5,14 @@
 ---
 
 
+### Implementation: Functional Melodic Contour (REQ-ART-MEL-01 - Green Phase) - 2025-04-12 04:23:22
+- **Approach**: Implemented the functional logic for applying a melodic contour to synthesized speech. Added conditional logic in `synthesize_text` to call `_apply_melody_contour` only when a `melody` list (tuples of Hz, duration) is provided. The `_apply_melody_contour` method iterates through the melody segments, estimates the original pitch of the corresponding audio segment using `librosa.pyin`, calculates the required pitch shift in semitones to match the target pitch, and applies the shift using `librosa.effects.pitch_shift`. Handled edge cases like short segments (skipped pyin), zero/invalid pitches (skipped shift), and potential errors during processing. Concatenated processed segments and ensured final audio length matched the original.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/vox_dei.py` (Modified `synthesize_text`, `_apply_melody_contour`), `tests/synthesis/test_vox_dei.py` (Modified tests `test_synthesize_text_accepts_melody_argument`, `test_synthesize_text_applies_melody_contour`).
+- **Notes**: Addressed Pylance errors related to `librosa.note_to_hz` return type by casting to `float`, although Pylance still flags them (tests pass). Corrected test assertions to match the updated code. All tests in `tests/synthesis/test_vox_dei.py` pass.
+
+---
+
+
 
 ### Implementation: Add Configuration for Master Dynamics Effect (REQ-ART-M01 - Config) - 2025-04-12 01:13:43
 - **Approach**: Added configuration for the master dynamics effect to `src/robotic_psalms/config.py`. Imported `MasterDynamicsParameters` from `.synthesis.effects` and added an optional field `master_dynamics: Optional[MasterDynamicsParameters] = Field(default=None, ...)` to the `PsalmConfig` model, including a descriptive docstring.

@@ -65,6 +65,30 @@
 ## Progress
 *Milestones, completed tasks, overall status.*
 
+#### [2025-04-12 04:30:41] - Task: Update Docstrings for Melodic Contour (REQ-ART-MEL-01 Related)
+- **Status:** Completed.
+- **Deliverables:** Updated docstrings for `synthesize_text` and `_apply_melody_contour` in `src/robotic_psalms/synthesis/vox_dei.py` to include details about the `melody` parameter and improve the description of the contour application process.
+---
+#### [2025-04-12 04:31:12] - Task: Update Documentation for Melodic Contour Input (REQ-ART-MEL-01 - Documentation)
+- **Status:** Completed.
+- **Deliverables:** Updated `README.md` Parameter Guide section for the `melody` argument. Updated docstrings in `src/robotic_psalms/synthesis/vox_dei.py` for `synthesize_text` and `_apply_melody_contour` (via delegation to `code` mode).
+---
+
+
+
+
+#### [2025-04-12 04:23:08] - Feature: Melodic Contour Application (REQ-ART-MEL-01 - Green Phase)
+- **Status:** Completed.
+- **Deliverables:** Implemented functional logic in `VoxDeiSynthesizer._apply_melody_contour` using `librosa.pyin` and `librosa.effects.pitch_shift`. Added conditional call in `synthesize_text`. Updated tests in `tests/synthesis/test_vox_dei.py` and confirmed they pass.
+---
+
+
+#### [2025-04-12 04:16:30] - Task: Write Failing Tests for Melodic Contour Input (REQ-ART-MEL-01 - Red Phase)
+- **Status:** Completed (Red Phase).
+- **Deliverables:** Added failing unit tests (`test_synthesize_text_accepts_melody_argument`, `test_synthesize_text_applies_melody_contour`) to `tests/synthesis/test_vox_dei.py`. Tests define the required interface and behavior for melodic input, currently failing due to missing implementation/signature changes in `VoxDeiSynthesizer`.
+---
+
+
 #### [2025-04-12 04:00:58] - Task: Update Documentation for Master Dynamics Integration (REQ-ART-M01 - Documentation)
 - **Status:** Completed.
 - **Deliverables:** Updated `README.md` example configuration and Parameter Guide for `master_dynamics`. Verified docstrings in `src/robotic_psalms/config.py` and `src/robotic_psalms/synthesis/effects.py` are adequate.
@@ -310,6 +334,12 @@
 #### [2025-04-12 04:01:51] - Feature: Master Dynamics Processing (REQ-ART-M01)
 - **Status:** Completed.
 - **Deliverables:** Implemented `apply_master_dynamics` function and `MasterDynamicsParameters`/`MasterDynamicsConfig` models using `pedalboard.Compressor` and `pedalboard.Limiter` in `src/robotic_psalms/synthesis/effects.py` and `src/robotic_psalms/config.py`. Integrated conditionally as the final step in `SacredMachineryEngine`. Core tests passing, documentation updated.
+---
+
+
+#### [2025-04-12 04:32:12] - Feature: Melodic Contour Input (REQ-ART-MEL-01)
+- **Status:** Completed.
+- **Deliverables:** Implemented melodic contour application in `VoxDeiSynthesizer` using `librosa` pitch shifting based on `melody` input argument (`List[Tuple[float, float]]`). Updated `synthesize_text` signature. Relevant tests created/updated and passing. Documentation updated.
 ---
 #### [2025-04-12 04:03:56] - Feature: Master Dynamics Processing (REQ-ART-M01)
 - **Status:** Completed & Ready for Commit.

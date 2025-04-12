@@ -17,6 +17,18 @@
 - **Related Issue**: REQ-ART-M01 (Integration Refactor Phase)
 
 
+### Optimization: [2025-04-12 04:27:33] - Refactor Melodic Contour Implementation & Tests (REQ-ART-MEL-01)
+- **Target**: `src/robotic_psalms/synthesis/vox_dei.py`, `tests/synthesis/test_vox_dei.py`
+- **Type**: Readability/Maintainability/Robustness/Testability
+- **Desc**:
+    - `vox_dei.py` (`_apply_melody_contour`): Moved `librosa` import to top level. Added constants `_MIN_PYIN_DURATION_SEC` and `_MIN_SEMITONE_SHIFT`. Added more detailed comments explaining the logic flow (pitch estimation, shift calculation, application). Standardized NumPy type hints to `npt.NDArray`. Fixed indentation errors introduced by previous diff. Added try/except block around semitone calculation.
+    - `test_vox_dei.py`: Removed obsolete `pytest.skip` from `test_synthesize_text_applies_melody_contour`. Added new test `test_apply_melody_contour_shifts_pitch` to directly verify pitch shifting logic using `librosa.pyin` for analysis (initially marked `xfail`, then removed marker after it passed). Fixed Pylance type errors by casting `librosa.note_to_hz` results to `float`.
+- **Metrics Before**: N/A (Focus on code quality and test coverage)
+- **Metrics After**: N/A (Test results confirmed: 10 passed)
+- **Related Debt**: N/A
+- **Related Issue**: REQ-ART-MEL-01 (Refactor Phase)
+
+
 ## Optimization Goals
 <!-- Describe the target areas for improvement (performance, modularity, etc.) -->
 

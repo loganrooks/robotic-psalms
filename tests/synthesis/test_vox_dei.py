@@ -2,6 +2,8 @@ import pytest
 import numpy as np
 import logging
 from unittest.mock import patch, MagicMock, ANY
+from typing import List, Tuple
+
 
 from robotic_psalms.synthesis.vox_dei import VoxDeiSynthesisError
 from robotic_psalms.synthesis.tts.engines.espeak import EspeakNGWrapper
@@ -141,3 +143,126 @@ def test_synthesize_text_synth_exception(mock_synth, caplog):
 
 # Note: Testing internal normalization/padding logic via public interface is complex.
 # Coverage for those specific lines might remain lower without direct private method tests.
+
+# --- Melodic Contour Tests (REQ-ART-MEL-01) ---
+
+@pytest.fixture
+def sample_melody() -> List[Tuple[float, float]]:
+    """Provides a simple ascending scale melody."""
+    # (Pitch in Hz, Duration in seconds)
+    return [
+        (261.63, 0.5), # C4
+        (293.66, 0.5), # D4
+        (329.63, 0.5), # E4
+        (349.23, 0.5), # F4
+    ]
+
+def test_synthesize_text_accepts_melody_argument(sample_melody):
+    """Test that synthesize_text can be called with a melody argument (will fail initially)."""
+    config = PsalmConfig()
+    synthesizer = VoxDeiSynthesizer(config=config)
+    text_input = "Ah"
+
+    # Mock the underlying synth call to avoid actual synthesis
+    with patch.object(EspeakNGWrapper, 'synth', return_value=(np.zeros(100, dtype=np.float32), 22050)):
+        # This call should now succeed as the signature accepts the melody argument.
+        # We pass melody as a keyword argument for clarity
+            synthesizer.synthesize_text(text_input, melody=sample_melody)
+
+@patch('robotic_psalms.synthesis.vox_dei.VoxDeiSynthesizer._apply_melody_contour', return_value=np.zeros(100, dtype=np.float32))
+def test_synthesize_text_applies_melody_contour(mock_apply_melody, sample_melody):
+    """Test that synthesize_text calls an internal method to apply melody (will fail initially)."""
+    config = PsalmConfig()
+    synthesizer = VoxDeiSynthesizer(config=config)
+    text_input = "Ah"
+    base_audio = np.random.rand(100).astype(np.float32)
+    sample_rate = 22050
+
+    # Mock the base TTS synthesis
+    with patch.object(EspeakNGWrapper, 'synth', return_value=(base_audio, sample_rate)):
+        # Assume synthesize_text accepts melody (this test focuses on the *application*)
+        # We might need to temporarily adjust the signature or use a different approach
+        # if the TypeError from the previous test blocks this one.
+        # For now, let's assume the signature is updated conceptually for this test.
+        # Attempt the call, expecting the mock _apply_melody_contour to be checked
+        # The try/except/skip block is removed as the signature now accepts 'melody'
+        synthesizer.synthesize_text(text_input, melody=sample_melody)
+
+    # This assertion will fail until _apply_melody_contour is actually called
+    mock_apply_melody.assert_called_once_with(ANY, sample_rate, sample_melody) # Check it's called with audio, sample_rate, and melody
+
+def test_synthesize_text_handles_no_melody():
+    """Test that synthesize_text works normally without a melody argument."""
+    config = PsalmConfig()
+    synthesizer = VoxDeiSynthesizer(config=config)
+    text_input = "Test"
+    base_audio = np.random.rand(100).astype(np.float32)
+    sample_rate = 22050
+
+    # Mock the base TTS synthesis and the (currently non-existent) melody application
+    with patch.object(EspeakNGWrapper, 'synth', return_value=(base_audio, sample_rate)), \
+         patch('robotic_psalms.synthesis.vox_dei.VoxDeiSynthesizer._apply_melody_contour') as mock_apply_melody:
+
+        # Call without the melody argument
+        audio_output, sr_output = synthesizer.synthesize_text(text_input)
+
+    # Assert basic synthesis worked
+    assert isinstance(audio_output, np.ndarray)
+    assert sr_output == sample_rate
+    assert audio_output.size > 0
+
+    # Assert that melody application was NOT called
+    mock_apply_melody.assert_not_called()
+
+
+
+def test_apply_melody_contour_shifts_pitch(sample_melody):
+    """Directly test if _apply_melody_contour shifts pitch as expected (XFAIL)."""
+    config = PsalmConfig()
+    synthesizer = VoxDeiSynthesizer(config=config)
+    sample_rate = 22050
+    duration = sum(d for _, d in sample_melody) # Total duration from melody
+    original_freq = 220.0 # A3
+
+    # Create a simple sine wave as input
+    t = np.linspace(0., duration, int(sample_rate * duration), endpoint=False)
+    input_audio = (0.5 * np.sin(2. * np.pi * original_freq * t)).astype(np.float32)
+
+    # Apply the melody contour directly
+    output_audio = synthesizer._apply_melody_contour(input_audio, sample_rate, sample_melody)
+
+    # --- Verification (Complex Part - XFAIL) ---
+    # Ideally, we'd analyze the pitch contour of output_audio.
+    # This requires robust pitch detection (like pyin) and segmenting the output
+    # according to the melody durations to check the average pitch in each segment.
+
+    # Example using pyin (simplified - likely needs refinement)
+    import librosa
+    segment_start_sample = 0
+    detected_pitches = []
+    for target_pitch_hz, duration_sec in sample_melody:
+        segment_end_sample = min(segment_start_sample + int(duration_sec * sample_rate), len(output_audio))
+        segment = output_audio[segment_start_sample:segment_end_sample]
+
+        if len(segment) > int(0.1 * sample_rate): # Min duration for pyin
+            f0, voiced_flag, _ = librosa.pyin(
+                segment.astype(np.float32),
+                fmin=float(librosa.note_to_hz('C2')), # Cast to float
+                fmax=float(librosa.note_to_hz('C7')), # Cast to float
+                sr=sample_rate
+            )
+            voiced_f0 = f0[voiced_flag]
+            if np.any(voiced_flag) and not np.all(np.isnan(voiced_f0)):
+                detected_pitch = np.nanmean(voiced_f0)
+                detected_pitches.append(detected_pitch)
+                # Basic assertion (likely too strict for real-world pyin results)
+                assert np.isclose(detected_pitch, target_pitch_hz, rtol=0.1), \
+                    f"Segment expected ~{target_pitch_hz:.1f} Hz, detected ~{detected_pitch:.1f} Hz"
+            else:
+                pytest.fail(f"Could not detect voiced pitch in segment for target {target_pitch_hz:.1f} Hz")
+        else:
+             pytest.fail(f"Output segment too short for pitch analysis (target {target_pitch_hz:.1f} Hz)")
+
+        segment_start_sample = segment_end_sample
+
+    assert len(detected_pitches) == len(sample_melody), "Mismatch between number of melody segments and detected pitches"

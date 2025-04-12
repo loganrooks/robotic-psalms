@@ -24,6 +24,18 @@
 <!-- Describe the component/feature being tested -->
 
 
+### Test Plan: Melodic Contour Input (REQ-ART-MEL-01) - [2025-04-12 04:16:30]
+#### Unit Tests:
+- Test Case: `synthesize_text` accepts `melody` argument / Expected: No `TypeError` / Status: Written (Failing - Red)
+- Test Case: `synthesize_text` applies melody contour (mocks internal method) / Expected: Internal method called / Status: Written (Failing - Red)
+- Test Case: `synthesize_text` handles no melody argument / Expected: No error, no melody application / Status: Written (Passing)
+#### Integration Tests:
+- Test Case: Synthesize with melody, verify output pitch contour matches input / Expected: Pitch contours match (approx) / Status: Planned
+#### Edge Cases Covered:
+- Missing melody argument.
+
+
+
 
 
 ### Test Plan: High-Quality Reverb (REQ-ART-E01) - 2025-04-08 13:03:24
@@ -278,6 +290,15 @@
 ## Refactoring Targets (Post-Pass)
 <!-- Identify areas for refactoring after tests pass -->
 
+### TDD Cycle: Melodic Contour Input (REQ-ART-MEL-01 - Red Phase) - [2025-04-12 04:16:30]
+- **Start**: [2025-04-12 04:16:05]
+- **Red**: Tests created: Wrote failing tests in `tests/synthesis/test_vox_dei.py` for accepting and conceptually applying melodic input (`test_synthesize_text_accepts_melody_argument`, `test_synthesize_text_applies_melody_contour`). Tests fail due to `TypeError` (missing argument) and `AssertionError` (mock not called).
+- **Green**: Implementation approach: Next step is to modify `VoxDeiSynthesizer.synthesize_text` signature to accept `melody: Optional[List[Tuple[float, float]]] = None` and add a placeholder call to a (currently non-existent) internal method like `_apply_melody_contour` when `melody` is provided.
+- **Refactor**: Improvements made: N/A (Red phase only)
+- **Outcomes**: Established test harness for melodic input feature.
+
+
+
 ### TDD Cycle: Vocal Synthesis Fix - 2025-04-08 07:04:40
 - **Start**: 2025-04-08 07:03:23
 - **End**: 2025-04-08 07:04:40
@@ -401,6 +422,10 @@
 
 ### Fixture: default_master_dynamics_params - [2025-04-11 23:56:15]
 - **Purpose**: Provides default parameters for master dynamics (REQ-ART-M01) / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Default parameters for master dynamics tests.
+
+### Fixture: sample_melody - [2025-04-12 04:16:30]
+- **Purpose**: Provides a simple ascending scale melody `List[Tuple[float, float]]` (Hz, seconds) / **Location**: `tests/synthesis/test_vox_dei.py` / **Usage**: Input for melodic contour tests.
+
 
 ### Fixture: dynamic_signal_mono - [2025-04-11 23:56:15]
 - **Purpose**: Provides a mono signal with distinct quiet and loud sections / **Location**: `tests/synthesis/test_effects.py` / **Usage**: Input for testing compression dynamic range reduction.
@@ -621,6 +646,18 @@
 - **Env**: Local
 - **Suite**: `tests/synthesis/test_effects.py -k saturation`
 - **Result**: FAIL (Anticipated)
+### Test Run: Melodic Contour Input (REQ-ART-MEL-01 - Red Phase) - [2025-04-12 04:17:18]
+- **Trigger**: Manual
+- **Env**: Local
+- **Suite**: `tests/synthesis/test_vox_dei.py -k melody`
+- **Result**: FAIL
+- **Summary**: 1 Passed / 2 Failed / 6 Deselected
+- **Report Link**: N/A
+- **Failures**: 
+    - `test_synthesize_text_applies_melody_contour`: `AttributeError: <class 'robotic_psalms.synthesis.vox_dei.VoxDeiSynthesizer'> does not have the attribute '_apply_melody_contour'`
+    - `test_synthesize_text_handles_no_melody`: `AttributeError: <class 'robotic_psalms.synthesis.vox_dei.VoxDeiSynthesizer'> does not have the attribute '_apply_melody_contour'`
+
+
 - **Failures**: `test_saturation_module_exists`: `ImportError: cannot import name 'apply_saturation' from 'robotic_psalms.synthesis.effects'`, `ImportError: cannot import name 'SaturationParameters' ...`, etc. (or similar NameErrors/Pylance errors during test collection).
 
 

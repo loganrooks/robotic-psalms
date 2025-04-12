@@ -3,6 +3,60 @@
 *This file tracks the immediate focus, ongoing tasks, and unresolved questions for the current session.*
 
 ---
+### [2025-04-12 04:31:01] - Task: Update Documentation for Melodic Contour Input (REQ-ART-MEL-01 - Documentation)
+- **Focus:** Update `README.md` and `src/robotic_psalms/synthesis/vox_dei.py` docstrings for the new melodic contour feature (`melody` argument).
+- **Actions:**
+    - Updated `README.md` Parameter Guide section with details on the `melody` argument format and usage (via Python API).
+    - Delegated docstring updates for `synthesize_text` and `_apply_melody_contour` in `src/robotic_psalms/synthesis/vox_dei.py` to `code` mode (confirmed completion).
+- **Status:** Completed.
+
+---
+
+
+### [2025-04-12 04:30:30] - Task: Update Docstrings for Melodic Contour (REQ-ART-MEL-01 Related)
+- **Focus:** Improve documentation for `synthesize_text` and `_apply_melody_contour` in `src/robotic_psalms/synthesis/vox_dei.py`.
+- **Actions:**
+    - Applied provided diff to update docstrings, adding details about the `melody` parameter and clarifying the `_apply_melody_contour` process.
+- **Status:** Completed.
+
+---
+
+
+### [2025-04-12 04:22:51] - Task: Implement Functional Melodic Contour Application (REQ-ART-MEL-01 - Green Phase)
+- **Focus:** Implement functional logic in `src/robotic_psalms/synthesis/vox_dei.py` (`_apply_melody_contour`) and ensure conditional call in `synthesize_text` is correct to pass tests.
+- **Actions:**
+    - Added conditional logic to `synthesize_text` to call `_apply_melody_contour` only if `melody` is provided.
+    - Implemented `_apply_melody_contour` using `librosa.pyin` to estimate original pitch per segment and `librosa.effects.pitch_shift` to apply the target pitch from the `melody` list. Handled short segments and potential errors during pitch estimation/shifting.
+    - Fixed Pylance errors related to `librosa.note_to_hz` return type by casting to `float` (though Pylance still reports them, tests pass).
+    - Corrected test `test_synthesize_text_accepts_melody_argument` by removing outdated `pytest.raises(TypeError)`.
+    - Corrected assertion in `test_synthesize_text_applies_melody_contour` to include `sample_rate` argument.
+    - Ran `pytest tests/synthesis/test_vox_dei.py` - All 9 tests passed.
+- **Status:** Completed (Green Phase). Functional implementation complete and verified by tests.
+
+---
+
+
+### [2025-04-12 04:19:14] - Task: Implement Minimal Melodic Input Signature (REQ-ART-MEL-01 - Green Phase Start)
+- **Focus:** Modify `src/robotic_psalms/synthesis/vox_dei.py` to accept `melody` argument and add placeholder `_apply_melody_contour` method.
+- **Actions:**
+    - Added `List`, `Tuple` imports.
+    - Updated `synthesize_text` signature to accept `melody: Optional[List[Tuple[float, float]]] = None`.
+    - Added placeholder `_apply_melody_contour` method returning audio unchanged.
+- **Status:** Completed (Green Phase Start). Minimal changes applied to resolve `TypeError` and `AttributeError` in tests.
+
+---
+
+
+### [2025-04-12 04:16:30] - Task: Write Failing Tests for Melodic Contour Input (REQ-ART-MEL-01 - Red Phase)
+- **Focus:** Create failing unit tests in `tests/synthesis/test_vox_dei.py` to drive the implementation of melodic input processing.
+- **Actions:**
+    - Added tests `test_synthesize_text_accepts_melody_argument`, `test_synthesize_text_applies_melody_contour`, `test_synthesize_text_handles_no_melody`.
+    - Assumed melody input format: `List[Tuple[float, float]]` (Hz, seconds).
+- **Status:** Completed (Red Phase). Tests added. Ready to verify failures via pytest.
+
+---
+
+
 ### [2025-04-12 04:03:43] - Task: Stage and Commit Master Dynamics Feature (REQ-ART-M01)
 - **Focus:** Stage all changes using `git add .` and commit with a detailed message summarizing the completion of REQ-ART-M01.
 - **Status:** Pending execution of git commands.
@@ -16,6 +70,10 @@
     - Read `src/robotic_psalms/synthesis/effects.py` (for context).
     - Read `src/robotic_psalms/synthesis/sacred_machinery.py`. Reviewed implementation logic (lines 235-246); found it clear, efficient, and correctly placed. No refactoring needed.
     - Read `tests/test_sacred_machinery.py`. Reviewed tests `test_process_psalm_applies_master_dynamics_when_configured` and `test_process_psalm_does_not_apply_master_dynamics_when_none`; found setup and assertions clear and effective. No refactoring needed.
+
+### [2025-04-12 04:31:42] - Task: Implement Melodic Contour Input (REQ-ART-MEL-01)
+- **Focus:** Completed full TDD cycle (implementation, integration, refactoring, documentation) for applying melodic contour to synthesized vocals using `librosa` post-processing. Modified `VoxDeiSynthesizer.synthesize_text` signature.
+- **Status:** Completed. All tests passing (excluding known xfails). Documentation updated.
     - Ran `poetry run pytest tests/test_sacred_machinery.py`. Result: 34 passed.
 - **Status:** Completed. No code changes were required as the existing implementation and tests meet the quality criteria.
 

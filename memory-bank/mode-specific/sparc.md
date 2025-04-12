@@ -518,5 +518,45 @@
 - Completion time: 2025-04-12 04:01:15
 - Outcome: Documentation updated successfully.
 
+### [2025-04-12 04:14:30] Task: REQ-ART-MEL-01 - Write Failing Tests (Melodic Contour)
+- Assigned to: tdd
+- Description: Create failing integration tests for melodic contour input.
+- Expected deliverable: Failing tests in `tests/synthesis/test_vox_dei.py`.
+- Status: completed
+- Completion time: 2025-04-12 04:17:44
+- Outcome: Failing tests created successfully (failing on TypeError/AttributeError).
+
+### [2025-04-12 04:17:44] Task: REQ-ART-MEL-01 - Implement Minimal Melodic Signature (Green Phase Start)
+- Assigned to: code
+- Description: Implement minimal signature changes in `vox_dei.py` to resolve initial test errors.
+- Expected deliverable: Tests running but failing on assertions.
+- Status: completed
+- Completion time: 2025-04-12 04:19:42
+- Outcome: Minimal implementation added. TypeError/AttributeError resolved.
+
+### [2025-04-12 04:19:42] Task: REQ-ART-MEL-01 - Implement Functional Melodic Contour (Green Phase)
+- Assigned to: code
+- Description: Implement functional melodic contour logic using `librosa` pitch shifting.
+- Expected deliverable: Passing melody tests.
+- Status: completed
+- Completion time: 2025-04-12 04:23:54
+- Outcome: Melodic contour implemented. All tests in `test_vox_dei.py` pass.
+
+### [2025-04-12 04:23:54] Task: REQ-ART-MEL-01 - Refactor Melodic Contour Implementation
+- Assigned to: refinement-optimization-mode
+- Description: Refactor melodic contour code in `vox_dei.py` and tests.
+- Expected deliverable: Refactored code, stable test results.
+- Status: completed
+- Completion time: 2025-04-12 04:28:00
+- Outcome: Code clarity improved, direct pitch shift test added. Tests pass.
+
+### [2025-04-12 04:28:00] Task: REQ-ART-MEL-01 - Update Documentation (Melodic Contour)
+- Assigned to: docs-writer
+- Description: Update `README.md` and `vox_dei.py` docstrings for melodic contour.
+- Expected deliverable: Updated documentation files.
+- Status: completed
+- Completion time: 2025-04-12 04:31:42
+- Outcome: Documentation updated successfully.
+
 ## Workflow State
 <!-- Update current workflow state here -->

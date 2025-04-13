@@ -1,7 +1,6 @@
 import numpy as np
 from pydantic import BaseModel, Field, ConfigDict, model_validator
-from pedalboard import Delay, Reverb
-from pedalboard import Pedalboard # Correct import
+from pedalboard import Pedalboard, Delay, Reverb #type: ignore # Importing pedalboard effects
 from scipy import signal # Added for filters
 import math # Added for RBJ filter calculations
 from scipy.interpolate import interp1d # Used for formant shifting spectral warping

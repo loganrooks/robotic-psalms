@@ -79,6 +79,18 @@
 ## Progress
 *Milestones, completed tasks, overall status.*
 
+#### [2025-04-12 19:36:00] - Feature: Enhanced Drone Generation (REQ-ART-A02-v2 - Green Phase)
+- **Status:** Completed.
+- **Deliverables:** Modified `_generate_drones` in `src/robotic_psalms/synthesis/sacred_machinery.py` using multiple detuned sawtooth oscillators with LFO modulation. New complexity tests (`test_generate_drones_harmonic_richness_fails`, `test_generate_drones_spectral_movement_fails`) now pass. All drone-related tests confirmed passing.
+---
+
+
+#### [2025-04-12 18:42:57] - Task: Stage and Commit Enhanced Pad Generation Feature (REQ-ART-A01-v2)
+- **Status:** Completed.
+- **Deliverables:** Staged and committed changes for enhanced pad generation (tests, implementation, documentation) to local Git repository (commit `4b0350c`).
+---
+
+
 #### [2025-04-12 18:34:09] - Task: Update Docstrings in Sacred Machinery
 - **Status:** Completed.
 - **Deliverables:** Updated docstrings for `_apply_time_varying_lowpass` and `_generate_pads` in `src/robotic_psalms/synthesis/sacred_machinery.py` based on user-provided diff.

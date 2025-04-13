@@ -6,6 +6,17 @@
 
 ## Optimization History Log
 <!-- Append optimization details using the format below -->
+### Optimization: [2025-04-12 19:39:23] - Refactor Drone Generation Logic (REQ-ART-A02-v2)
+- **Target**: `src/robotic_psalms/synthesis/sacred_machinery.py` (`_generate_drones`)
+- **Type**: Clarity/Maintainability/Constants
+- **Desc**: Refactored `_generate_drones`: Introduced class constants for oscillator count, frequency divisor, and LFO parameters (`_DRONE_OSC_COUNT`, `_DRONE_BASE_FREQ_DIVISOR`, `_DRONE_LFO_AMP_FREQ`, etc.). Updated function to use constants. Improved comments regarding detuning factor and FM effect via `signal.sawtooth`.
+- **Metrics Before**: N/A (Focus on code quality)
+- **Metrics After**: N/A (Test results confirmed: 8 `generate_drones` tests passed)
+- **Related Debt**: N/A
+- **Related Issue**: REQ-ART-A02-v2 (Refactor Phase)
+
+
+
 ### Optimization: [2025-04-12 18:09:41] - Refactor Pad Generation Logic (REQ-ART-A01-v2)
 - **Target**: `src/robotic_psalms/synthesis/sacred_machinery.py` (`_generate_pads`)
 - **Type**: Modularity/Readability/Maintainability

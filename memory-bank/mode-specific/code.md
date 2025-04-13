@@ -5,6 +5,22 @@
 ---
 
 
+### Implementation: Update Docstring for _generate_drones - 2025-04-12 19:42:34
+- **Approach**: Updated the docstring for the `_generate_drones` method in `src/robotic_psalms/synthesis/sacred_machinery.py` to accurately reflect its current implementation using multiple detuned sawtooth oscillators with LFO modulation for detuning and amplitude, as per REQ-ART-A02-v2 enhancements.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/sacred_machinery.py` (Modified docstring).
+- **Notes**: Used `read_file` to confirm the existing docstring line (633) after initial `apply_diff` failed, then successfully applied the diff targeting the correct line.
+
+---
+
+
+### Implementation: Enhance Drone Generation Logic (REQ-ART-A02-v2 - Green Phase) - 2025-04-12 19:36:00
+- **Approach**: Modified `_generate_drones` in `src/robotic_psalms/synthesis/sacred_machinery.py` to meet new complexity requirements (harmonic peaks > 10, spectral centroid variance > 5000.0). Replaced the previous simple FM synthesis with a combination of three sawtooth oscillators. The oscillators are slightly detuned from the base frequency (derived from the liturgical mode), and the amount of detuning is modulated by a slow LFO (0.15 Hz) up to a maximum of 1.5 Hz difference. A very slow amplitude LFO (0.05 Hz) was also added for subtle volume variation. The output is normalized.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/sacred_machinery.py` (Modified `_generate_drones`).
+- **Notes**: This approach successfully passed the new failing tests (`test_generate_drones_harmonic_richness_fails`, `test_generate_drones_spectral_movement_fails`) and maintained passing status for existing drone tests. The use of multiple detuned sawtooth waves inherently creates richer harmonics and beating effects, while the LFO modulating the detuning amount introduces spectral movement over time.
+
+---
+
+
 ### Implementation: Enhance Pad Generation Logic (REQ-ART-A01-v2 - Green Phase) - 2025-04-12 18:06:09
 - **Approach**: Modified `_generate_pads` in `src/robotic_psalms/synthesis/sacred_machinery.py` to meet new complexity requirements (spectral centroid variance > 50000, mean spectral flux > 0.5). Introduced two new LFOs: one modulating the `harmonicity` (mix between sine and sawtooth waves) and another modulating the cutoff frequency of a 2nd-order Butterworth low-pass filter. To implement the time-varying filter, a segmented approach was used: the audio was processed in 1024-sample chunks, with the filter coefficients recalculated for each chunk based on the average LFO value within that chunk, using `scipy.signal.sosfilt`.
 - **Key Files Modified/Created**: `src/robotic_psalms/synthesis/sacred_machinery.py` (Modified `_generate_pads`).

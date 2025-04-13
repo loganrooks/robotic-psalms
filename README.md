@@ -320,7 +320,7 @@ The core functionality, including text processing and audio synthesis using `esp
 Future development will focus on enhancing the artistic capabilities and achieving a more sophisticated sonic aesthetic, as outlined in the [Artistic Specification](./artistic_specification.md). Key planned features include:
 
 *   **Improved Vocal Processing:** Initial robust formant shifting using `pyworld` (REQ-ART-V01) is integrated. Future work includes enhancing the vocal effects chain focusing on reverb and delay (REQ-ART-V02).
-*   **Ambient Texture:** Enhanced, evolving pad generation implemented (REQ-ART-A01-v2). Future work may include richer drone generation (REQ-ART-A02).
+*   **Ambient Texture:** Enhanced, evolving pad generation (REQ-ART-A01-v2) and richer, evolving drone generation (REQ-ART-A02-v2) implemented.
 *   **Effects Refinement:** High-quality reverb (e.g., FDN or convolution) (REQ-ART-E01), improved spectral freeze (REQ-ART-E02), refined glitch effects (REQ-ART-E03), and saturation (REQ-ART-E04).
 *   **Melodic Control:** Guiding vocal synthesis with melodic input (REQ-ART-MEL-01, REQ-ART-MEL-02, REQ-ART-MEL-03).
 

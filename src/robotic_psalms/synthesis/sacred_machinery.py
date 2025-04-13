@@ -45,6 +45,17 @@ class SacredMachineryEngine:
     _PAD_FILTER_MIN_NORM_CUTOFF = 0.001 # Safety margin
     _PAD_FILTER_MAX_NORM_CUTOFF = 0.999 # Safety margin
 
+    # Drone Generation Constants
+    _DRONE_OSC_COUNT = 3
+    _DRONE_BASE_FREQ_DIVISOR = 2  # Octave down
+    _DRONE_LFO_AMP_FREQ = 0.05
+    _DRONE_LFO_AMP_BASE = 0.6
+    _DRONE_LFO_AMP_DEPTH = 0.4
+    _DRONE_LFO_DETUNE_FREQ = 0.15
+    _DRONE_LFO_DETUNE_MAX_HZ = 1.5
+    _DRONE_LFO_DETUNE_BASE_FACTOR = 0.5 # Centered around 0.5
+    _DRONE_LFO_DETUNE_DEPTH_FACTOR = 0.5 # Range [0, 1]
+
 
     def __init__(self, config: PsalmConfig):
         """Initialize the sacred machinery engine
@@ -619,33 +630,76 @@ class SacredMachineryEngine:
         return hit.astype(np.float32) # Cast to ensure correct return type
 
     def _generate_drones(self, duration: float) -> npt.NDArray[np.float32]:
-        """Generate frequency modulated drones"""
+        """Generate rich, evolving drones using multiple detuned oscillators.
+
+        This method creates drone sounds based on the root frequency of the current
+        musical mode (shifted down by `_DRONE_BASE_FREQ_DIVISOR`). It uses
+        `_DRONE_OSC_COUNT` sawtooth oscillators. The richness and evolution come from:
+        1.  **Detuning:** Oscillators are detuned relative to each other. The amount
+            of detuning is modulated by a slow LFO (`_DRONE_LFO_DETUNE_FREQ`,
+            `_DRONE_LFO_DETUNE_MAX_HZ`).
+        2.  **Amplitude Modulation:** The overall amplitude is modulated by another
+            slow LFO (`_DRONE_LFO_AMP_FREQ`).
+
+        Internal constants (`_DRONE_*`) control the oscillator count, LFO parameters,
+        and detuning amounts. The final output is normalized.
+
+        Args:
+            duration: The desired duration of the drone in seconds.
+
+        Returns:
+            An array containing the generated drone audio signal.
+        """
         num_samples = int(duration * self.sample_rate)
         t = np.arange(num_samples) / self.sample_rate
 
-        # Base frequency from mode
-        base_freq = self.mode_frequencies[self.config.mode][0] / 2  # One octave down
+        # Base frequency from mode, shifted down
+        base_freq = self.mode_frequencies[self.config.mode][0] / self._DRONE_BASE_FREQ_DIVISOR
 
-        # Generate main drone
-        mod_freq = 0.1  # Slow modulation
-        mod_depth = 0.01 * base_freq  # Small frequency deviation
+        # LFOs for modulation
+        lfo_amp_freq = self._DRONE_LFO_AMP_FREQ
+        lfo_detune_freq = self._DRONE_LFO_DETUNE_FREQ
+        max_detune_hz = self._DRONE_LFO_DETUNE_MAX_HZ
 
-        # FM synthesis
-        modulator = np.sin(2 * np.pi * mod_freq * t)
-        instantaneous_freq = base_freq + mod_depth * modulator
-        phase = np.cumsum(instantaneous_freq) / self.sample_rate
-        drone = np.sin(2 * np.pi * phase)
+        # Amplitude LFO (slow swell)
+        lfo_amp = self._DRONE_LFO_AMP_BASE + self._DRONE_LFO_AMP_DEPTH * np.sin(
+            2 * np.pi * lfo_amp_freq * t
+        )
+        # Detuning Amount LFO (slow variation, range [0, max_detune_hz])
+        lfo_detune_amount = (
+            self._DRONE_LFO_DETUNE_BASE_FACTOR
+            + self._DRONE_LFO_DETUNE_DEPTH_FACTOR
+            * np.sin(2 * np.pi * lfo_detune_freq * t)
+        ) * max_detune_hz
 
-        # Add harmonics
-        for harmonic in [2, 3, 4]:
-            harmonic_freq = base_freq * harmonic
-            harmonic_mod_depth = mod_depth * harmonic
+        drone = np.zeros(num_samples, dtype=np.float32)
+        num_oscillators = self._DRONE_OSC_COUNT
 
-            instantaneous_freq = harmonic_freq + harmonic_mod_depth * modulator
-            phase = np.cumsum(instantaneous_freq) / self.sample_rate
-            drone += np.sin(2 * np.pi * phase) * (0.3 / harmonic)
+        for i in range(num_oscillators):
+            # Calculate detuning factor for this oscillator, centered around 0.
+            # Example for 3 oscillators: i=0 -> -1.0, i=1 -> 0.0, i=2 -> +1.0
+            detune_factor = i - (num_oscillators - 1) / 2.0
+            detune_offset = lfo_detune_amount * detune_factor
 
-        return np.array(drone * 0.4, dtype=np.float32)
+            # Calculate instantaneous frequency for this oscillator
+            osc_freq = base_freq + detune_offset
+
+            # Generate sawtooth wave using scipy.signal.sawtooth.
+            # Note: Providing a time-varying frequency array `osc_freq` to the phase
+            # calculation `2 * np.pi * osc_freq * t` effectively creates frequency
+            # modulation (FM) of the phase, resulting in dynamic timbre shifts.
+            saw_wave = signal.sawtooth(2 * np.pi * osc_freq * t)
+
+            # Add to the mix, dividing by num_oscillators to prevent immediate clipping
+            drone += saw_wave / num_oscillators
+
+        # Apply overall amplitude LFO
+        drone *= lfo_amp
+
+        # Normalize final output
+        drone = self._normalize_audio(drone)
+
+        return drone.astype(np.float32)
 
     def _fit_to_length(
         self,

@@ -4,6 +4,8 @@ from unittest.mock import patch, MagicMock, ANY, call # Add call
 from unittest.mock import patch, MagicMock, ANY # Add ANY
 import numpy.fft as fft
 import librosa
+from scipy import signal
+
 import numpy as np
 from typing import cast # Added for casting
 from robotic_psalms.synthesis.effects import ReverbParameters, DelayParameters, ChorusParameters, SpectralFreezeParameters, GlitchParameters, SaturationParameters, MasterDynamicsParameters # Add MasterDynamicsParameters
@@ -705,6 +707,64 @@ def test_generate_drones_non_repetitive(engine: SacredMachineryEngine):
     # This assertion should FAIL if the drone is perfectly looping/static
     assert not np.allclose(segment1, segment2, atol=1e-10), "Drone seems repetitive between segments (within tolerance)"
 
+
+
+
+# --- NEW FAILING TESTS FOR DRONE COMPLEXITY (REQ-ART-A02-v2) ---
+
+def test_generate_drones_harmonic_richness_fails(engine: SacredMachineryEngine):
+    """(FAILING TEST) Test that drone harmonic richness (peak count) exceeds a high threshold."""
+    duration = 3.0
+    sample_rate = engine.sample_rate
+    drones = engine._generate_drones(duration)
+
+    if len(drones) < 4096: # Need enough samples for FFT
+        pytest.skip("Generated drone is too short for spectral analysis.")
+
+    # Calculate FFT
+    spectrum = np.abs(fft.rfft(drones))
+    freqs = fft.rfftfreq(len(drones), d=1./sample_rate)
+
+    # Find peaks (simple approach)
+    # Use a height relative to the max peak, ignoring DC
+    max_peak_val = np.max(spectrum[1:]) if len(spectrum) > 1 else 0
+    peak_threshold = max_peak_val * 0.02 # 2% of max peak height
+
+    # Find peaks above threshold, excluding DC component
+    peaks, _ = signal.find_peaks(spectrum[1:], height=peak_threshold)
+    num_significant_peaks = len(peaks)
+
+    # Define a threshold expected to FAIL against the current simple FM implementation
+    min_expected_peaks = 10
+
+    print(f"\n[DEBUG] Drone Harmonic Peaks: {num_significant_peaks} (Threshold: {peak_threshold:.4f})") # Temporary debug
+
+    assert num_significant_peaks > min_expected_peaks, \
+        f"Drone harmonic richness ({num_significant_peaks} peaks) is too low, expected > {min_expected_peaks}"
+
+def test_generate_drones_spectral_movement_fails(engine: SacredMachineryEngine):
+    """(FAILING TEST) Test that drone spectral centroid variance exceeds a high threshold."""
+    duration = 5.0 # Longer duration to capture slow movement
+    sample_rate = engine.sample_rate
+    drones = engine._generate_drones(duration)
+
+    if len(drones) < 4096: # Need enough samples for STFT
+        pytest.skip("Generated drone is too short for spectral analysis.")
+
+    # Calculate spectral centroid per frame
+    centroids = librosa.feature.spectral_centroid(y=drones, sr=sample_rate)[0]
+
+    # Calculate variance of the centroid over time
+    centroid_variance = np.var(centroids)
+
+    # Define a threshold expected to FAIL against the current slow FM implementation
+    # Baseline variance is likely very low. Set threshold significantly higher.
+    min_expected_variance = 5000.0 # Increased threshold significantly
+
+    print(f"\n[DEBUG] Drone Centroid Variance: {centroid_variance:.2f}") # Temporary debug
+
+    assert centroid_variance > min_expected_variance, \
+        f"Drone spectral centroid variance ({centroid_variance:.2f}) is too low, expected > {min_expected_variance}"
 
 # --- NEW TESTS FOR SPECTRAL FREEZE INTEGRATION ---
 

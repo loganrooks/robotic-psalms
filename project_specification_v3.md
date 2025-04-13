@@ -36,7 +36,7 @@ The Robotic Psalms project aims to generate ethereal, computerized vocal arrange
 *   **Mixing & Mastering:**
     *   **Master Dynamics:** Compressor and Limiter applied to the final mix using `pedalboard`.
 *   **Configuration:** Comprehensive configuration via `config.py` (Pydantic) and `config.yml`.
-*   **Input:** Accepts Latin text and optional MIDI file path (`midi_path`) for melody and duration control.
+*   **Input:** Accepts Latin text file path and optional MIDI file path (`midi_path`) for melody and duration control. (Future: Custom DSL planned).
 *   **Testing:** Extensive unit and integration tests cover most implemented features.
 
 ### 2.2 Known Issues & Limitations
@@ -52,25 +52,45 @@ The following requirements from the original artistic specification or v2 remain
 
 *   **REQ-ART-V04:** Granular Vocal Textures
 *   **REQ-ART-M02:** Stereo Panning
+*   **(Deferred)** MusicXML Input Parsing (See P5)
 
 ## 3. Revised Priorities (P4 and Beyond)
 
 With P1-P3 complete, the focus shifts towards optional features, refinement, and addressing known limitations.
 
-*   **Phase 4 (P4): Optional Features & Refinement**
-    1.  **REQ-ART-V04:** Implement Granular Vocal Textures.
-    2.  **REQ-ART-M02:** Implement Stereo Panning for layers.
-    3.  **REQ-FIX-01:** Investigate/Resolve Delay Feedback `xfail`.
-    4.  **REQ-FIX-02:** Investigate/Resolve Chorus Voices `xfail`.
+*   **Phase 4 (P4): Input Enhancement & Optional Features**
+    1.  **REQ-INPUT-DSL-01:** Design and Implement Custom DSL for Input.
+    2.  **REQ-ART-V04:** Implement Granular Vocal Textures.
+    3.  **REQ-ART-M02:** Implement Stereo Panning for layers.
+    4.  **REQ-FIX-01:** Investigate/Resolve Delay Feedback `xfail`.
+    5.  **REQ-FIX-02:** Investigate/Resolve Chorus Voices `xfail`.
 *   **Phase 5 (P5): Exploration & Enhancement** (Lower Priority / Future Work)
     *   Further refinement/optimization of existing effects and synthesis modules.
-    *   Exploration of alternative user input methods (e.g., different melody formats).
+    *   Exploration of alternative user input methods (e.g., MusicXML parsing).
     *   Investigation of alternative TTS engines for different vocal qualities.
     *   Addressing any remaining minor `xfail` tests or quality improvements.
 
 ## 4. Functional Requirements (Next Phase - P4)
 
-### 4.1 REQ-ART-V04: Granular Vocal Textures
+### 4.1 REQ-INPUT-DSL-01: Custom Domain-Specific Language (DSL) for Input
+
+*   **Description:** Design and implement a text-based Domain-Specific Language (DSL) that allows users to specify the core elements for a psalm generation, including Latin text, melodic contour, rhythm/duration, and potentially basic articulation or dynamics, within a single input file. This aims to provide a more integrated and flexible input method compared to separate text and MIDI files.
+*   **Acceptance Criteria:**
+    1.  A clear syntax for the DSL is defined and documented.
+    2.  A parser (e.g., using Lark, Ply, or TextX) is implemented to read and interpret the DSL file.
+    3.  The parser successfully extracts Latin text, note information (pitch, duration), and any other defined parameters.
+    4.  The parser provides informative error messages for syntax errors.
+    5.  The extracted data is correctly mapped and passed to the relevant synthesis components (`VoxDeiSynthesizer`, potentially `SacredMachineryEngine`).
+    6.  The system can generate audio based on input from a valid DSL file.
+*   **TDD Anchors:**
+    *   `test_dsl_parser_valid_syntax`: Test parsing of various valid DSL constructs.
+    *   `test_dsl_parser_invalid_syntax`: Test error handling for common syntax mistakes.
+    *   `test_dsl_data_extraction_text`: Verify correct extraction of Latin text segments.
+    *   `test_dsl_data_extraction_notes`: Verify correct extraction of notes with pitch and duration.
+    *   `test_dsl_integration_synthesizer`: Test that data extracted from DSL is correctly passed to `VoxDeiSynthesizer`.
+    *   `test_dsl_end_to_end`: Test generating audio from a simple DSL file.
+
+### 4.2 REQ-ART-V04: Granular Vocal Textures
 
 *   **Description:** Integrate granular synthesis capabilities to process vocal segments, enabling the creation of evolving soundscapes, rhythmic effects, or unique textural transformations from the vocal source.
 *   **Acceptance Criteria:**
@@ -86,7 +106,7 @@ With P1-P3 complete, the focus shifts towards optional features, refinement, and
     *   `test_granular_parameter_density`: Verify changing density alters output.
     *   `test_granular_integration`: Mock and test conditional application within `VoxDeiSynthesizer` or `SacredMachineryEngine`.
 
-### 4.2 REQ-ART-M02: Stereo Panning
+### 4.3 REQ-ART-M02: Stereo Panning
 
 *   **Description:** Introduce stereo panning controls for individual synthesized layers (Vocals, Pads, Drones, Percussion) during the final mixing stage.
 *   **Acceptance Criteria:**
@@ -101,7 +121,7 @@ With P1-P3 complete, the focus shifts towards optional features, refinement, and
     *   `test_pan_center`: Configure `layer_pan = 0.0`, verify energy is roughly equal in both channels.
     *   `test_pan_multiple_layers`: Configure different pans for different layers, verify combined output reflects this.
 
-### 4.3 REQ-FIX-01: Investigate/Resolve Delay Feedback XFail
+### 4.4 REQ-FIX-01: Investigate/Resolve Delay Feedback XFail
 
 *   **Description:** Re-evaluate the `pedalboard.Delay` feedback limitation identified in P1. Research alternative Python delay implementations (custom DSP, other libraries like `pedalboard`'s underlying `JUCE`, `scipy.signal`, etc.) that offer reliable feedback control. If a suitable alternative is found and integration is feasible, implement it as a replacement for `pedalboard.Delay`. Otherwise, document the limitation clearly and accept the `xfail`.
 *   **Acceptance Criteria:**
@@ -110,7 +130,7 @@ With P1-P3 complete, the focus shifts towards optional features, refinement, and
 *   **TDD Anchors:**
     *   (If implementing replacement): Re-use or adapt `test_complex_delay_feedback_parameter` to verify that increasing the feedback parameter results in more audible repeats and energy buildup.
 
-### 4.4 REQ-FIX-02: Investigate/Resolve Chorus Voices XFail
+### 4.5 REQ-FIX-02: Investigate/Resolve Chorus Voices XFail
 
 *   **Description:** Re-evaluate the `pedalboard.Chorus` limitation where `num_voices` is ignored. If multi-voice chorus is deemed important for the artistic goals, research and implement a manual multi-voice chorus (e.g., using multiple modulated delays). If the current `pedalboard.Chorus` effect is sufficient, confirm this decision, remove the `num_voices` parameter from `ChorusParameters`/`ChorusConfig`, and remove the corresponding `xfail` test.
 *   **Acceptance Criteria:**

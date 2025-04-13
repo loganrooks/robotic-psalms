@@ -130,6 +130,15 @@
 ---
 
 
+#### [2025-04-13 04:45:58] - Decision: Prioritize Custom DSL for User Input Enhancement
+- **Context:** Need for more user-friendly input methods beyond separate lyrics/MIDI files. Analysis performed comparing PDF OMR, MusicXML parsing, and a Custom DSL.
+- **Analysis Summary:** PDF OMR deemed too complex/unreliable. MusicXML parsing (via `music21`) is feasible but adds significant dependency and mapping effort. Custom DSL offers best balance of control, flexibility, implementation feasibility, and lower dependencies for the project's specific needs.
+- **Decision:** Prioritize the design and implementation of a Custom DSL for user input. Consider MusicXML parsing as a secondary, future enhancement. Avoid PDF OMR.
+- **Justification:** Provides tailored input, manageable complexity (with parsing libraries), lower dependencies, and iterative development potential. See full analysis in `docs/research-reports/input_enhancement_analysis.md`.
+- **Alternatives Considered:** PDF OMR, MusicXML parsing first.
+---
+
+
 ## Progress
 *Milestones, completed tasks, overall status.*
 
@@ -552,4 +561,17 @@
 - **Status:** Completed.
 - **Deliverables:** Created `docs/archive/` directory. Moved `project_specification.md` to `docs/archive/project_specification_v1.md`. Moved `pseudocode.md` to `docs/archive/pseudocode_tts_fix_v1.md`. Resolved Holistic Review Report Issue 3.7.
 ---
+#### [2025-04-13 00:41:41] - Task: Stage and Commit Documentation & Cleanup Fixes (Holistic Review)
+- **Status:** Completed.
+- **Deliverables:** Staged all changes using `git add .` and committed with message `chore: Update documentation and cleanup config based on holistic review` (commit `e119d66`).
+---
+
+
+
+#### [2025-04-13 04:53:56] - Task: Update Project Specification for Custom DSL Input
+- **Status:** Completed.
+- **Deliverables:** Updated `project_specification_v3.md` to reflect the prioritization of a Custom DSL (`REQ-INPUT-DSL-01`) as the primary P4 input enhancement, based on architectural analysis (`docs/research-reports/input_enhancement_analysis.md`). MusicXML parsing is now deferred to P5.
+---
+
+
 

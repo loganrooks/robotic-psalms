@@ -28,3 +28,9 @@
 
 ## Data Models
 <!-- Append new data models using the format below -->
+
+### Decision: Input Enhancement Strategy - [2025-04-13 04:46:11]
+- **Context**: Explored options for user input beyond separate text/MIDI files.
+- **Analysis**: Compared PDF OMR, MusicXML parsing, and Custom DSL. Full details in `docs/research-reports/input_enhancement_analysis.md`.
+- **Recommendation**: Prioritize development of a Custom DSL for its flexibility, control, and manageable implementation complexity (using parsing libraries). Consider MusicXML parsing (via `music21`) as a secondary future option. Avoid PDF OMR due to high complexity and likely low reliability.
+- **Next Steps**: Design DSL grammar, delegate implementation (likely to `spec-pseudocode` for grammar/pseudocode, then `code` for parser implementation).

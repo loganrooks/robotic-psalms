@@ -3,6 +3,36 @@
 *This file tracks the immediate focus, ongoing tasks, and unresolved questions for the current session.*
 
 
+### [2025-04-13 05:03:00] - Task: Update Project Specification for Input Enhancement
+- **Focus:** Update `project_specification_v3.md` based on architectural analysis and user feedback.
+- **Actions:** Task completed by `spec-pseudocode`. User confirmed completion, prioritizing Custom DSL (`REQ-INPUT-DSL-01`) for P4 and deferring MusicXML.
+- **Status:** Completed. Specification updated to reflect new P4 priority (Custom DSL). Next focus is initiating P4.
+
+---
+
+### [2025-04-13 04:45:47] - Task: Analyze User Input Enhancement Options
+- **Focus:** Analyze feasibility, complexity, and trade-offs of PDF/MusicXML parsing vs. Custom DSL for user input.
+- **Actions:**
+    - Researched OMR (PDF) and MusicXML parsing libraries (`brave_web_search`).
+    - Analyzed approaches based on UX, flexibility, accuracy, effort, dependencies.
+    - Drafted analysis report with diagrams and recommendation.
+    - Wrote report to `docs/research-reports/input_enhancement_analysis.md`.
+- **Recommendation:** Prioritize Custom DSL, consider MusicXML secondary, avoid PDF OMR.
+- **Status:** Completed. Pending Memory Bank updates (Global, Architect-Specific).
+---
+
+
+### [2025-04-13 00:41:41] - Task: Stage and Commit Documentation & Cleanup Fixes (Holistic Review)
+- **Focus:** Stage and commit all changes related to documentation and configuration cleanup based on the Holistic Review Report.
+- **Actions:**
+    - Activated Memory Bank.
+    - Executed `git add .` (Success).
+    - Executed `git commit -m "chore: Update documentation and cleanup config based on holistic review"` (Success, commit `e119d66`).
+    - Updated Memory Bank (`devops.md`, `globalContext.md`, `activeContext.md`).
+- **Status:** Completed.
+---
+
+
 ### [2025-04-13 00:40:07] - Task: Archive Obsolete Root Files (Holistic Review Fix)
 - **Focus:** Move `project_specification.md` and `pseudocode.md` to `docs/archive/` and rename them, resolving Holistic Review Report Issue 3.7.
 - **Actions:**
@@ -1271,3 +1301,14 @@
 - **Focus:** Implement functional logic for `apply_robust_formant_shift` using `pyworld`.
 - **Actions:** Added `pyworld` dependency. Implemented logic using `pw.harvest`, `pw.cheaptrick`, `pw.d4c`, modification of `sp` (spectral envelope), and `pw.synthesize`. Added interpolation for `f0`. Handled potential `pyworld` errors. Fixed Pylance errors. Ran tests.
 - **Status:** Functional implementation complete. All tests pass (18 passed, 1 xfailed). Ready for Refactor phase.
+
+
+### [2025-04-13 04:53:56] - Task: Update Project Specification for Custom DSL Input
+- **Focus:** Update `project_specification_v3.md` to reflect the prioritization of a Custom DSL (`REQ-INPUT-DSL-01`) and deferral of MusicXML, based on recent architectural analysis.
+- **Actions:**
+    - Re-initialized Memory Bank.
+    - Read `project_specification_v3.md`.
+    - Applied diff to update priorities (P4, P5) and add `REQ-INPUT-DSL-01` functional requirement section.
+    - Updated Memory Bank (`globalContext.md`, `activeContext.md`, `spec-pseudocode.md`).
+- **Status:** Completed.
+---

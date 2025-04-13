@@ -152,6 +152,28 @@
     - (If implementing replacement): Create tests verifying that increasing `num_voices` results in an audibly thicker/more complex chorus effect compared to fewer voices.
 
 
+
+### Feature: REQ-INPUT-DSL-01 - Custom Domain-Specific Language (DSL) for Input
+- Added: 2025-04-13 04:53:56
+- Description: Design and implement a text-based Domain-Specific Language (DSL) that allows users to specify the core elements for a psalm generation, including Latin text, melodic contour, rhythm/duration, and potentially basic articulation or dynamics, within a single input file. This aims to provide a more integrated and flexible input method compared to separate text and MIDI files.
+- Acceptance criteria:
+    1. A clear syntax for the DSL is defined and documented.
+    2. A parser (e.g., using Lark, Ply, or TextX) is implemented to read and interpret the DSL file.
+    3. The parser successfully extracts Latin text, note information (pitch, duration), and any other defined parameters.
+    4. The parser provides informative error messages for syntax errors.
+    5. The extracted data is correctly mapped and passed to the relevant synthesis components (`VoxDeiSynthesizer`, potentially `SacredMachineryEngine`).
+    6. The system can generate audio based on input from a valid DSL file.
+- Dependencies: Parsing library (e.g., Lark, Ply, TextX), `src/robotic_psalms/config.py`, `src/robotic_psalms/synthesis/vox_dei.py`.
+- Status: Draft (P4)
+- TDD Anchors:
+    - `test_dsl_parser_valid_syntax`: Test parsing of various valid DSL constructs.
+    - `test_dsl_parser_invalid_syntax`: Test error handling for common syntax mistakes.
+    - `test_dsl_data_extraction_text`: Verify correct extraction of Latin text segments.
+    - `test_dsl_data_extraction_notes`: Verify correct extraction of notes with pitch and duration.
+    - `test_dsl_integration_synthesizer`: Test that data extracted from DSL is correctly passed to `VoxDeiSynthesizer`.
+    - `test_dsl_end_to_end`: Test generating audio from a simple DSL file.
+
+
 ## Non-Functional Requirements
 <!-- Append requirements here -->
 

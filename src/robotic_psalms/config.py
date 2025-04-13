@@ -1,10 +1,17 @@
-from enum import Enum
-from typing import Optional
-from .synthesis.effects import ResonantFilterParameters, BandpassFilterParameters, ChorusParameters, SpectralFreezeParameters, GlitchParameters, SaturationParameters, MasterDynamicsParameters
-from .synthesis.effects import ResonantFilterParameters, BandpassFilterParameters, ChorusParameters, SpectralFreezeParameters, GlitchParameters, SaturationParameters
-from pydantic import BaseModel, Field, model_validator # Corrected import
-from dataclasses import dataclass
+"""Configuration models for the Robotic Psalms project using Pydantic.
 
+Defines data structures for various parameters controlling synthesis, effects,
+voice characteristics, and MIDI mappings.
+"""
+from enum import Enum
+from typing import Optional, Tuple # Added Tuple for potential future MIDIMapping use
+from .synthesis.effects import (
+    ResonantFilterParameters, BandpassFilterParameters, ChorusParameters,
+    SpectralFreezeParameters, GlitchParameters, SaturationParameters,
+    MasterDynamicsParameters
+)
+from pydantic import BaseModel, Field, model_validator
+from dataclasses import dataclass
 
 class LiturgicalMode(str, Enum):
     """Church modes for psalm settings"""
@@ -162,12 +169,7 @@ class VocalTimbre(BaseModel): # Removed empty lines below
 
 class MIDIMapping(BaseModel):
     """MIDI CC mappings for real-time control"""
-    glitch_density: int = Field(
-        default=1,
-        ge=0,
-        le=127,
-        description="CC number for glitch density"
-    )
+    # glitch_density removed as it's superseded by GlitchParameters
     harmonicity: int = Field(
         default=2,
         ge=0,
@@ -300,10 +302,7 @@ class PsalmConfig(BaseModel):
         default_factory=MixLevels,
         description="Audio mix level settings"
     )
-    midi_input: Optional[str] = Field(
-        default=None,
-        description="Path to input MIDI file"
-    )
+    # midi_input removed as it's redundant with midi_path
 
 
     class Config:

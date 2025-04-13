@@ -38,7 +38,6 @@ matplotlib = ">=3.5.0"
 pyopengl = ">=3.1.6"
 
 # TTS Engines (Optional - install specific group if needed)
-espeakng = { version = ">=1.0", optional = true } # Switch to the alternative espeakng library
 python-espeak = { version = ">=0.6.3", optional = true }
 
 
@@ -55,7 +54,6 @@ sphinx = ">=4.0.0"
 sphinx-rtd-theme = ">=1.0.0"
 
 [tool.poetry.extras]
-espeak-ng = ["espeakng"]
 espeak = ["python-espeak"]
 all = ["espeakng", "dev", "docs"] # Example 'all' group
 

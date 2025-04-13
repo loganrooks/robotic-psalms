@@ -9,8 +9,11 @@ import numpy as np
 import numpy.typing as npt
 from scipy import signal
 # Type hint imports to avoid circular dependency at runtime
+# Import config classes used at runtime
+from ..config import PsalmConfig, HauntingParameters, LiturgicalMode
+# Type hint imports to avoid circular dependency at runtime
 if typing.TYPE_CHECKING:
-    from ..config import PsalmConfig, HauntingParameters, LiturgicalMode
+    pass # No specific type hints needed here now
 from .vox_dei import VoxDeiSynthesizer, VoxDeiSynthesisError
 from .effects import (
     apply_high_quality_reverb, ReverbParameters,
@@ -35,7 +38,12 @@ class SynthesisResult:
     sample_rate: int
 
 class SacredMachineryEngine:
-    """Main synthesis engine combining all sound elements"""
+    """
+    Main synthesis engine for Robotic Psalms.
+
+    Orchestrates vocal, pad, drone, and percussion synthesis, applies the
+    configured effects chain, and mixes the final output.
+    """
     # Pad Generation Constants
     _PAD_LFO_AMP_FREQ = 0.1
     _PAD_LFO_FILTER_FREQ = 0.15
@@ -281,7 +289,11 @@ class SacredMachineryEngine:
         )
 
     def _mix_components(self, vocals, pads, percussion, drones):
-        """Mix all audio components together"""
+        """
+        Mix all audio components together according to configured levels.
+
+        Applies mix levels before padding components to the same length and summing.
+        """
         max_len = max(len(vocals), len(pads), len(percussion), len(drones))
 
         # Apply mix levels before padding
@@ -495,9 +507,11 @@ class SacredMachineryEngine:
         audio: npt.NDArray[np.float32]
     ) -> npt.NDArray[np.float32]:
         """
-        Apply haunting effects using high-quality reverb and spectral freeze.
+        Apply haunting effects using high-quality reverb and optional spectral freeze.
 
         Uses `apply_high_quality_reverb` with parameters from `self.haunting.reverb`.
+        Conditionally applies `apply_smooth_spectral_freeze` based on `self.haunting.spectral_freeze`.
+        Ensures output length matches input length after reverb application.
         """
         # Apply high-quality reverb
         reverb_params = ReverbParameters(**self.haunting.reverb.model_dump())

@@ -107,6 +107,51 @@
 - TDD Anchors: See TDD Anchors section below (related to Forced Aligner, Mapping, Stretching, Integration).
 
 
+### Feature: REQ-ART-V04 - Granular Vocal Textures
+- Added: 2025-04-13 00:22:52
+- Description: Integrate granular synthesis capabilities to process vocal segments, enabling the creation of evolving soundscapes, rhythmic effects, or unique textural transformations from the vocal source.
+- Acceptance criteria: 1. A new effect module/function (e.g., `apply_granular_synthesis`) is implemented, likely in `effects.py`. 2. Configurable parameters (e.g., `grain_size_ms`, `overlap`, `pitch_variation`, `density`, `window_shape`) are exposed via a Pydantic model (e.g., `GranularParameters`) and integrated into `PsalmConfig`, applied conditionally. 3. Unit tests verify the effect modifies the audio signal in a way consistent with granular synthesis (e.g., spectral changes, temporal changes). 4. Unit tests verify parameter control influences the output characteristics. 5. Subjective listening confirms the effect can transform vocal input into distinct textures.
+- Dependencies: `src/robotic_psalms/synthesis/effects.py`, `src/robotic_psalms/config.py`, potentially a granular synthesis library (e.g., `librosa`, `soundgrain`, custom implementation).
+- Status: Draft (P4)
+- TDD Anchors:
+    - `test_granular_effect_exists`: Verify function/model import.
+    - `test_granular_effect_modifies_audio`: Check output differs significantly from input.
+    - `test_granular_parameter_grain_size`: Verify changing grain size alters output characteristics (e.g., spectral content, perceived texture).
+    - `test_granular_parameter_density`: Verify changing density alters output.
+    - `test_granular_integration`: Mock and test conditional application within `VoxDeiSynthesizer` or `SacredMachineryEngine`.
+
+### Feature: REQ-ART-M02 - Stereo Panning
+- Added: 2025-04-13 00:22:52
+- Description: Introduce stereo panning controls for individual synthesized layers (Vocals, Pads, Drones, Percussion) during the final mixing stage.
+- Acceptance criteria: 1. Panning parameters (e.g., `vocal_pan`, `pad_pan`, `drone_pan`, `percussion_pan`) are added to `PsalmConfig`, accepting values from -1.0 (full left) to 1.0 (full right), defaulting to 0.0 (center). 2. The mixing logic within `SacredMachineryEngine.process_psalm` is updated to produce stereo output. 3. The mixing logic applies the configured panning to each layer before summation. 4. Unit tests verify that panning parameters correctly influence the left/right channel balance of the final mix.
+- Dependencies: `src/robotic_psalms/synthesis/sacred_machinery.py`, `src/robotic_psalms/config.py`, `numpy`.
+- Status: Draft (P4)
+- TDD Anchors:
+    - `test_mix_produces_stereo_output`: Verify output array has 2 channels.
+    - `test_pan_left`: Configure `layer_pan = -1.0`, verify energy is predominantly in the left channel (channel 0).
+    - `test_pan_right`: Configure `layer_pan = 1.0`, verify energy is predominantly in the right channel (channel 1).
+    - `test_pan_center`: Configure `layer_pan = 0.0`, verify energy is roughly equal in both channels.
+    - `test_pan_multiple_layers`: Configure different pans for different layers, verify combined output reflects this.
+
+### Feature: REQ-FIX-01 - Investigate/Resolve Delay Feedback XFail
+- Added: 2025-04-13 00:22:52
+- Description: Re-evaluate the `pedalboard.Delay` feedback limitation identified in P1. Research alternative Python delay implementations (custom DSP, other libraries) that offer reliable feedback control. If a suitable alternative is found and integration is feasible, implement it as a replacement for `pedalboard.Delay`. Otherwise, document the limitation clearly and accept the `xfail`.
+- Acceptance criteria: 1. The `test_complex_delay_feedback_parameter` test in `tests/synthesis/test_effects.py` passes consistently. 2. OR: A clear analysis and justification for accepting the limitation is documented, and the test remains `xfail` or is modified appropriately.
+- Dependencies: `tests/synthesis/test_effects.py`, `src/robotic_psalms/synthesis/effects.py`, `pedalboard` library, potentially alternative DSP libraries.
+- Status: Draft (P4)
+- TDD Anchors:
+    - (If implementing replacement): Re-use or adapt `test_complex_delay_feedback_parameter` to verify that increasing the feedback parameter results in more audible repeats and energy buildup.
+
+### Feature: REQ-FIX-02 - Investigate/Resolve Chorus Voices XFail
+- Added: 2025-04-13 00:22:52
+- Description: Re-evaluate the `pedalboard.Chorus` limitation where `num_voices` is ignored. If multi-voice chorus is deemed important for the artistic goals, research and implement a manual multi-voice chorus (e.g., using multiple modulated delays). If the current `pedalboard.Chorus` effect is sufficient, confirm this decision, remove the `num_voices` parameter from `ChorusParameters`/`ChorusConfig`, and remove the corresponding `xfail` test.
+- Acceptance criteria: 1. The `test_chorus_parameters_affect_output` test related to `num_voices` in `tests/synthesis/test_effects.py` passes consistently (if manual implementation is chosen). 2. OR: The `num_voices` parameter is removed from configuration and models, and the corresponding test is removed or modified.
+- Dependencies: `tests/synthesis/test_effects.py`, `src/robotic_psalms/synthesis/effects.py`, `pedalboard` library.
+- Status: Draft (P4)
+- TDD Anchors:
+    - (If implementing replacement): Create tests verifying that increasing `num_voices` results in an audibly thicker/more complex chorus effect compared to fewer voices.
+
+
 ## Non-Functional Requirements
 <!-- Append requirements here -->
 

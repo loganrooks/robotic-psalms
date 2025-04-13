@@ -1,6 +1,10 @@
 # DevOps Specific Memory
 
 ## Deployment History Log
+### Deployment: [2025-04-12 21:31:35]
+- **Env**: [Local Git] / **Comps**: [Syllable Duration Control (REQ-ART-MEL-03)] / **Version**: [a6facaf] / **Trigger**: [Manual] / **Status**: [Success] / **Duration**: [N/A] / **Rollback**: [N/A] / **Notes**: [feat(synthesis): Implement syllable duration control (REQ-ART-MEL-03)]
+
+
 ### Deployment: [2025-04-12 20:16:17]
 - **Env**: [Local Git] / **Comps**: [Enhanced Drone Generation (REQ-ART-A02-v2)] / **Version**: [bcefa40] / **Trigger**: [Manual] / **Status**: [Success] / **Duration**: [N/A] / **Rollback**: [N/A] / **Notes**: [feat(synthesis): Enhance drone generation richness and movement (REQ-ART-A02-v2)]
 
@@ -43,6 +47,12 @@
 ## Infrastructure Configuration Overview
 ### Infra Config: [Local Script] - [System Dependencies] - [2025-04-12 21:28:26]
 - **Provider**: [N/A - Local Script] / **Region**: [N/A] / **Version**: [N/A] / **Config**: Added `ffmpeg` to `apt-get install` in `scripts/install_all.sh` for `pyfoal` requirement (REQ-ART-MEL-03). / **ManagedBy**: [Manual Script Edit] / **IaC Link**: [`scripts/install_all.sh`]
+
+### Infra Config: [Local Poetry] - [Dependencies] - [2025-04-13 00:14:41]
+- **Provider**: [N/A - Poetry] / **Region**: [N/A] / **Version**: [N/A] / **Config**: Removed unused optional dependency `espeakng` and extra `espeak-ng` from `pyproject.toml`. Updated `poetry.lock`. / **ManagedBy**: [Manual Edit + Poetry] / **IaC Link**: [`pyproject.toml`, `poetry.lock`]
+
+### Infra Config: [Local Filesystem] - [Documentation Archive] - [2025-04-13 00:39:38]
+- **Provider**: [N/A - Local FS] / **Region**: [N/A] / **Version**: [N/A] / **Config**: Created `docs/archive/` directory. Moved `project_specification.md` to `docs/archive/project_specification_v1.md`. Moved `pseudocode.md` to `docs/archive/pseudocode_tts_fix_v1.md`. / **ManagedBy**: [Manual CLI] / **IaC Link**: [N/A]
 
 <!-- Append infra config details using the format below -->
 

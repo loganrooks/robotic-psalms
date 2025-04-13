@@ -1,3 +1,5 @@
+"""Audio effect implementations for Robotic Psalms."""
+
 import numpy as np
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from pedalboard import Pedalboard, Delay, Reverb #type: ignore # Importing pedalboard effects
@@ -115,7 +117,7 @@ class GlitchParameters(BaseModel):
     repeat_count: int = Field(..., ge=2, description="Number of times to repeat a chunk for 'repeat' or 'stutter' glitches (minimum 2).") # Updated validation to ge=2
     tape_stop_speed: float = Field(..., gt=0.0, lt=1.0, description="Final speed factor for the 'tape_stop' effect (e.g., 0.5 for half speed). Speed ramps down towards this value. Must be > 0.0 and < 1.0.") # Updated validation to lt=1.0
     bitcrush_depth: int = Field(..., ge=1, le=16, description="Target bit depth for the 'bitcrush' effect (1 to 16).")
-    bitcrush_rate_factor: float = Field(..., ge=0.0, le=1.0, description="Sample rate reduction factor for 'bitcrush'. Maps inversely to step size for sample holding (0.0=max reduction/large step, 1.0=no reduction/step=1).")
+    bitcrush_rate_factor: float = Field(..., ge=0.0, le=1.0, description="Controls sample rate reduction via sample holding. 1.0 = no reduction, 0.0 = max reduction.")
     model_config = ConfigDict(extra='forbid')
 
 

@@ -14,12 +14,12 @@ For detailed documentation, please see the [Full Documentation](./docs/index.md)
 
 - **Sacred Machinery Synthesis**
   - Evolving glacial synth pads
-  - Advanced vocal synthesis combining eSpeak/Festival
+  - Advanced vocal synthesis using the `espeak-ng` command-line tool via `subprocess.run`
   - Stochastic metallic percussion
   - Dynamic drone modulation
 
 - **Customizable Parameters**
-  - Glitch density control
+  - Refined Glitch Effects (`glitch_effect`)
   - Celestial harmonicity blending
   - Robotic articulation settings
   - Haunting intensity adjustments
@@ -70,7 +70,6 @@ brew install espeak-ng portaudio ffmpeg
 ### Python Requirements
 - Python 3.9 or higher
 - Virtual environment recommended
-- **`espeakng` Python Wrapper:** This package uses the `espeakng` Python library by `sayak-brm` ([PyPI](https://pypi.org/project/espeakng/), [GitHub](https://github.com/sayak-brm/espeakng-python)) to interact with the system's `espeak-ng` engine. It's installed as an optional dependency. **Note:** This is distinct from other similarly named wrappers.
 ## Installation
 
 1. Create and activate a virtual environment:
@@ -79,14 +78,15 @@ python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-2. Install the package with the `espeak-ng` optional dependency. For development, use the `-e` flag for an editable install:
+2. Install the package and its core dependencies. For development, use the `-e` flag for an editable install and include the `dev` extra:
 ```bash
 # Install for usage
-pip install ".[espeak-ng]"
+pip install .
 
 # Install for development
-pip install -e ".[espeak-ng, dev]"
+pip install -e ".[dev]"
 ```
+*Note: Ensure the required system packages (like `espeak-ng`, `portaudio`, `ffmpeg`) are installed first (see System Requirements).*
 *Note: The `dev` extra includes tools like `pytest`, `black`, `mypy`, etc.*
 
 ## Usage
@@ -350,15 +350,13 @@ Future development will focus on enhancing the artistic capabilities and achievi
 
 ### Common Issues
 
-1.  **`espeak-ng` System Library Not Found/Working:**
-    *   **Error:** May manifest as `FileNotFoundError` when the code tries to call `/usr/bin/espeak-ng`, errors from the `espeakng` Python wrapper failing to connect (e.g., `EspeakNGError`), or silent/incorrect audio output.
-    *   **Solution:** Ensure the `espeak-ng` system package (version 1.50+) is correctly installed (see System Requirements). Verify the `espeak-ng` command works directly in your terminal (e.g., `espeak-ng "hello"`). Check system PATH if installed in a non-standard location.
-
-2.  **`espeakng` Python Wrapper (`sayak-brm`) Issues:**
-    *   **Error:** `ModuleNotFoundError: No module named 'espeakng'`
-    *   **Solution:** Make sure you installed the package with the correct `espeak-ng` extra: `pip install ".[espeak-ng]"`. Verify the `espeakng` package is listed in `pip list`.
-    *   **Error:** Errors related to shared library loading (`.so`, `.dylib`, `.dll`).
-    *   **Solution:** The `sayak-brm/espeakng-python` wrapper relies on finding the `espeak-ng` shared library. Ensure the system installation is complete and potentially check `LD_LIBRARY_PATH` (Linux) or system equivalents if the library isn't found automatically. Refer to the [wrapper's documentation](https://sayak-brm.github.io/espeakng-python/) for specific troubleshooting.
+1.  **`espeak-ng` Command Not Found/Working:**
+    *   **Error:** May manifest as `FileNotFoundError` when the code tries to call `espeak-ng` via `subprocess.run`, or silent/incorrect audio output from the TTS stage.
+    *   **Solution:**
+        *   Ensure the `espeak-ng` system package (version 1.50+) is correctly installed (see System Requirements).
+        *   Verify the `espeak-ng` command works directly in your terminal by running: `espeak-ng "hello world" -w test_output.wav`. Check if `test_output.wav` is created and contains audio.
+        *   Ensure the `espeak-ng` executable is in your system's PATH environment variable, accessible to the Python process running the script. The code currently assumes `espeak-ng` can be called directly.
+        *   Check permissions for the `espeak-ng` executable and the temporary directory used by the script (usually `/tmp`).
 
 3.  **PortAudio Not Found:**
     *   **Error:** `OSError: PortAudio library not found` (or similar errors from `sounddevice`).
@@ -383,5 +381,5 @@ MIT License - see LICENSE file for details
 ## Acknowledgments
 
 - Inspired by Jóhann Jóhannsson's "Odi et Amo"
-- Uses the `espeak-ng` system library via the `espeakng` Python wrapper ([sayak-brm/espeakng-python](https://github.com/sayak-brm/espeakng-python)) for text-to-speech.
+- Uses the `espeak-ng` system command-line tool via Python's `subprocess.run` for text-to-speech synthesis.
 - Built with Python's scientific computing stack

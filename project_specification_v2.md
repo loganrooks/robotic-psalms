@@ -1,3 +1,6 @@
+> **Note:** This document (`project_specification_v2.md`) is outdated and has been superseded by `project_specification_v3.md`. Please refer to the latest version for current project details.
+
+
 # Project Specification: Robotic Psalms - v2.0 (Post-Initial Implementation)
 
 ## 1. Introduction & Revised Goal

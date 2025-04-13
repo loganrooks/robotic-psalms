@@ -2,7 +2,142 @@
 
 *This file tracks the immediate focus, ongoing tasks, and unresolved questions for the current session.*
 
+
+### [2025-04-13 00:40:07] - Task: Archive Obsolete Root Files (Holistic Review Fix)
+- **Focus:** Move `project_specification.md` and `pseudocode.md` to `docs/archive/` and rename them, resolving Holistic Review Report Issue 3.7.
+- **Actions:**
+    - Activated Memory Bank.
+    - Created `docs/archive/` directory using `mkdir -p`.
+    - Moved `project_specification.md` to `docs/archive/project_specification_v1.md` using `mv`.
+    - Moved `pseudocode.md` to `docs/archive/pseudocode_tts_fix_v1.md` using `mv`.
+    - Verified file locations using `list_files`.
+    - Updated Memory Bank (`devops.md`, `globalContext.md`, `activeContext.md`).
+- **Status:** Completed.
 ---
+
+
+### [2025-04-13 00:32:56] - Task: Address Minor Code Docstring Gaps (Holistic Review Fix)
+- **Focus:** Apply minor docstring updates to `effects.py` and `sacred_machinery.py` based on Holistic Review Report (Issue 3.6).
+- **Actions:**
+    - Activated Memory Bank.
+    - Read `effects.py` (lines 110-125).
+    - Inserted module docstring into `effects.py`.
+    - Applied diff to update `GlitchParameters.bitcrush_rate_factor` docstring in `effects.py`.
+    - Read `sacred_machinery.py` (lines 35-45, 490-505, 280-290).
+    - Applied diff to update `SacredMachineryEngine`, `_apply_haunting_effects`, and `_mix_components` docstrings in `sacred_machinery.py`.
+    - Ran `pytest` (172 passed, 6 xfailed).
+- **Status:** Pending Memory Bank update & completion.
+---
+
+
+### [2025-04-13 00:29:26] - Task: Clean Up `config.py` (Holistic Review Fix)
+- **Focus:** Remove redundant `midi_input` field from `PsalmConfig`, remove outdated `glitch_density` from `MIDIMapping`, add module docstring to `src/robotic_psalms/config.py` based on Holistic Review Report (Issue 3.5).
+- **Actions:**
+    - Activated Memory Bank.
+    - Read `src/robotic_psalms/config.py`.
+    - Applied diff to add docstring, remove `MIDIMapping.glitch_density`, and remove `PsalmConfig.midi_input`.
+    - Ran `pytest` (failed due to `NameError: LiturgicalMode`).
+    - Read `src/robotic_psalms/synthesis/sacred_machinery.py`.
+    - Applied diff to fix `LiturgicalMode` import in `sacred_machinery.py`.
+    - Ran `pytest` (172 passed, 6 xfailed).
+- **Status:** Completed.
+---
+
+
+### [2025-04-13 00:26:08] - Task: Correct Features List in `README.md` (Holistic Review Fix)
+- **Focus:** Update Features list in `README.md` (Line 22) to replace "Glitch density control" with "Refined Glitch Effects (`glitch_effect`)" based on Holistic Review Report (Issue 3.4).
+- **Actions:**
+    - Activated Memory Bank.
+    - Read `README.md` (lines 9-32).
+    - Applied diff to replace line 22.
+    - Reviewed other features (TTS) - confirmed accuracy.
+- **Status:** Pending Memory Bank update & completion.
+---
+
+
+### [2025-04-13 00:24:21] - Task: Update `architecture.md` (Holistic Review Fix)
+- **Focus:** Update `src/robotic_psalms/architecture.md` based on Holistic Review Report (Issue 3.3) regarding outdated Configuration Schema, Effect Processing Chain, Output Management, and Implementation Notes (Spec Reference).
+- **Actions:**
+    - Activated Memory Bank.
+    - Read `src/robotic_psalms/architecture.md`.
+    - Applied diff to update Configuration Schema (lines 46-66), Effect Processing Chain (lines 20-24), Output Management (lines 26-30), and Implementation Note 6 (line 92).
+    - Verified Technical Dependencies (line 83) and Implementation Note 5 (line 91) were already correct.
+- **Status:** Completed.
+---
+
+
+### [2025-04-13 00:22:14] - Task: Create `project_specification_v3.md` (Holistic Review Fix)
+- **Focus:** Analyze current project state (post P1-P3) using Memory Bank, define P4 requirements, and create `project_specification_v3.md`.
+- **Actions:**
+    - Initialized Memory Bank.
+    - Read `artistic_specification.md`.
+    - Analyzed completed features, known issues, deferred requirements.
+    - Defined P4 priorities: REQ-ART-V04 (Granular), REQ-ART-M02 (Panning), REQ-FIX-01 (Delay Feedback), REQ-FIX-02 (Chorus Voices).
+    - Wrote content for `project_specification_v3.md`.
+    - Created `project_specification_v3.md` using `write_to_file`.
+    - Delegated task to `docs-writer` to mark v2 as superseded (confirmed complete).
+    - Delegated task to `docs-writer` to update references (confirmed no updates needed).
+    - Updated Memory Bank (`activeContext.md`, `globalContext.md`, `spec-pseudocode.md`).
+- **Status:** Completed.
+---
+
+
+### [2025-04-13 00:21:51] - Task: Update Project Specification References
+- **Focus:** Search for references to `project_specification_v2.md` or "project specification" in Markdown files and update them to `project_specification_v3.md`.
+- **Actions:**
+    - Activated Memory Bank.
+    - Searched for `project_specification_v2\.md` in `*.md` files (18 results, mostly historical/logs).
+    - Read `src/robotic_psalms/architecture.md` (lines 85-100) to check specific location mentioned in holistic review; no v2 reference found.
+    - Searched for `(?i)project specification` in `*.md` files (7 results, mostly historical/logs).
+    - Determined no updates were needed in current documentation files.
+- **Status:** Completed.
+---
+
+
+### [2025-04-13 00:19:52] - Task: Mark project_specification_v2.md as Outdated
+- **Focus:** Add a prominent notice to the top of `project_specification_v2.md` indicating it is superseded by `project_specification_v3.md`.
+- **Actions:**
+    - Inserted blockquote notice at line 1 using `insert_content`.
+- **Status:** Completed.
+---
+
+
+### [2025-04-13 00:16:25] - Task: Correct TTS Description in architecture.md (Holistic Review Fix)
+- **Focus:** Update `src/robotic_psalms/architecture.md` based on Holistic Review Report (Issue 3.1) to reflect use of `espeak-ng` command-line via `subprocess.run`.
+- **Actions:**
+    - Read `architecture.md` (lines 75-100).
+    - Applied diff to correct Technical Dependencies (line 83) and Implementation Note 5 (line 91).
+    - Updated Memory Bank (`docs-writer.md`, `activeContext.md`, `globalContext.md`).
+- **Status:** Completed.
+---
+
+
+### [2025-04-12 22:39:00] - Task: Perform Holistic Review (Documentation Focus)
+- **Focus:** Review project documentation (`README.md`, `architecture.md`, `project_specification_v2.md`, code docstrings) for accuracy, consistency, clarity, and completeness. Identify gaps/contradictions. Propose workflow example. Suggest improvements.
+- **Actions:**
+    - Loaded Memory Bank context (`activeContext.md`, `globalContext.md`).
+    - Reviewed `README.md`, `pyproject.toml`, `architecture.md`, `sacred_machinery.py`, `vox_dei.py`, `effects.py`, `config.py`, `project_specification_v2.md`.
+    - Identified documentation inconsistencies (TTS method, outdated features/params/status) and outdated files (`architecture.md`, `project_specification_v2.md`).
+    - Noted generally good quality of code docstrings.
+    - Developed workflow example.
+    - Formulated recommendations for documentation updates, spec update, config refinement, and minor docstring improvements.
+    - Updated Memory Bank (`holistic-reviewer.md`, `activeContext.md`, `globalContext.md` planned next).
+    - Logged planned delegations to `docs-writer`, `spec-pseudocode`, `code`.
+- **Status:** Completed. Preparing final report and Memory Bank updates.
+---
+
+---
+### [2025-04-12 22:28:31] - Task: Analyze Recent Development Cycle for SPARC Improvements
+- **Focus:** Analyze feedback logs, workflow logs (`sparc.md`), and system config (`.roomodes`, `.clinerules-*`) from the Robotic Psalms P1-P3 development cycle. Identify friction points and formulate proposals for system rule/instruction improvements.
+- **Actions:**
+    - Read Memory Bank context (`activeContext.md`, `globalContext.md`).
+    - Read feedback logs (`sparc-feedback.md`, `tdd-feedback.md`, `code-feedback.md`, `debug-feedback.md`, others empty).
+    - Read workflow log (`sparc.md`).
+    - Read system config (`.roomodes`, `.clinerules-*`).
+    - Documented findings, patterns, and proposals in `memory-bank/mode-specific/system-refiner.md`.
+- **Status:** Analysis complete. Documenting proposals in Memory Bank.
+---
+
 ### [2025-04-12 21:28:14] - Task: Add ffmpeg to Installation Script
 ### [2025-04-12 21:28:00] - Task: Update Documentation for Duration Control (REQ-ART-MEL-03 - Documentation Phase)
 - **Focus:** Update project documentation (`README.md`, `vox_dei.py` docstrings, `config.py`, `install_all.sh`) to reflect the implementation of REQ-ART-MEL-03 (Duration Control using `pyfoal` and `librosa`).

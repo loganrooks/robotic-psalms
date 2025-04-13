@@ -5,6 +5,14 @@
 ---
 
 
+### Plan Item: Correct Features List in `README.md` (Holistic Review Fix) - [2025-04-13 00:26:31]
+- **Type**: Guide / **Audience**: User/Dev / **Outline**: 1. Read README Features section 2. Replace 'Glitch density control' with 'Refined Glitch Effects (`glitch_effect`)' 3. Review other features / **Status**: Done / **Owner**: docs-writer / **Source**: Holistic Review Report (Issue 3.4) / **Location**: README.md
+
+
+### Plan Item: Update `architecture.md` (Holistic Review Fix) - [2025-04-13 00:24:47]
+- **Type**: Guide / **Audience**: Dev / **Outline**: 1. Update Config Schema (ref to config.py) 2. Update Effect Chain list 3. Update Output Management list 4. Update Implementation Note 6 (spec ref) / **Status**: Done / **Owner**: docs-writer / **Source**: Holistic Review Report (Issue 3.3) / **Location**: src/robotic_psalms/architecture.md
+
+
 ### Plan Item: Update Duration Control Docs (REQ-ART-MEL-03) - [2025-04-12 21:29:00]
 - **Type**: Guide/API / **Audience**: User/Dev / **Outline**: 1. Update README (Features, Dependencies, Install, Param Guide, Known Issues) 2. Delegate vox_dei.py docstring updates 3. Check config.py 4. Delegate install_all.sh update / **Status**: Done / **Owner**: docs-writer -> code, devops / **Source**: User Task REQ-ART-MEL-03 / **Location**: README.md, src/robotic_psalms/synthesis/vox_dei.py, scripts/install_all.sh
 
@@ -53,6 +61,16 @@
 
 ### Plan Item: Update Atmospheric Filter Docs (REQ-ART-V02) - [2025-04-11 17:29:48]
 - **Type**: Guide / **Audience**: User/Dev / **Outline**: 1. Update README (Example, Param Guide) / **Status**: Done / **Owner**: docs-writer / **Source**: User Task REQ-ART-V02 / **Location**: README.md
+
+### Plan Item: Correct TTS Description in architecture.md - [2025-04-13 00:16:12]
+- **Type**: Guide / **Audience**: Dev / **Outline**: 1. Correct Technical Dependencies (Line 83) 2. Correct Implementation Note 5 (Line 91) / **Status**: Done / **Owner**: docs-writer / **Source**: Holistic Review Report (Issue 3.1) / **Location**: src/robotic_psalms/architecture.md
+
+## Documentation Debt Log
+<!-- Append debt items using the format below -->
+
+### Debt Item: project_specification_v2.md Outdated - [Status: Resolved] - [2025-04-13 00:19:52]
+- **Location**: project_specification_v2.md / **Description**: File is superseded by project_specification_v3.md. / **Priority**: High / **Resolution**: Added prominent notice at the top of the file pointing to v3. / **Resolved Date**: 2025-04-13 00:19:52
+
 
 ## Documentation Scope
 <!-- Describe the documentation task -->

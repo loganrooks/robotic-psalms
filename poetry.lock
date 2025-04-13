@@ -564,17 +564,6 @@ files = [
 ]
 
 [[package]]
-name = "espeakng"
-version = "1.0.3"
-description = "An eSpeak NG TTS binding for Python3"
-optional = true
-python-versions = ">=3.9"
-files = [
-    {file = "espeakng-1.0.3-py3-none-any.whl", hash = "sha256:1199e7c1fa0ee3c3c6a0b68170ec2a8659ded1815794188de267fdee33d18df4"},
-    {file = "espeakng-1.0.3.tar.gz", hash = "sha256:b07f464cdca968516a0dfcc171c587d522ba366fcc4cb5e0efbda2f3e2a1bd05"},
-]
-
-[[package]]
 name = "exceptiongroup"
 version = "1.2.2"
 description = "Backport of PEP 654 (exception groups)"
@@ -2838,11 +2827,10 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 type = ["pytest-mypy"]
 
 [extras]
-all = ["espeakng"]
+all = []
 espeak = ["python-espeak"]
-espeak-ng = ["espeakng"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "36decf387ca449f912f6ab42770e4606be53e4491f1c59e74226bddcf6d1789a"
+content-hash = "dc2b8c05c45a89a8502c617bfd51af2d1c74c7c6d9868cf38f548b0732ea080e"

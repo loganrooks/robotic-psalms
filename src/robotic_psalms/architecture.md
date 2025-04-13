@@ -18,16 +18,17 @@ This system generates ethereal computerized vocal arrangements of Latin psalms i
   * Drone Modulation System
 
 ### 3. Effect Processing Chain
-- Reverb/Freeze Processor
-- Glitch Generator
-- Spectral Manipulator
-- Formant Shifter
+- `apply_robust_formant_shift` (Vocal)
+- `apply_high_quality_reverb`
+- `apply_complex_delay`
+- `apply_refined_glitch`
+- `apply_saturation`
+- `apply_chorus`
+- `apply_smooth_spectral_freeze` (within Haunting)
+- `apply_master_dynamics` (Final Output)
 
 ### 4. Output Management
-- Multi-track Renderer
-- MIDI Export System
-- Visual Generator
-- Documentation Engine
+- WAV Audio Renderer (Master and Stems)
 
 ## Data Flow Architecture
 ```mermaid
@@ -43,27 +44,7 @@ graph TD
 ## Key Interfaces
 
 ### 1. Configuration Schema
-```yaml
-synthesis:
-  mode: enum[dorian, phrygian, lydian, mixolydian, aeolian]
-  tempo_scale: float
-  
-effects:
-  glitch_density: float[0-1]
-  celestial_harmonicity: float[0-1]
-  robotic_articulation:
-    phoneme_spacing: float
-    consonant_harshness: float
-  haunting_intensity:
-    reverb_decay: float
-    spectral_freeze: float
-
-voice:
-  timbre_blend:
-    choirboy: float[0-1]
-    android: float[0-1]
-    machinery: float[0-1]
-```
+*(Note: The detailed configuration schema is defined using Pydantic models within `src/robotic_psalms/config.py`. This includes nested structures for various effects like `GlitchParameters`, `ReverbConfig`, `DelayConfig`, `ChorusParameters`, `SaturationParameters`, `MasterDynamicsParameters`, `SpectralFreezeParameters`, etc. Please refer to `config.py` for the definitive source of truth.)*
 
 ### 2. Error Handling
 - VoxDeiSynthesisError: TTS engine failures
@@ -80,7 +61,7 @@ voice:
 - Audio: numpy, scipy, librosa
 - MIDI: mido, python-rtmidi
 - Synthesis: sounddevice
-- Text: espeakng (Python wrapper for system `espeak-ng`)
+- Text: espeak-ng (System command-line tool)
 - Config: pyyaml, pydantic
 
 ## Implementation Notes
@@ -88,5 +69,5 @@ voice:
 2. Implement thread-safe parameter controls
 3. Cache frequently used audio samples
 4. Monitor CPU/memory usage for stability
-5. **Refactoring Note (April 2025):** The TTS engine was refactored to use the `espeakng` Python wrapper interacting with the system's `espeak-ng` command-line tool, resolving previous stability issues. Festival is no longer used.
-6. **Future Direction:** Subsequent development aims to enhance artistic expression through improved effects (reverb, formant shifting), complex ambient layers, and melodic control, as detailed in `artistic_specification.md`.
+5. **Refactoring Note (April 2025):** The TTS engine was refactored to directly call the system's `espeak-ng` command-line tool using `subprocess.run`, bypassing Python wrappers and resolving previous stability issues. Festival is no longer used.
+6. **Future Direction:** Subsequent development aims to enhance artistic expression through improved effects, complex ambient layers, and melodic control, as detailed in `project_specification_v3.md`.

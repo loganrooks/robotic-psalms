@@ -5,6 +5,14 @@
 ---
 
 
+### Implementation: Clean Up `config.py` (Holistic Review Fix) - 2025-04-13 00:29:56
+- **Approach**: Addressed Holistic Review Report Issue 3.5. Added a module docstring to `src/robotic_psalms/config.py`. Removed the redundant `midi_input: Optional[str]` field from `PsalmConfig` (superseded by `midi_path`). Removed the outdated `glitch_density: int` field from `MIDIMapping` (superseded by `GlitchParameters`). Fixed a resulting `NameError` in `src/robotic_psalms/synthesis/sacred_machinery.py` by moving the `LiturgicalMode` import out of the `TYPE_CHECKING` block.
+- **Key Files Modified/Created**: `src/robotic_psalms/config.py` (Modified), `src/robotic_psalms/synthesis/sacred_machinery.py` (Modified).
+- **Notes**: Used `apply_diff` for initial changes. Ran `pytest`, identified `NameError`, read `sacred_machinery.py`, used `apply_diff` to fix import, re-ran `pytest` successfully.
+
+---
+
+
 ### Implementation: Update Docstrings for Duration Control (REQ-ART-MEL-03) - 2025-04-12 21:26:18
 - **Approach**: Updated docstrings for `synthesize_text`, `_apply_duration_control`, `_perform_alignment`, and `_stretch_segment_if_needed` in `src/robotic_psalms/synthesis/vox_dei.py`. The updates clarify the role of `midi_path` in triggering duration control, detail the alignment (`pyfoal`) and stretching (`librosa`) process within `_apply_duration_control` and its helpers, and mention dependencies and potential issues.
 - **Key Files Modified/Created**: `src/robotic_psalms/synthesis/vox_dei.py` (Modified docstrings).
@@ -361,4 +369,11 @@
 - **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Modified `apply_chorus`), `tests/synthesis/test_effects.py` (Removed `xfail` marker from `test_chorus_parameters_affect_output`).
 - **Notes**: The implementation successfully addresses the `xfail` related to `num_voices`. Tests for `rate_hz` and `feedback` within `test_chorus_parameters_affect_output` now fail as expected, confirming these parameters are ignored. All other chorus tests pass.
  The `rate_hz` and `feedback` parameters were ignored to manage complexity and focus on the core requirement of supporting `num_voices`. Implementing LFO modulation (`rate_hz`) and feedback loops manually adds significant complexity beyond the scope of fixing the `num_voices` test failure.
+
+
+
+### Implementation: Address Minor Code Docstring Gaps (Holistic Review Fix) - 2025-04-13 00:33:17
+- **Approach**: Addressed Holistic Review Report Issue 3.6. Added module docstring to `effects.py`. Reworded `GlitchParameters.bitcrush_rate_factor` docstring for clarity. Expanded `SacredMachineryEngine` class docstring. Updated `_apply_haunting_effects` docstring to mention conditional spectral freeze and length alignment. Updated `_mix_components` docstring to clarify timing of mix level application.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/effects.py` (Modified), `src/robotic_psalms/synthesis/sacred_machinery.py` (Modified).
+- **Notes**: Used `insert_content` for module docstring and `apply_diff` for other changes. Confirmed changes with `pytest` (172 passed, 6 xfailed).
 

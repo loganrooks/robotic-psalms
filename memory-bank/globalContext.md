@@ -89,8 +89,91 @@
 ---
 
 
+#### [2025-04-12 22:28:45] - Proposal: Enhance Mode Completion Summaries
+- **Context:** Analysis of recent workflow feedback (`sparc-feedback.md`, `code-feedback.md`) revealed modes often provide insufficient detail in `attempt_completion` summaries, requiring extra clarification.
+- **Proposal:** Update `customInstructions` in `.roomodes` for relevant modes to explicitly require detailed summaries including changes, files affected, test results, and status.
+- **Rationale:** Improve workflow efficiency, reduce clarification cycles, ensure orchestrator has necessary context.
+- **Status:** Proposed (System Refiner)
+
+---
+
+#### [2025-04-12 22:28:45] - Proposal: Formalize Git Commit Workflow Step
+- **Context:** Feedback (`sparc-feedback.md`) and workflow analysis showed an initial lack of standardized version control after feature completion.
+- **Proposal:** Update SPARC orchestrator rules (`.roomodes` or `.clinerules-sparc`) to mandate a `git commit` step (delegated to `devops`) after each full feature cycle (impl, test, refactor, docs).
+- **Rationale:** Enforce version control hygiene, improve traceability.
+- **Status:** Proposed (System Refiner)
+
+---
+
+#### [2025-04-12 22:28:45] - Proposal: Mandate Full Test Suite Runs Post-Change
+- **Context:** Analysis (`code-feedback.md`, user context) indicated regressions occurred possibly due to modes running only module-specific tests after changes.
+- **Proposal:** Update `customInstructions` (`.roomodes` for `code`, `debug`) and TDD rules (`.clinerules-tdd`) to require running the *full* test suite before `attempt_completion` for changes impacting shared code or interfaces.
+- **Rationale:** Reduce regression risk, improve system stability.
+- **Status:** Proposed (System Refiner)
+
+---
+
+#### [2025-04-12 22:28:45] - Proposal: Clarify Tool Usage Instructions
+- **Context:** Feedback (`tdd-feedback.md`, `code-feedback.md`) showed repeated incorrect XML tool usage format by modes.
+- **Proposal:** Revise core system prompt's explanation of tool format for clarity and add reminders to `customInstructions` in `.roomodes` for affected modes.
+- **Rationale:** Eliminate tool format errors caused by misinterpretation.
+- **Status:** Proposed (System Refiner)
+
+---
+
+#### [2025-04-12 22:28:45] - Proposal: Document SPARC's Specification Handling Model
+- **Context:** User expectation mismatch regarding SPARC directly parsing spec files versus orchestrating specialist modes that process specs into the Memory Bank.
+- **Proposal:** Add documentation (e.g., in `SPARC_Overview.md` or SPARC's rules/description) clarifying SPARC's reliance on specialist modes (`spec-pseudocode`, `architect`) and the Memory Bank for structured specification/design information.
+- **Rationale:** Manage user expectations, clarify workflow.
+- **Status:** Proposed (System Refiner)
+
+---
+
+
 ## Progress
 *Milestones, completed tasks, overall status.*
+
+#### [2025-04-13 00:29:44] - Task: Clean Up `config.py` (Holistic Review Fix)
+- **Status:** Completed.
+- **Deliverables:** Updated `src/robotic_psalms/config.py` by adding a module docstring, removing the redundant `midi_input` field from `PsalmConfig`, and removing the outdated `glitch_density` field from `MIDIMapping`. Fixed a resulting `NameError` in `src/robotic_psalms/synthesis/sacred_machinery.py` by correcting the import of `LiturgicalMode`. All tests pass (172 passed, 6 xfailed). Resolved Holistic Review Report Issue 3.5.
+---
+
+
+#### [2025-04-13 00:26:22] - Task: Correct Features List in `README.md` (Holistic Review Fix)
+- **Status:** Completed.
+- **Deliverables:** Updated `README.md` Features list (Line 22) to replace "Glitch density control" with "Refined Glitch Effects (`glitch_effect`)", aligning with implementation and resolving Holistic Review Report Issue 3.4.
+---
+
+
+#### [2025-04-13 00:24:38] - Task: Update `architecture.md` (Holistic Review Fix)
+- **Status:** Completed.
+- **Deliverables:** Updated `src/robotic_psalms/architecture.md` to correct outdated Configuration Schema, Effect Processing Chain, Output Management, and Implementation Notes (Spec Reference) based on Holistic Review Report (Issue 3.3).
+---
+
+
+#### [2025-04-13 00:22:40] - Task: Create `project_specification_v3.md`
+- **Status:** Completed.
+- **Deliverables:** Created `project_specification_v3.md` reflecting the completion of P1, P2, and P3. Defined P4 requirements (REQ-ART-V04 Granular Vocals, REQ-ART-M02 Stereo Panning, REQ-FIX-01 Delay Feedback, REQ-FIX-02 Chorus Voices). Delegated tasks to mark v2 as superseded and update references.
+---
+
+
+#### [2025-04-13 00:19:52] - Task: Mark project_specification_v2.md as Outdated
+- **Status:** Completed.
+- **Deliverables:** Added a prominent notice to the top of `project_specification_v2.md` indicating it is superseded by `project_specification_v3.md`.
+---
+
+
+#### [2025-04-13 00:16:34] - Task: Correct TTS Description in architecture.md
+- **Status:** Completed.
+- **Deliverables:** Updated `src/robotic_psalms/architecture.md` (Technical Dependencies, Implementation Note 5) to accurately reflect the use of the `espeak-ng` command-line tool via `subprocess.run`, resolving inconsistency identified in Holistic Review Report (Issue 3.1).
+---
+
+
+#### [2025-04-12 22:39:00] - Task: Perform Holistic Review (Documentation Focus)
+- **Status:** Completed.
+- **Deliverables:** Review report detailing findings on documentation accuracy, consistency, clarity, and completeness across `README.md`, `architecture.md`, `project_specification_v2.md`, and code docstrings. Identified key inconsistencies (TTS method, outdated spec/features) and outdated files. Provided workflow example. Documented findings and recommendations in `memory-bank/mode-specific/holistic-reviewer.md`. Logged planned delegations to `docs-writer`, `spec-pseudocode`, `code`.
+---
+
 
 #### [2025-04-12 21:29:00] - Task: Update Documentation for Duration Control (REQ-ART-MEL-03 - Documentation Phase)
 - **Status:** Completed.
@@ -463,5 +546,10 @@
 #### [2025-04-12 21:26:05] - Task: Update Docstrings for Duration Control (REQ-ART-MEL-03)
 - **Status:** Completed.
 - **Deliverables:** Updated docstrings for `synthesize_text`, `_apply_duration_control`, `_perform_alignment`, and `_stretch_segment_if_needed` in `src/robotic_psalms/synthesis/vox_dei.py` to accurately reflect the duration control implementation details (MIDI input, `pyfoal` alignment, `librosa` stretching).
+---
+
+#### [2025-04-13 00:39:50] - Task: Archive Obsolete Root Files (Holistic Review Fix)
+- **Status:** Completed.
+- **Deliverables:** Created `docs/archive/` directory. Moved `project_specification.md` to `docs/archive/project_specification_v1.md`. Moved `pseudocode.md` to `docs/archive/pseudocode_tts_fix_v1.md`. Resolved Holistic Review Report Issue 3.7.
 ---
 

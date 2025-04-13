@@ -76,8 +76,27 @@
 
 ---
 
+#### [2025-04-12 20:19:00] - Decision: Use Forced Alignment + Time Stretching for REQ-ART-MEL-03
+- **Context:** Requirement REQ-ART-MEL-03 (Syllable/Note Duration Control) needs a mechanism to align synthesized vocal rhythm with MIDI input.
+- **Analysis:**
+    - Approach 1 (Direct TTS Modification): Modifying `espeak-ng` (via command-line wrapper) phoneme timing is infeasible due to lack of direct control options.
+    - Approach 2 (Time Stretching): Feasible but complex. Requires synthesizing audio, using a forced alignment tool (e.g., `aeneas`, `pyfoal`) to get segment boundaries (words/phonemes), mapping segments to MIDI note durations, and time-stretching segments using `librosa.effects.time_stretch`.
+- **Decision:** Proceed with Approach 2 (Forced Alignment + Time Stretching).
+- **Justification:** Only feasible approach identified. Leverages existing components (`espeak-ng`, `midi_parser`, `librosa`) but adds complexity and dependencies (forced aligner). Addresses the core requirement.
+- **Risks:** Audio quality artifacts from stretching, complexity of forced alignment integration, fragility of segment-to-note mapping.
+- **Alternatives Considered:** Direct TTS modification (rejected as infeasible).
+
+---
+
+
 ## Progress
 *Milestones, completed tasks, overall status.*
+
+#### [2025-04-12 21:29:00] - Task: Update Documentation for Duration Control (REQ-ART-MEL-03 - Documentation Phase)
+- **Status:** Completed.
+- **Deliverables:** Updated `README.md` (feature list, dependencies, install instructions, parameter guide, known issues). Delegated and confirmed updates for `vox_dei.py` docstrings (`code` mode) and `scripts/install_all.sh` (`devops` mode).
+---
+
 
 #### [2025-04-12 19:36:00] - Feature: Enhanced Drone Generation (REQ-ART-A02-v2 - Green Phase)
 - **Status:** Completed.
@@ -432,4 +451,17 @@
 - **Deliverables:** Created `project_specification_v2.md` summarizing current state, known issues, revised priorities (P1: Stability, P2: Core Art, P3: Melodic Refinement), and detailed requirements for next phases. Updated Memory Bank (`activeContext.md`, `globalContext.md`, `spec-pseudocode.md`).
 ---
 
+
+
+#### [2025-04-12 20:19:00] - Task: Analyze and Design Syllable/Note Duration Control (REQ-ART-MEL-03)
+- **Status:** Design Complete.
+- **Deliverables:** Analysis report comparing TTS modification vs. time-stretching. Proposed design using Forced Alignment (e.g., `aeneas`) + Time Stretching (`librosa`) integrated into `VoxDeiSynthesizer`. High-level pseudocode with TDD anchors generated.
+- **Next Steps:** Implementation (`code` mode), Testing (`tdd` mode).
+---
+
+
+#### [2025-04-12 21:26:05] - Task: Update Docstrings for Duration Control (REQ-ART-MEL-03)
+- **Status:** Completed.
+- **Deliverables:** Updated docstrings for `synthesize_text`, `_apply_duration_control`, `_perform_alignment`, and `_stretch_segment_if_needed` in `src/robotic_psalms/synthesis/vox_dei.py` to accurately reflect the duration control implementation details (MIDI input, `pyfoal` alignment, `librosa` stretching).
+---
 

@@ -25,6 +25,10 @@ mido = ">=1.2.10"
 python-rtmidi = ">=1.4.9"
 
 pretty_midi = ">=0.2.9" # For high-level MIDI structure access
+pyfoal = "^0.0.1" # Forced alignment tool (replaces aeneas)
+pypar = {git = "https://github.com/maxrmorrison/pypar.git"}
+
+
 # Configuration
 pydantic = ">=2.0.0"
 pyyaml = ">=6.0.0"

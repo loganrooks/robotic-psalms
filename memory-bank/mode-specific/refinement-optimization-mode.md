@@ -6,6 +6,17 @@
 
 ## Optimization History Log
 <!-- Append optimization details using the format below -->
+### Optimization: [2025-04-12 21:21:00] - Refactor Duration Control Logic (REQ-ART-MEL-03)
+- **Target**: `src/robotic_psalms/synthesis/vox_dei.py` (`_apply_duration_control`)
+- **Type**: Modularity/Readability/Maintainability/Constants/Type Hinting
+- **Desc**: Refactored `_apply_duration_control`: Introduced `_STRETCH_RATE_THRESHOLD` constant. Added `AlignedWord` TypedDict. Extracted alignment logic to `_perform_alignment` helper and stretching logic to `_stretch_segment_if_needed` helper. Updated main method to use helpers. Used `cast(typing.Any, ...)` in loop to handle mock object access vs. TypedDict definition.
+- **Metrics Before**: N/A (Focus on code quality)
+- **Metrics After**: N/A (Test results confirmed: 21 `test_vox_dei.py` tests passed)
+- **Related Debt**: N/A
+- **Related Issue**: REQ-ART-MEL-03 (Refactor Phase)
+
+
+
 ### Optimization: [2025-04-12 19:39:23] - Refactor Drone Generation Logic (REQ-ART-A02-v2)
 - **Target**: `src/robotic_psalms/synthesis/sacred_machinery.py` (`_generate_drones`)
 - **Type**: Clarity/Maintainability/Constants

@@ -75,3 +75,13 @@ def test_robotic_psalms_import() -> None:
     assert hasattr(config, 'PsalmConfig'), "PsalmConfig not found"
     assert hasattr(sacred_machinery, 'SacredMachineryEngine'), "SacredMachineryEngine not found"
     assert hasattr(vox_dei, 'VoxDeiSynthesizer'), "VoxDeiSynthesizer not found"
+
+
+def test_pyfoal_import() -> None:
+    """Test that the pyfoal package can be imported"""
+    try:
+        # Just try importing the main package
+        import pyfoal
+        assert pyfoal is not None, "pyfoal module could not be imported"
+    except ImportError as e:
+        pytest.fail(f"Failed to import pyfoal: {str(e)}")

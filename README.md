@@ -9,6 +9,7 @@ For detailed documentation, please see the [Full Documentation](./docs/index.md)
 - **Input System**
   - Latin lyrics processing with verse/chapter markers
   - Optional MIDI input for melodic structure
+  - Syllable/Note Duration Control (via MIDI)
   - Configurable psalm settings (tempo, mode, effects)
 
 - **Sacred Machinery Synthesis**
@@ -43,6 +44,10 @@ This project relies on specific system and Python libraries.
     *   **PortAudio:** Required for real-time audio I/O (used by `sounddevice`).
     *   Installation instructions vary by operating system (see below).
 
+3.  **FFmpeg:**
+    *   Required by `pyfoal` (and potentially other audio libraries) for audio file reading and manipulation.
+    *   Installation instructions vary by operating system (see below).
+
 *(Note: Festival is no longer used.)*
 
 
@@ -50,16 +55,17 @@ This project relies on specific system and Python libraries.
 
 Ubuntu/Debian:
 ```bash
-# Install eSpeak NG and PortAudio development libraries
+# Install eSpeak NG, PortAudio development libraries, and FFmpeg
 sudo apt-get update
-sudo apt-get install espeak-ng portaudio19-dev
+sudo apt-get install espeak-ng portaudio19-dev ffmpeg
 ```
 
 macOS:
 ```bash
-# Install eSpeak NG and PortAudio
-brew install espeak-ng portaudio
+# Install eSpeak NG, PortAudio, and FFmpeg
+brew install espeak-ng portaudio ffmpeg
 ```
+ - **`pyfoal` and `pypar`:** Used for forced alignment to enable syllable/note duration control. `pyfoal` is installed via PyPI, while `pypar` is installed directly from its Git repository as it's a dependency of `pyfoal` not available on PyPI. These are installed automatically as core dependencies.
 
 ### Python Requirements
 - Python 3.9 or higher
@@ -279,7 +285,10 @@ robotic-psalms examples/psalm.txt output.wav --config examples/config.yml --visu
   - `enable_limiter`: (Boolean, Default: true) Enables the limiter.
   - `limiter_threshold_db`: (Float, <= 0.0, Default: -1.0) The maximum level (dB) the output signal is allowed to reach. Prevents clipping.
 
-- `midi_path`: (Optional, String) Path to a MIDI file containing the desired melody. If provided, the system will parse the MIDI file (typically using the first instrument track) to extract pitch and duration information, overriding any internal pitch generation or other melodic settings for the vocals.
+- `midi_path`: (Optional, String) Path to a MIDI file containing the desired melody and rhythm.
+  - **Functionality**: If provided, this enables two features:
+    1.  **Melodic Contour (REQ-ART-MEL-01):** The pitch of the synthesized vocals will follow the pitches of the notes in the MIDI file.
+    2.  **Duration Control (REQ-ART-MEL-03):** The duration of synthesized speech segments (currently aligned at the word level) will be adjusted to match the duration of corresponding notes in the MIDI file. This uses forced alignment (`pyfoal`) and time-stretching (`librosa`).
   - **Format**: A valid file path string (e.g., `"./melodies/my_melody.mid"`).
   - **Parsing**: The `src.robotic_psalms.utils.midi_parser.parse_midi_melody` utility is used internally to convert the MIDI notes into a list of `(pitch_hz, duration_sec)` tuples.
   - **Example (Configuration)**:
@@ -292,7 +301,13 @@ robotic-psalms examples/psalm.txt output.wav --config examples/config.yml --visu
     # When calling the synthesizer directly
     synthesizer.synthesize_text(text="...", midi_path="path/to/your/melody.mid")
     ```
-  - **Notes**: Ensure the MIDI file is accessible. Parsing errors might occur for invalid MIDI files. The quality of the melodic contour application depends on the accuracy of the MIDI data and the underlying pitch shifting capabilities.
+  - **Notes**:
+    - Ensure the MIDI file is accessible. Parsing errors might occur for invalid MIDI files.
+    - Melodic contour quality depends on MIDI accuracy and pitch shifting.
+    - **Duration Control Limitations**:
+      - Alignment is currently performed at the **word level**. If the number of words in the text doesn't match the number of notes in the MIDI, duration control may behave unpredictably or be partially applied.
+      - Forced alignment accuracy (`pyfoal`) directly impacts the quality of duration matching. Inaccurate alignments lead to incorrect stretching.
+      - Time-stretching (`librosa.effects.time_stretch`) can introduce audio artifacts, especially with large stretch factors (significant differences between spoken duration and MIDI note duration).
 ### Voice Timbre
 Blend between three voice characteristics:
 - `choirboy`: Pure, angelic qualities
@@ -312,6 +327,10 @@ This will install additional tools:
 - black: Code formatting
 - isort: Import sorting
 - mypy: Type checking
+*   **Duration Control (REQ-ART-MEL-03):**
+    *   Alignment is word-level; mismatches between word count and MIDI note count can lead to unpredictable results.
+    *   Time-stretching (`librosa`) can introduce audio artifacts, especially with large stretch factors.
+    *   Accuracy depends heavily on the forced alignment quality from `pyfoal`.
 
 ## Development Status & Roadmap
 

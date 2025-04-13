@@ -99,11 +99,12 @@
 
 ### Feature: REQ-ART-MEL-03 - Syllable/Note Duration Control
 - Added: 2025-04-12 06:28:29
-- Description: Implement a mechanism to control the duration of synthesized syllables or notes, allowing rhythmic phrasing aligned with the input melody (`REQ-ART-MEL-01`/`02`). Requires careful design: investigate options like modifying TTS phoneme timing (if possible with `espeak-ng`), or post-processing synthesized audio using time-stretching algorithms (e.g., `librosa.effects.time_stretch`, phase vocoder methods) aligned with syllable boundaries (which may require separate alignment tooling).
-- Acceptance criteria: 1. Vocal output rhythmically follows durations specified in conjunction with the melody input format.
-- Dependencies: `src/robotic_psalms/synthesis/vox_dei.py`, TTS engine capabilities (`espeak-ng`), potentially time-stretching libraries (`librosa`), potentially text-to-phoneme alignment tools.
-- Status: Draft
-- TDD Anchors: Test vocal output aligns specified syllable durations (e.g., 0.25s vs 0.5s) with corresponding melody notes, verifiable via segmentation and timing analysis.
+- Updated: 2025-04-12 20:19:00
+- Description: Implement a mechanism to control the duration of synthesized syllables or notes, allowing rhythmic phrasing aligned with the input melody (`REQ-ART-MEL-01`/`02`). Uses forced alignment to identify word/phoneme boundaries in the synthesized audio and time-stretching (`librosa`) to adjust segment durations to match target durations derived from the MIDI input.
+- Acceptance criteria: 1. Vocal output rhythmically follows durations specified in conjunction with the melody input format (within tolerance). 2. Audio quality remains acceptable after time-stretching.
+- Dependencies: `src/robotic_psalms/synthesis/vox_dei.py`, `src/robotic_psalms/utils/midi_parser.py`, `espeak-ng` (TTS), `librosa` (time-stretch), Forced Alignment library (e.g., `aeneas`, `pyfoal`), `numpy`.
+- Status: Design Complete
+- TDD Anchors: See TDD Anchors section below (related to Forced Aligner, Mapping, Stretching, Integration).
 
 
 ## Non-Functional Requirements
@@ -476,9 +477,230 @@ END CLASS
 - Test that the final mix contains audible vocal elements.
 
 
+### Pseudocode: REQ-ART-MEL-03 - Syllable/Note Duration Control
+- Created: 2025-04-12 20:19:00
+- Updated: 2025-04-12 20:19:00
+```pseudocode
+# In src/robotic_psalms/synthesis/vox_dei.py
+
+# Add necessary imports for forced alignment library and time stretching
+IMPORT forced_alignment_tool # e.g., aeneas, pyfoal
+IMPORT librosa
+IMPORT numpy as np
+FROM typing IMPORT List, Tuple, Optional
+
+CLASS VoxDeiSynthesizer
+
+    # ... (existing methods: __init__, _initialize_tts_engine, _apply_robotic_effects, etc.) ...
+
+    METHOD synthesize_text(self, text: String, midi_path: Optional[String] = None) -> NumpyArray[Float32]
+        IF self.tts_engine IS None THEN
+            RAISE VoxDeiSynthesisError("No TTS engine available")
+        END IF
+
+        TRY
+            // --- 1. Initial Synthesis ---
+            self.logger.info("Synthesizing raw audio...")
+            # Configure TTS parameters if needed (pitch, rate etc. - potentially base values before melody contour)
+            # self.tts_engine.set_parameter(...)
+            raw_audio = self.tts_engine.synthesize(text)
+            IF length(raw_audio) == 0 THEN
+                RAISE VoxDeiSynthesisError("TTS returned empty audio")
+            END IF
+            self.logger.info(f"Raw audio synthesized, length: {len(raw_audio)} samples")
+
+            // --- 2. Duration Control (If MIDI provided) ---
+            duration_controlled_audio = raw_audio
+            IF midi_path IS NOT None THEN
+                self.logger.info(f"Applying duration control using MIDI: {midi_path}")
+                TRY
+                    # Parse MIDI to get target durations
+                    # Assuming midi_parser returns List[Tuple[pitch_hz, duration_sec]]
+                    target_notes = parse_midi_melody(midi_path) # Existing function
+                    target_durations = [note[1] for note in target_notes]
+
+                    IF target_durations THEN
+                        duration_controlled_audio = self._apply_duration_control(
+                            raw_audio, text, target_durations
+                        )
+                        self.logger.info(f"Duration control applied, new length: {len(duration_controlled_audio)} samples")
+                    ELSE
+                        self.logger.warning("MIDI parsed, but no notes found. Skipping duration control.")
+                    END IF
+                CATCH Error AS e
+                    self.logger.error(f"Failed to apply duration control: {e}. Using raw audio.")
+                    # Fallback to raw_audio if duration control fails
+                    duration_controlled_audio = raw_audio
+            END IF
+
+            // --- 3. Apply Robotic Effects (Formant, Timbre) ---
+            self.logger.info("Applying robotic effects...")
+            processed_audio = self._apply_robotic_effects(duration_controlled_audio)
+
+            // --- 4. Apply Melody Contour (Pitch Shifting - if MIDI provided) ---
+            // Note: Pitch shifting AFTER duration control might be better quality
+            final_audio = processed_audio
+            IF midi_path IS NOT None AND target_notes THEN
+                 self.logger.info("Applying melody contour...")
+                 # Assuming _apply_melody_contour takes the audio and the list of (pitch, duration) tuples
+                 # It might need modification if it expects original audio timing.
+                 # For now, assume it works on the duration-controlled audio.
+                 final_audio = self._apply_melody_contour(processed_audio, target_notes)
+                 self.logger.info("Melody contour applied.")
+            END IF
+
+
+            RETURN final_audio
+
+        CATCH Error AS e
+            RAISE VoxDeiSynthesisError(f"Synthesis pipeline failed: {e}")
+        END TRY
+    END METHOD
+
+    METHOD _apply_duration_control(self,
+                                   audio: NumpyArray[Float32],
+                                   text: String,
+                                   target_durations: List[float]
+                                  ) -> NumpyArray[Float32]
+
+        // --- 2a. Forced Alignment ---
+        self.logger.info("Performing forced alignment...")
+        # Configure aligner (language, mode: word/phoneme) based on self.config
+        # Example using a hypothetical aligner API
+        alignment_config = self.config.forced_aligner_config # Get from PsalmConfig
+        aligner = forced_alignment_tool.Aligner(alignment_config)
+
+        # Aligner needs audio path or data, and text path or data
+        # Save temporary audio file if needed by the aligner
+        temp_audio_path = save_temp_wav(audio, self.sample_rate)
+        try:
+            # Returns list like [(segment_text, start_sec, end_sec), ...]
+            # Using 'word' level alignment as initial strategy
+            aligned_segments = aligner.align(audio_path=temp_audio_path, text=text, mode='word')
+        finally:
+            remove_temp_file(temp_audio_path) # Clean up
+
+        IF NOT aligned_segments THEN
+            self.logger.warning("Forced alignment returned no segments. Skipping duration control.")
+            RETURN audio
+        END IF
+        self.logger.info(f"Alignment found {len(aligned_segments)} segments.")
+
+        // --- 2b. Map Segments to Target Durations ---
+        num_segments = len(aligned_segments)
+        num_targets = len(target_durations)
+        self.logger.info(f"Mapping {num_segments} aligned segments to {num_targets} target durations.")
+
+        # Simple 1:1 mapping - handle mismatch
+        mapped_targets = {} # Dict[segment_index, target_duration]
+        for i in range(min(num_segments, num_targets)):
+            mapped_targets[i] = target_durations[i]
+
+        if num_segments > num_targets:
+            self.logger.warning(f"More aligned segments ({num_segments}) than target durations ({num_targets}). Extra segments will keep original duration.")
+        elif num_targets > num_segments:
+            self.logger.warning(f"More target durations ({num_targets}) than aligned segments ({num_segments}). Extra durations ignored.")
+
+        // --- 2c. Time Stretching ---
+        stretched_pieces = []
+        sample_rate_float = float(self.sample_rate)
+
+        for i, (segment_text, start_sec, end_sec) in enumerate(aligned_segments):
+            start_sample = int(start_sec * sample_rate_float)
+            end_sample = int(end_sec * sample_rate_float)
+            audio_segment = audio[start_sample:end_sample]
+
+            original_duration = end_sec - start_sec
+            target_duration = mapped_targets.get(i, original_duration) # Use original if no target mapped
+
+            IF original_duration <= 0 or target_duration <= 0 THEN
+                self.logger.warning(f"Segment '{segment_text}' has invalid duration (orig: {original_duration}, target: {target_duration}). Skipping stretch.")
+                stretched_pieces.append(audio_segment)
+                CONTINUE
+            END IF
+
+            stretch_factor = target_duration / original_duration
+            self.logger.debug(f"Stretching segment '{segment_text}' ({original_duration:.3f}s -> {target_duration:.3f}s), factor: {stretch_factor:.3f}")
+
+            # Avoid extreme stretching if possible, maybe clamp factor?
+            # stretch_factor = max(0.5, min(2.0, stretch_factor)) # Example clamping
+
+            IF abs(stretch_factor - 1.0) < 0.01 THEN # Avoid tiny stretches
+                 stretched_segment = audio_segment
+            ELSE
+                # librosa.effects.time_stretch expects rate = 1 / stretch_factor
+                # Correction: rate IS the stretch factor. rate > 1 speeds up (shorter), rate < 1 slows down (longer).
+                # We want the output duration to be target_duration.
+                # If target > original, we need to slow down (rate < 1). rate = original / target
+                # If target < original, we need to speed up (rate > 1). rate = original / target
+                # So, rate = original_duration / target_duration = 1.0 / stretch_factor
+                stretch_rate = 1.0 / stretch_factor
+                try:
+                    stretched_segment = librosa.effects.time_stretch(y=audio_segment, rate=stretch_rate)
+                except Exception as stretch_error:
+                    self.logger.error(f"Librosa time_stretch failed for segment '{segment_text}': {stretch_error}. Using original segment.")
+                    stretched_segment = audio_segment
+
+            END IF
+            stretched_pieces.append(stretched_segment)
+
+        // --- 2d. Concatenate ---
+        IF stretched_pieces THEN
+            return np.concatenate(stretched_pieces).astype(np.float32)
+        ELSE
+            self.logger.warning("No segments were stretched. Returning original audio.")
+            return audio
+        END IF
+
+    END METHOD
+
+END CLASS
+
+# Helper functions (to be defined elsewhere, e.g., utils)
+FUNCTION save_temp_wav(audio: NumpyArray[Float32], sample_rate: int) -> String
+    # Uses tempfile and soundfile to save audio, returns path
+END FUNCTION
+
+FUNCTION remove_temp_file(path: String)
+    # Deletes the file at path
+END FUNCTION
+
+FUNCTION parse_midi_melody(midi_path: str) -> List[Tuple[float, float]]
+    # Existing function in src/robotic_psalms/utils/midi_parser.py
+END FUNCTION
+```
 
 ## TDD Anchors
 <!-- Append TDD anchors here -->
+
+#### TDD Anchors: REQ-ART-MEL-03 - Syllable/Note Duration Control
+- **Forced Aligner Integration:**
+    - `test_forced_aligner_returns_boundaries`: Mock or use a real aligner with known audio/text to verify it returns a list of `(segment, start, end)` tuples.
+    - `test_forced_aligner_handles_empty_audio`: Verify behavior with zero-length audio.
+    - `test_forced_aligner_handles_no_text`: Verify behavior with empty text.
+    - `test_forced_aligner_handles_config`: Verify aligner uses configuration parameters.
+- **Mapping Logic:**
+    - `test_map_segments_to_durations_equal_length`: Test 1:1 mapping when segment count equals target count.
+    - `test_map_segments_to_durations_more_segments`: Test mapping when segments > targets (extra segments use original duration).
+    - `test_map_segments_to_durations_more_targets`: Test mapping when targets > segments (extra targets ignored).
+- **Time Stretching Segment:**
+    - `test_stretch_segment_makes_longer`: Verify stretching with factor < 1.0 increases segment length.
+    - `test_stretch_segment_makes_shorter`: Verify stretching with factor > 1.0 decreases segment length.
+    - `test_stretch_segment_no_stretch`: Verify stretching with factor ~1.0 results in minimal length change.
+    - `test_stretch_segment_handles_zero_duration`: Verify behavior with zero original or target duration.
+    - `test_stretch_segment_handles_librosa_error`: Mock `librosa.effects.time_stretch` to raise error, verify original segment is used.
+- **`_apply_duration_control` Integration:**
+    - `test_apply_duration_control_calls_aligner`: Mock aligner, verify it's called.
+    - `test_apply_duration_control_calls_stretcher`: Mock `librosa.effects.time_stretch`, verify it's called for segments needing stretching.
+    - `test_apply_duration_control_concatenates_results`: Verify output audio length is approximately the sum of target durations (within tolerance).
+    - `test_apply_duration_control_handles_alignment_failure`: Mock aligner to return empty list, verify original audio is returned.
+- **`synthesize_text` Integration:**
+    - `test_synthesize_text_calls_duration_control_with_midi`: Mock `_apply_duration_control`, verify it's called when `midi_path` is provided.
+    - `test_synthesize_text_skips_duration_control_without_midi`: Verify `_apply_duration_control` is NOT called when `midi_path` is None.
+    - `test_synthesize_text_applies_effects_after_duration_control`: Mock `_apply_robotic_effects`, verify it receives the output of `_apply_duration_control`.
+    - `test_synthesize_text_applies_contour_after_duration_control`: Mock `_apply_melody_contour`, verify it receives the output of `_apply_robotic_effects`.
+- **End-to-End (Qualitative/Analysis):**
+    - `test_output_rhythm_matches_midi`: Synthesize audio with known text/MIDI rhythm. Analyze output audio (e.g., using onset detection or manual inspection) to confirm segment durations match MIDI note durations.
 
 ## System Constraints
 <!-- Append new constraints using the format below -->

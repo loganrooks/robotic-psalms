@@ -1,6 +1,10 @@
 # DevOps Specific Memory
 
 ## Deployment History Log
+### Deployment: [2025-04-12 20:16:17]
+- **Env**: [Local Git] / **Comps**: [Enhanced Drone Generation (REQ-ART-A02-v2)] / **Version**: [bcefa40] / **Trigger**: [Manual] / **Status**: [Success] / **Duration**: [N/A] / **Rollback**: [N/A] / **Notes**: [feat(synthesis): Enhance drone generation richness and movement (REQ-ART-A02-v2)]
+
+
 ### Deployment: [2025-04-12 18:42:57]
 - **Env**: [Local Git] / **Comps**: [Enhanced Pad Generation (REQ-ART-A01-v2)] / **Version**: [4b0350c] / **Trigger**: [Manual] / **Status**: [Success] / **Duration**: [N/A] / **Rollback**: [N/A] / **Notes**: [feat(synthesis): Enhance pad generation complexity (REQ-ART-A01-v2)]
 
@@ -37,6 +41,9 @@
 - **Env**: [Local Git] / **Comps**: [Saturation Effect (REQ-ART-E04)] / **Version**: [ab44ab4] / **Trigger**: [Manual] / **Status**: [Success] / **Duration**: [N/A] / **Rollback**: [N/A] / **Notes**: [feat(synthesis): Add configurable saturation effect (REQ-ART-E04)]
 
 ## Infrastructure Configuration Overview
+### Infra Config: [Local Script] - [System Dependencies] - [2025-04-12 21:28:26]
+- **Provider**: [N/A - Local Script] / **Region**: [N/A] / **Version**: [N/A] / **Config**: Added `ffmpeg` to `apt-get install` in `scripts/install_all.sh` for `pyfoal` requirement (REQ-ART-MEL-03). / **ManagedBy**: [Manual Script Edit] / **IaC Link**: [`scripts/install_all.sh`]
+
 <!-- Append infra config details using the format below -->
 
 ## Environment Registry

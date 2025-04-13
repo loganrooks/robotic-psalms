@@ -5,6 +5,22 @@
 ---
 
 
+### Implementation: Update Docstrings for Duration Control (REQ-ART-MEL-03) - 2025-04-12 21:26:18
+- **Approach**: Updated docstrings for `synthesize_text`, `_apply_duration_control`, `_perform_alignment`, and `_stretch_segment_if_needed` in `src/robotic_psalms/synthesis/vox_dei.py`. The updates clarify the role of `midi_path` in triggering duration control, detail the alignment (`pyfoal`) and stretching (`librosa`) process within `_apply_duration_control` and its helpers, and mention dependencies and potential issues.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/vox_dei.py` (Modified docstrings).
+- **Notes**: Used `apply_diff` with multiple blocks to update the docstrings in a single operation.
+
+---
+
+
+### Implementation: Functional Duration Control Logic (REQ-ART-MEL-03 - Green Phase) - 2025-04-12 21:15:00
+- **Approach**: Implemented `_apply_duration_control` in `src/robotic_psalms/synthesis/vox_dei.py`. The function uses `pyfoal.align` to get word boundaries from the input audio and text. It then maps these aligned words to the `target_durations_sec` list (derived from MIDI). The code iterates through the aligned words, extracts the corresponding audio segment, calculates the required time stretch rate (`original_duration / target_duration`), and applies `librosa.effects.time_stretch` if the rate is significantly different from 1.0. Silence gaps between words and before/after the aligned segments are preserved. Error handling is included for alignment failures, stretch failures, and invalid durations. Mismatches between the number of aligned words and target durations are handled by processing only up to the minimum length of the two lists.
+- **Key Files Modified/Created**: `src/robotic_psalms/synthesis/vox_dei.py` (Modified `_apply_duration_control`, `synthesize_text`, added imports), `tests/synthesis/test_vox_dei.py` (Updated mocks and assertions for duration control tests).
+- **Notes**: Encountered and resolved issues with `pyfoal` type hints (using `# type: ignore`) and corrected several test assertions related to mock return values, expected durations in mismatch scenarios, and call order verification. All unit tests in `test_vox_dei.py` now pass.
+
+---
+
+
 ### Implementation: Update Docstring for _generate_drones - 2025-04-12 19:42:34
 - **Approach**: Updated the docstring for the `_generate_drones` method in `src/robotic_psalms/synthesis/sacred_machinery.py` to accurately reflect its current implementation using multiple detuned sawtooth oscillators with LFO modulation for detuning and amplitude, as per REQ-ART-A02-v2 enhancements.
 - **Key Files Modified/Created**: `src/robotic_psalms/synthesis/sacred_machinery.py` (Modified docstring).
@@ -275,6 +291,19 @@
 - **Purpose**: Provides a high-level interface for parsing MIDI files, accessing instruments, notes, pitch, and timing information.
 - **Used by**: `src/robotic_psalms/utils/midi_parser.py`
 - **Config notes**: Added to main dependencies in `pyproject.toml`.
+
+
+### Dependency: pyfoal - 2025-04-12 20:51:00
+- **Version**: ^0.0.1
+- **Purpose**: Forced alignment tool (replaces `aeneas`). Required for REQ-ART-MEL-03.
+- **Used by**: Potentially `VoxDeiSynthesizer` or a new alignment module.
+- **Config notes**: Added to main dependencies in `pyproject.toml`.
+
+### Dependency: pypar - 2025-04-12 20:51:00
+- **Version**: Git (`https://github.com/maxrmorrison/pypar.git`)
+- **Purpose**: Phoneme alignment representation, required by `pyfoal`.
+- **Used by**: `pyfoal`.
+- **Config notes**: Added via Git URL to main dependencies in `pyproject.toml` as it was not found on PyPI.
 
 ### Implementation: Pylance Fixes for vox_dei.py - 2025-04-08 10:23:06
 - **Approach**: Resolved Pylance static analysis issues in `src/robotic_psalms/synthesis/vox_dei.py`. Removed unused imports and deprecated `EspeakWrapper` fallback. Refactored filter methods (`_choir_filter`, `_android_filter`, `_machinery_filter`) to use `signal.butter(..., output='sos')` and `signal.sosfiltfilt` for improved stability and type inference, resolving errors related to `signal.butter` return types.

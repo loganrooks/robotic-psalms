@@ -5,6 +5,10 @@
 ---
 
 
+### Plan Item: Update Duration Control Docs (REQ-ART-MEL-03) - [2025-04-12 21:29:00]
+- **Type**: Guide/API / **Audience**: User/Dev / **Outline**: 1. Update README (Features, Dependencies, Install, Param Guide, Known Issues) 2. Delegate vox_dei.py docstring updates 3. Check config.py 4. Delegate install_all.sh update / **Status**: Done / **Owner**: docs-writer -> code, devops / **Source**: User Task REQ-ART-MEL-03 / **Location**: README.md, src/robotic_psalms/synthesis/vox_dei.py, scripts/install_all.sh
+
+
 ### Plan Item: Update Enhanced Pad Generation Docs (REQ-ART-A01-v2) - [2025-04-12 18:35:30]
 - **Type**: Guide/API / **Audience**: Dev/User / **Outline**: 1. Delegate sacred_machinery.py docstring updates (_generate_pads, _apply_time_varying_lowpass) 2. Update README.md (Features, Roadmap) 3. Review architecture.md (No changes needed) / **Status**: Done / **Owner**: docs-writer -> code / **Source**: User Task REQ-ART-A01-v2 / **Location**: src/robotic_psalms/synthesis/sacred_machinery.py, README.md, src/robotic_psalms/architecture.md
 

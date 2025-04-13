@@ -26,6 +26,28 @@
 
 
 
+### Test Plan: Syllable/Note Duration Control (REQ-ART-MEL-03) - [2025-04-12 20:57:48]
+#### Unit Tests (`tests/synthesis/test_vox_dei.py` - `_apply_duration_control`):
+- Test Case: Calls `pyfoal.align` correctly / Expected: Mock called with audio, text, sr / Status: Written (Passing - raises AttributeError)
+- Test Case: Handles `pyfoal.align` failure / Expected: Returns original audio / Status: Written (Passing - raises AttributeError)
+- Test Case: Calls `librosa.effects.time_stretch` with correct rates / Expected: Mock called multiple times with calculated rates / Status: Written (Passing - raises AttributeError)
+- Test Case: Skips `librosa.effects.time_stretch` if rate ~1.0 / Expected: Mock called fewer times / Status: Written (Passing - raises AttributeError)
+- Test Case: Concatenates stretched segments / Expected: Output length matches sum of target durations / Status: Written (Passing - raises AttributeError)
+- Test Case: Handles `librosa.effects.time_stretch` failure / Expected: Returns original audio / Status: Written (Passing - raises AttributeError)
+- Test Case: Handles duration mismatch (fewer targets) / Expected: Returns original audio / Status: Written (Passing - raises AttributeError)
+- Test Case: Handles duration mismatch (more targets) / Expected: Returns original audio / Status: Written (Passing - raises AttributeError)
+#### Integration Tests (`tests/synthesis/test_vox_dei.py` - `synthesize_text`):
+- Test Case: `_apply_duration_control` called when MIDI provides durations / Expected: Mock `_apply_duration_control` called / Status: Written (Failing - Red)
+- Test Case: `_apply_duration_control` NOT called when MIDI parse is empty / Expected: Mock `_apply_duration_control` not called / Status: Written (Failing - Red)
+- Test Case: Call order is duration -> formant -> contour / Expected: Mocks called in specific order / Status: Written (Failing - Red)
+#### Edge Cases Covered:
+- Alignment success/failure
+- Time stretch success/failure
+- Stretch rate near 1.0
+- Mismatch between aligned segments and target durations
+- MIDI parsing yields durations vs. empty list
+
+
 ### Test Plan: Rich Drone Generation (REQ-ART-A02-v2) - [2025-04-12 18:46:22]
 #### Unit Tests (`tests/test_sacred_machinery.py`):
 - Test Case: Harmonic Richness (FFT Peak Count) / Expected: Peak Count > 10 / Status: Written (Failing)
@@ -353,6 +375,18 @@
 - **Green**: Implementation approach: Pending enhancement of `_generate_drones` in `src/robotic_psalms/synthesis/sacred_machinery.py` to meet the new complexity thresholds.
 - **Refactor**: Improvements made: N/A (Red phase only)
 - **Outcomes**: Established quantitative, failing tests to drive the implementation of richer and more evolving drone generation as required by REQ-ART-A02-v2.
+
+
+### TDD Cycle: Syllable/Note Duration Control (REQ-ART-MEL-03 - Red Phase) - [2025-04-12 20:57:48]
+- **Start**: [2025-04-12 20:53:01]
+- **Red**: Tests created:
+    - Unit tests for `_apply_duration_control` in `tests/synthesis/test_vox_dei.py` using mocks for `pyfoal` and `librosa`. These pass because `pytest.raises(AttributeError)` correctly catches the missing method.
+    - Integration tests for `synthesize_text` in `tests/synthesis/test_vox_dei.py` using mocks for `_apply_duration_control`, `_apply_formant_shift`, `_apply_melody_contour`. These fail with `AttributeError` on `_apply_duration_control`, confirming the integration point is missing.
+- **Green**: Implementation approach: Next step is to:
+    1. Add a minimal placeholder `_apply_duration_control` method to `VoxDeiSynthesizer`.
+    2. Add logic to `synthesize_text` to call `_apply_duration_control` conditionally (after TTS, before formant/contour) when valid durations are available from MIDI parsing.
+- **Refactor**: Improvements made: N/A (Red phase only)
+- **Outcomes**: Established test harness for duration control feature (REQ-ART-MEL-03). Confirmed expected failures for Red phase.
 
 ### TDD Cycle: MIDI Melody Input (REQ-ART-MEL-02 - Red Phase) - [2025-04-12 04:50:53]
 - **Start**: [2025-04-12 04:49:45]
@@ -763,6 +797,16 @@
 - **Report Link**: N/A
 - **Failures**: `test_process_psalm_applies_master_dynamics_when_configured`: `AttributeError: ... does not have the attribute 'apply_master_dynamics'`, `test_process_psalm_does_not_apply_master_dynamics_when_none`: `AttributeError: ... does not have the attribute 'apply_master_dynamics'`
 
+
+
+### Test Run: Duration Control Tests (REQ-ART-MEL-03 - Red Phase) - [2025-04-12 20:57:48]
+- **Trigger**: Manual / **Env**: Local / **Suite**: `tests/synthesis/test_vox_dei.py`
+- **Result**: FAIL / **Summary**: 18 Passed / 3 Failed / 0 Skipped
+- **Report Link**: N/A
+- **Failures**:
+    - `test_synthesize_text_calls_duration_control_when_midi_valid`: `AttributeError: <class 'robotic_psalms.synthesis.vox_dei.VoxDeiSynthesizer'> does not have the attribute '_apply_duration_control'`
+    - `test_synthesize_text_skips_duration_control_when_midi_empty`: `AttributeError: <class 'robotic_psalms.synthesis.vox_dei.VoxDeiSynthesizer'> does not have the attribute '_apply_duration_control'`
+    - `test_synthesize_text_duration_control_call_order`: `AttributeError: <class 'robotic_psalms.synthesis.vox_dei.VoxDeiSynthesizer'> does not have the attribute '_apply_duration_control'`
 
 ### Test Run: [2025-04-12 18:46:22]
 - **Trigger**: Manual / **Env**: Local / **Suite**: `tests/test_sacred_machinery.py -k generate_drones`

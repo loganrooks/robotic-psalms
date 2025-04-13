@@ -1,13 +1,16 @@
 import logging
 import random
 import librosa
+import typing
 from typing import Any, Optional, cast # Removed Protocol, runtime_checkable
 from pathlib import Path
 import soundfile as sf
 import numpy as np
 import numpy.typing as npt
 from scipy import signal
-from ..config import PsalmConfig, HauntingParameters, LiturgicalMode
+# Type hint imports to avoid circular dependency at runtime
+if typing.TYPE_CHECKING:
+    from ..config import PsalmConfig, HauntingParameters, LiturgicalMode
 from .vox_dei import VoxDeiSynthesizer, VoxDeiSynthesisError
 from .effects import (
     apply_high_quality_reverb, ReverbParameters,
@@ -57,7 +60,8 @@ class SacredMachineryEngine:
     _DRONE_LFO_DETUNE_DEPTH_FACTOR = 0.5 # Range [0, 1]
 
 
-    def __init__(self, config: PsalmConfig):
+    def __init__(self, config: "PsalmConfig"): # Use string literal for type hint
+        from ..config import PsalmConfig # Import locally to break circular dependency
         """Initialize the sacred machinery engine
 
         Args:

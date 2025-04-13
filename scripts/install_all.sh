@@ -15,7 +15,8 @@ sudo apt-get install -y \
     espeak-ng \
     libespeak-ng-dev \
     espeak \
-    libespeak-dev 
+    libespeak-dev \
+    ffmpeg
 
 # Create and activate virtual environment
 echo "Setting up Python environment..."

@@ -1,63 +1,82 @@
 # Robotic Psalms Configuration
+# See src/robotic_psalms/config.py for full schema documentation
 
 # Liturgical mode selection
 mode: "dorian"
 tempo_scale: 0.7  # Slower, more ethereal tempo
 
 # Effect densities
-glitch_density: 0.0001
-celestial_harmonicity: 0.4  # More sawtooth character
+celestial_harmonicity: 0.4  # More sawtooth character (0.0=saw, 1.0=sine)
 
 # Voice articulation
 robotic_articulation:
   phoneme_spacing: 1.5  # Slightly stretched phonemes
   consonant_harshness: 0.1  # Softer consonants
 
-# Ethereal qualities
+# Ethereal qualities (reverb and optional spectral freeze)
 haunting_intensity:
-  reverb_decay: 8.0    # Further reduced reverb
-  spectral_freeze: 0.95 # Further reduced freezing
+  reverb:
+    decay_time: 8.0      # Long reverb tail in seconds
+    pre_delay: 0.03      # Slight pre-delay
+    diffusion: 0.8       # Smooth reverb
+    damping: 0.7         # Some high-frequency damping
+  # spectral_freeze: null  # Disabled by default
+  # To enable spectral freeze, use:
+  # spectral_freeze:
+  #   freeze_point: 0.5    # Capture spectrum at 50% of audio
+  #   blend_amount: 0.3    # 30% frozen spectrum blend
+  #   fade_duration: 2.0   # 2 second fade
 
-# Voice character blend
+# Voice character blend (should sum to ~1.0)
 vocal_timbre:
   choirboy: 0.95  # Emphasis on choir-like qualities
-  android: 0.1
-  machinery: 0.1  # Subtle mechanical undertones
+  android: 0.025
+  machinery: 0.025  # Subtle mechanical undertones
 
+# Voice range settings
 voice_range:
-  base_pitch: "C4"  # Base pitch (can be: C2-G2 for bass, G2-D3 for baritone, C3-G3 for tenor, E3-C4 for counter-tenor)
+  base_pitch: "C4"  # Base pitch (C2-G2 bass, G2-D3 baritone, C3-G3 tenor, E3-C4 counter-tenor)
   formant_shift: 1.1  # > 1.0 raises formants, < 1.0 lowers them
 
-# MIDI control mapping
-midi_mapping:
-  glitch_density: 1
-  harmonicity: 2
-  articulation: 3
-  haunting: 4
-
+# Audio mix levels
 mix_levels:
   vocals: 1.0    # Full volume for vocals
   pads: 0.3      # Slightly reduced pads
   percussion: 0.3 # Lower percussion
   drones: 0.3    # Moderate drones
 
+# Optional effects (uncomment to enable)
+# glitch_effect:
+#   glitch_type: "stutter"
+#   intensity: 0.1
+#   chunk_size_ms: 50.0
 
-# # Bass
-# voice_range:
+# chorus_params:
+#   rate_hz: 0.5
+#   depth: 0.3
+#   mix: 0.3
+#   centre_delay_ms: 7.0
+#   feedback: 0.0
+
+# saturation_effect:
+#   drive_db: 6.0
+#   output_gain_db: -3.0
+
+# -----------------------------------------------------------
+# Voice Range Presets (for reference)
+# -----------------------------------------------------------
+# Bass:
 #   base_pitch: "C2"
 #   formant_shift: 0.8
-
-# # Baritone
-# voice_range:
+#
+# Baritone:
 #   base_pitch: "G2"
 #   formant_shift: 0.9
-
-# # Tenor
-# voice_range:
+#
+# Tenor:
 #   base_pitch: "C3"
 #   formant_shift: 1.0
-
-# # Counter-tenor
-# voice_range:
+#
+# Counter-tenor:
 #   base_pitch: "E3"
 #   formant_shift: 1.2

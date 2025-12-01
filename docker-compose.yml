@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  robotic-psalms:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    image: robotic-psalms:latest
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      # Mount input files (psalms, MIDI, configs)
+      - ./examples:/app/examples:ro
+      - ./input:/app/input:ro
+      # Mount output directory for generated audio
+      - ./output:/app/output
+    working_dir: /app
+    entrypoint: ["robotic-psalms"]
+
+  # Service for running tests
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    image: robotic-psalms:latest
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ./tests:/app/tests:ro
+      - ./src:/app/src:ro
+    working_dir: /app
+    entrypoint: ["pytest"]
+    command: ["-v", "--tb=short"]
+
+  # Interactive shell for debugging
+  shell:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    image: robotic-psalms:latest
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ./examples:/app/examples:ro
+      - ./output:/app/output
+      - ./src:/app/src
+    working_dir: /app
+    entrypoint: ["/bin/bash"]
+    stdin_open: true
+    tty: true

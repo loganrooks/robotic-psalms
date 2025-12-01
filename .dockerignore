@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv
+ENV
+.eggs
+*.egg-info
+*.egg
+dist
+build
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Testing/Coverage
+.coverage
+.pytest_cache
+htmlcov
+.tox
+.nox
+
+# Project specific
+output/
+*.wav
+*.mp3
+*.ogg
+memory-bank/
+docs/research-reports/
+
+# Cline/Roo files
+.clinerules*
+.roo
+.roomodes
+.context-ignore
+
+# Claude
+.claude
+
+# Misc
+*.log
+*.tmp
+.DS_Store
+Thumbs.db

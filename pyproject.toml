@@ -6,6 +6,9 @@ authors = ["Robotic Psalms Project"]
 license = "MIT" # Assuming MIT, can be changed
 readme = "README.md"
 
+[tool.poetry.scripts]
+robotic-psalms = "robotic_psalms.cli:main"
+
 [tool.poetry.dependencies]
 python = "^3.9" # Match target version from black config
 

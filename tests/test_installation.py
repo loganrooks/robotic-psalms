@@ -70,11 +70,31 @@ def test_robotic_psalms_import() -> None:
     import robotic_psalms
     from robotic_psalms import config, cli
     from robotic_psalms.synthesis import vox_dei, sacred_machinery
-    
+
     assert hasattr(cli, 'main'), "CLI main function not found"
     assert hasattr(config, 'PsalmConfig'), "PsalmConfig not found"
     assert hasattr(sacred_machinery, 'SacredMachineryEngine'), "SacredMachineryEngine not found"
     assert hasattr(vox_dei, 'VoxDeiSynthesizer'), "VoxDeiSynthesizer not found"
+
+
+def test_config_importable_standalone() -> None:
+    """Regression test: `import robotic_psalms.config` must succeed on its own.
+
+    `config.py` imports `.synthesis.effects`, which runs `synthesis/__init__.py`.
+    If that file eagerly imports `sacred_machinery`/`vox_dei` (both of which
+    import back from `..config`), whichever module is imported first decides
+    whether the cycle resolves: importing `synthesis` before `config` happens
+    to work, but `python -m robotic_psalms` imports `cli`, which imports
+    `config` before `synthesis.sacred_machinery`, and hits the partially
+    initialized module. Run in a subprocess so this test's own import order
+    (or another test module's) can't accidentally paper over the bug.
+    """
+    result = subprocess.run(
+        [sys.executable, "-c", "import robotic_psalms.config"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_pyfoal_import() -> None:

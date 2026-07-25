@@ -4,6 +4,7 @@ from typing import Optional
 import subprocess
 import io
 import os
+import shutil # For locating the espeak-ng executable on PATH
 import tempfile
 import shlex # For safe command construction
 
@@ -33,13 +34,20 @@ class EspeakNGWrapper(TTSEngine):
         self.rate = rate
         self.pitch = pitch
         self.volume = volume # Corresponds to espeak-ng -a flag (amplitude)
-        self.espeak_cmd = "/usr/bin/espeak-ng" # Path confirmed earlier
+        # Resolve the executable: explicit override, then PATH (covers both
+        # Windows, where the hardcoded Linux path never existed, and
+        # Homebrew installs on macOS), then the historical path as a last
+        # resort so existing deployments that rely on it keep working.
+        self.espeak_cmd = (
+            os.environ.get("ESPEAK_NG_BINARY")
+            or shutil.which("espeak-ng")
+            or "/usr/bin/espeak-ng"
+        )
         self.input_file_path: Optional[str] = None # Initialize temporary file path tracker
 
         # Verify command exists
         if not os.path.exists(self.espeak_cmd):
              self.logger.error(f"espeak-ng command not found at {self.espeak_cmd}")
-             # Optionally try finding in PATH if absolute path fails? For now, rely on the known path.
              raise FileNotFoundError(f"espeak-ng command not found at {self.espeak_cmd}")
         self.logger.info(f"EspeakNGWrapper initialized using command: {self.espeak_cmd}")
 

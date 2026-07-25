@@ -41,6 +41,35 @@ def test_espeak_ng_wrapper_init_file_not_found():
         with pytest.raises(FileNotFoundError, match="espeak-ng command not found"):
             EspeakNGWrapper()
 
+def test_espeak_ng_wrapper_init_uses_env_var_override(monkeypatch):
+    """ESPEAK_NG_BINARY, when set, takes priority over PATH and the legacy path."""
+    monkeypatch.setenv('ESPEAK_NG_BINARY', '/custom/espeak-ng')
+    with patch('robotic_psalms.synthesis.tts.engines.espeak.shutil.which', return_value='/should/not/be/used') as mock_which, \
+         patch('os.path.exists', return_value=True):
+        tts_engine = EspeakNGWrapper()
+
+    assert tts_engine.espeak_cmd == '/custom/espeak-ng'
+    mock_which.assert_not_called()
+
+def test_espeak_ng_wrapper_init_falls_back_to_path(monkeypatch):
+    """Without ESPEAK_NG_BINARY set, the wrapper resolves espeak-ng via PATH."""
+    monkeypatch.delenv('ESPEAK_NG_BINARY', raising=False)
+    with patch('robotic_psalms.synthesis.tts.engines.espeak.shutil.which', return_value='/usr/local/bin/espeak-ng') as mock_which, \
+         patch('os.path.exists', return_value=True):
+        tts_engine = EspeakNGWrapper()
+
+    assert tts_engine.espeak_cmd == '/usr/local/bin/espeak-ng'
+    mock_which.assert_called_once_with('espeak-ng')
+
+def test_espeak_ng_wrapper_init_falls_back_to_legacy_path(monkeypatch):
+    """With neither an override nor a PATH match, the historical hardcoded path is used."""
+    monkeypatch.delenv('ESPEAK_NG_BINARY', raising=False)
+    with patch('robotic_psalms.synthesis.tts.engines.espeak.shutil.which', return_value=None), \
+         patch('os.path.exists', return_value=True):
+        tts_engine = EspeakNGWrapper()
+
+    assert tts_engine.espeak_cmd == '/usr/bin/espeak-ng'
+
 # --- Synthesis Error Handling Tests ---
 
 @patch('robotic_psalms.synthesis.tts.engines.espeak.subprocess.run')
